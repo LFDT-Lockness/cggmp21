@@ -3,9 +3,20 @@ name = "cggmp21"
 version = "0.0.0"
 edition = "2021"
 
-description = "Placeholder for a future library"
 license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+generic-ec = { path = "../../generic-ec/generic-ec" }
+generic-ec-zkp = { path = "../../generic-ec/generic-ec-zkp" }
+round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
+
+digest = "0.10"
+sha2 = "0.10"
+rand_core = "0.6"
+
+futures = "0.3"
+
+thiserror = "1"
+phantom-type = "0.4"
