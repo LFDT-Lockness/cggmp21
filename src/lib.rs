@@ -3,3 +3,4 @@
 pub mod key_share;
 pub mod keygen;
 pub mod security_level;
+pub mod trusted_dealer;
