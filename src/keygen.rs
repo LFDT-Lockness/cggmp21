@@ -17,13 +17,13 @@ use round_based::{
 };
 use thiserror::Error;
 
-const SECURITY_BITS: usize = 256;
-const SECURITY_BYTES: usize = SECURITY_BITS / 8;
+use crate::key_share::IncompleteKeyShare;
+use crate::security_level::SecurityLevel;
 
 #[derive(ProtocolMessage, Clone)]
-pub enum Msg<E: Curve, D: Digest> {
+pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round1(MsgRound1<D>),
-    Round2(MsgRound2<E, D>),
+    Round2(MsgRound2<E, L, D>),
     Round3(MsgRound3<E>),
 }
 
@@ -32,8 +32,8 @@ pub struct MsgRound1<D: Digest> {
     commitment: HashCommit<D>,
 }
 #[derive(Clone)]
-pub struct MsgRound2<E: Curve, D: Digest> {
-    rid: [u8; SECURITY_BYTES],
+pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
+    rid: L::Rid,
     X: Point<E>,
     sch_commit: schnorr_pok::Commit<E>,
     decommit: hash_commitment::DecommitNonce<D>,
@@ -43,24 +43,22 @@ pub struct MsgRound3<E: Curve> {
     sch_proof: schnorr_pok::Proof<E>,
 }
 
-pub struct Keygen<R, E: Curve, D> {
-    rng: R,
+pub struct KeygenBuilder<E: Curve, L, D> {
     i: u16,
     n: u16,
     tag: Tag<E>,
-    _ph: PhantomType<(E, D)>,
+    _ph: PhantomType<(E, L, D)>,
 }
 
-impl<R, E, D> Keygen<R, E, D>
+impl<E, L, D> KeygenBuilder<E, L, D>
 where
-    R: RngCore + CryptoRng,
     E: Curve,
     Scalar<E>: FromHash,
+    L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
-    pub fn new(rng: R, i: u16, n: u16) -> Self {
+    pub fn new(i: u16, n: u16) -> Self {
         Self {
-            rng,
             i,
             n,
             tag: Tag::default(),
@@ -72,20 +70,22 @@ where
         Self { tag, ..self }
     }
 
-    pub async fn start<M>(
-        mut self,
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
         party: M,
-    ) -> Result<IncompleteKeyShare<E>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<IncompleteKeyShare<E, L>, KeygenError<M::ReceiveError, M::SendError>>
     where
-        M: Mpc<ProtocolMessage = Msg<E, D>>,
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = Msg<E, L, D>>,
     {
         let MpcParty { delivery, .. } = party.into_party();
         let (incomings, mut outgoings) = delivery.split();
 
         // Setup networking
-        let mut rounds = Rounds::<Msg<E, D>>::builder();
+        let mut rounds = Rounds::<Msg<E, L, D>>::builder();
         let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(self.i, self.n));
-        let round2 = rounds.add_round(RoundInput::<MsgRound2<E, D>>::broadcast(self.i, self.n));
+        let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L, D>>::broadcast(self.i, self.n));
         let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(self.i, self.n));
         let mut rounds = rounds.listen(incomings);
 
@@ -96,14 +96,13 @@ where
             .as_hash_to_curve_tag()
             .ok_or(BugReason::InvalidHashToCurveTag)?;
 
-        let x_i = SecretScalar::<E>::random(&mut self.rng);
+        let x_i = SecretScalar::<E>::random(rng);
         let X_i = Point::generator() * &x_i;
 
-        let mut rid = [0u8; SECURITY_BYTES];
-        self.rng.fill_bytes(&mut rid);
+        let mut rid = L::Rid::default();
+        rng.fill_bytes(rid.as_mut());
 
-        let (sch_secret, sch_commit) =
-            schnorr_pok::prover_commits_ephemeral_secret::<E, _>(&mut self.rng);
+        let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
         let (hash_commit, decommit) = HashCommit::<D>::builder()
             .mix_bytes(sid)
@@ -112,7 +111,7 @@ where
             .mix_bytes(&rid)
             .mix(X_i)
             .mix(&sch_commit.0)
-            .commit(&mut self.rng);
+            .commit(rng);
 
         let my_commitment = MsgRound1 {
             commitment: hash_commit,
@@ -171,13 +170,14 @@ where
         }
 
         // Calculate challenge
-        let mut rid = [0u8; 32];
+        let mut rid = L::Rid::default();
         for decommitment in &decommitments {
-            rid.iter_mut()
-                .zip(&decommitment.rid)
+            rid.as_mut()
+                .iter_mut()
+                .zip(decommitment.rid.as_ref())
                 .for_each(|(x, r_i)| *x ^= r_i);
         }
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&self.i.to_be_bytes(), &rid])
+        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&self.i.to_be_bytes(), rid.as_ref()])
             .map_err(BugReason::HashToScalarError)?;
         let challenge = schnorr_pok::Challenge { nonce: challenge };
 
@@ -199,7 +199,7 @@ where
 
         let mut blame = vec![];
         for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
-            let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), &rid])
+            let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
                 .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
                 .map_err(BugReason::HashToScalarError)?;
             if sch_proof
@@ -215,10 +215,11 @@ where
         }
 
         Ok(IncompleteKeyShare {
+            i: self.i,
             shared_public_key: decommitments.iter().map(|d| d.X).sum(),
             rid,
             public_shares: decommitments.iter().map(|d| d.X).collect(),
-            x_i,
+            x: x_i,
         })
     }
 }
@@ -255,13 +256,6 @@ impl<E: Curve, D: Digest<OutputSize = digest::typenum::U32>> From<D> for Tag<E> 
             _curve: PhantomType::new(),
         }
     }
-}
-
-pub struct IncompleteKeyShare<E: Curve> {
-    pub shared_public_key: Point<E>,
-    pub rid: [u8; SECURITY_BYTES],
-    pub public_shares: Vec<Point<E>>,
-    pub x_i: SecretScalar<E>,
 }
 
 /// Keygen failed error

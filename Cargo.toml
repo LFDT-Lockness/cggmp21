@@ -11,6 +11,7 @@ license = "MIT OR Apache-2.0"
 generic-ec = { path = "../../generic-ec/generic-ec" }
 generic-ec-zkp = { path = "../../generic-ec/generic-ec-zkp" }
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
+libpaillier = "0.4"
 
 digest = "0.10"
 sha2 = "0.10"
@@ -20,3 +21,9 @@ futures = "0.3"
 
 thiserror = "1"
 phantom-type = "0.4"
+
+[dev-dependencies]
+generic-tests = "0.1"
+generic-ec = { path = "../../generic-ec/generic-ec", features = ["all-curves"] }
+
+rand_dev = "0.1"
