@@ -1,36 +1,71 @@
+//! Key share
+
 use generic_ec::{Curve, Point, SecretScalar};
 use libpaillier::unknown_order::BigNumber;
 use thiserror::Error;
 
 use crate::security_level::SecurityLevel;
 
+/// Core key share
+///
+/// Core key share is obtained as an output of [key generation protocol](cggmp21::keygen).
+/// It can not be used in signing protocol as it lacks of required auxiliary information.
+/// You need to carry out [key refresh protocol](crate::refresh) to obtain "completed"
+/// [KeyShare].
 #[derive(Clone)]
 pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
+    /// Index of local party in key generation protocol
     pub i: u16,
+    /// Public key corresponding to shared secret key
     pub shared_public_key: Point<E>,
+    /// Randomness derived at key generation
     pub rid: L::Rid,
+    /// Public shares of all parties sharing the key
+    ///
+    /// `public_shares[i]` corresponds to public share of $\ith$ party
     pub public_shares: Vec<Point<E>>,
+    /// Secret share $x_i$
     pub x: SecretScalar<E>,
 }
 
+/// Key share
+///
+/// Key share is obtained as output of [key refresh protocol](cggmp21::refresh).
+/// It contains a [core share](IncompleteKeyShare) and auxiliary data required to
+/// carry out signing.
 #[derive(Clone)]
 pub struct KeyShare<E: Curve, L: SecurityLevel> {
+    /// Core key share
     pub core: IncompleteKeyShare<E, L>,
+    /// Secret prime $p$
     pub p: BigNumber,
+    /// Secret prime $q$
     pub q: BigNumber,
+    /// El-Gamal private key
     pub y: SecretScalar<E>,
+    /// Public auxiliary data of all parties sharing the key
+    ///
+    /// `parties[i]` corresponds to public auxiliary data of $\ith$ party
     pub parties: Vec<PartyAux<E>>,
 }
 
+/// Party public auxiliary data
 #[derive(Debug, Clone)]
 pub struct PartyAux<E: Curve> {
+    /// $N_i = p_i \cdot q_i$
     pub N: BigNumber,
+    /// Ring-Perdesten parameter $s_i$
     pub s: BigNumber,
+    /// Ring-Perdesten parameter $t_i$
     pub t: BigNumber,
+    /// El-Gamal public key
     pub Y: Point<E>,
 }
 
 impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
+    /// Validates a share
+    ///
+    /// Performs consistency checks against a key share, returns `Ok(())` if share looks OK.
     pub fn validate(&self) -> Result<(), InvalidKeyShare> {
         let n: u16 = self
             .public_shares
@@ -54,6 +89,9 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
 }
 
 impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
+    /// Validates a share
+    ///
+    /// Performs consistency checks against a key share, returns `Ok(())` if share looks OK.
     pub fn validate(&self) -> Result<(), InvalidKeyShare> {
         self.core.validate()?;
 
@@ -83,6 +121,7 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     }
 }
 
+/// Error indicating that key share is not valid
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct InvalidKeyShare(#[from] ErrorReason);
