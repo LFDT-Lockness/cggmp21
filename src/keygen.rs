@@ -17,8 +17,10 @@ use round_based::{
 };
 use thiserror::Error;
 
+use crate::execution_id::ProtocolChoice;
 use crate::key_share::IncompleteKeyShare;
 use crate::security_level::SecurityLevel;
+use crate::ExecutionId;
 
 #[derive(ProtocolMessage, Clone)]
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
@@ -43,10 +45,10 @@ pub struct MsgRound3<E: Curve> {
     sch_proof: schnorr_pok::Proof<E>,
 }
 
-pub struct KeygenBuilder<E: Curve, L, D> {
+pub struct KeygenBuilder<E: Curve, L: SecurityLevel, D: Digest> {
     i: u16,
     n: u16,
-    tag: Tag<E>,
+    execution_id: ExecutionId<E, L, D>,
     _ph: PhantomType<(E, L, D)>,
 }
 
@@ -61,13 +63,16 @@ where
         Self {
             i,
             n,
-            tag: Tag::default(),
+            execution_id: ExecutionId::default(),
             _ph: PhantomType::new(),
         }
     }
 
-    pub fn set_tag(self, tag: Tag<E>) -> Self {
-        Self { tag, ..self }
+    pub fn set_execution_id(self, id: ExecutionId<E, L, D>) -> Self {
+        Self {
+            execution_id: id,
+            ..self
+        }
     }
 
     pub async fn start<R, M>(
@@ -90,11 +95,10 @@ where
         let mut rounds = rounds.listen(incomings);
 
         // Round 1
-        let sid = self.tag.as_bytes();
-        let tag_htc = self
-            .tag
-            .as_hash_to_curve_tag()
-            .ok_or(BugReason::InvalidHashToCurveTag)?;
+        let execution_id = self.execution_id.evaluate(ProtocolChoice::Keygen);
+        let sid = execution_id.as_slice();
+        let tag_htc =
+            hash_to_curve::Tag::new(&execution_id).ok_or(BugReason::InvalidHashToCurveTag)?;
 
         let x_i = SecretScalar::<E>::random(rng);
         let X_i = Point::generator() * &x_i;
@@ -221,40 +225,6 @@ where
             public_shares: decommitments.iter().map(|d| d.X).collect(),
             x: x_i,
         })
-    }
-}
-
-pub struct Tag<E: Curve> {
-    tag: [u8; 32],
-    _curve: PhantomType<E>,
-}
-
-impl<E: Curve> Tag<E> {
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.tag
-    }
-
-    fn as_hash_to_curve_tag(&self) -> Option<hash_to_curve::Tag> {
-        hash_to_curve::Tag::new(self.as_bytes())
-    }
-}
-
-impl<E: Curve> Default for Tag<E> {
-    fn default() -> Self {
-        sha2::Sha256::new().into()
-    }
-}
-
-impl<E: Curve, D: Digest<OutputSize = digest::typenum::U32>> From<D> for Tag<E> {
-    fn from(hash: D) -> Self {
-        Tag {
-            tag: hash
-                .chain_update("-CGGMP21-DFNS-KEYGEN-")
-                .chain_update(E::CURVE_NAME.as_bytes())
-                .finalize()
-                .into(),
-            _curve: PhantomType::new(),
-        }
     }
 }
 
