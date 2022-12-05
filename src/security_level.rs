@@ -51,13 +51,13 @@ impl<const N: usize> Default for Rid<N> {
 ///
 /// ## Example
 ///
-/// Let's define security level corresponding to $\kappa=4096$ and $\varepsilon=16$:
+/// Let's define security level corresponding to $\kappa=1024$ and $\varepsilon=16$:
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
 ///
 /// #[derive(Clone)]
 /// pub struct MyLevel;
-/// define_security_level!(MyLevel{ security_bits = 4096, epsilon_bits = 16 });
+/// define_security_level!(MyLevel{ security_bits = 1024, epsilon_bits = 16 });
 /// ```
 #[macro_export]
 macro_rules! define_security_level {
@@ -73,6 +73,13 @@ macro_rules! define_security_level {
 
 #[doc(inline)]
 pub use define_security_level;
+
+/// Reasonably secure security level
+///
+/// This security level is suitable for most use-cases.
+#[derive(Clone)]
+pub struct ReasonablySecure;
+define_security_level!(ReasonablySecure{ security_bits = 256, epsilon_bits = 8 });
 
 /// Security level suitable for testing
 ///
