@@ -117,10 +117,10 @@ mod test {
         let mut rng = DevRng::new();
         let shares = mock_keygen::<E, DevelopmentOnly, _>(&mut rng, 5);
         let reconstructed_private_key: Scalar<E> = shares.iter().map(|s_i| &s_i.core.x).sum();
-        shares
-            .iter()
-            .enumerate()
-            .for_each(|(i, s_i)| s_i.validate().expect(&format!("{i} share not valid")));
+        shares.iter().enumerate().for_each(|(i, s_i)| {
+            s_i.validate()
+                .unwrap_or_else(|e| panic!("{i} share not valid: {e}"))
+        });
         assert_eq!(
             shares[0].core.shared_public_key,
             Point::generator() * reconstructed_private_key
