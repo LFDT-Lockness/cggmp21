@@ -41,7 +41,13 @@ impl<E: Curve, L: SecurityLevel, D: Digest> ExecutionId<E, L, D> {
     ///
     /// Execution ID is derived from provided hashed identifier `H(m)` as follows:
     /// ```text
-    /// ID = H(H(m) || "-CGGMP21-DFNS-{PROTOCOL_NAME}-{CURVE_NAME}-K-{SECURITY_LEVEL}-E-{EPSILON}")
+    /// ID = H(H(m) || "-CGGMP21-DFNS-{PROTOCOL_NAME}-{CURVE_NAME}"
+    ///     || "-K-{SECURITY_LEVEL}"
+    ///     || "-E-{EPSILON}"
+    ///     || "-L-{ELL}"
+    ///     || "-L'-{ELL_PRIME}"
+    ///     || "-M-{M}"
+    ///     || "-Q-{Q}")
     /// ```
     ///
     /// If `H(m)` wasn't provided, it's replaced with zeroes byte string of the same size as `H(m)`
@@ -49,6 +55,11 @@ impl<E: Curve, L: SecurityLevel, D: Digest> ExecutionId<E, L, D> {
     pub(crate) fn evaluate(self, protocol: ProtocolChoice) -> digest::Output<D> {
         let security_bits = u16::try_from(L::SECURITY_BITS).unwrap_or(u16::MAX);
         let epsilon = u16::try_from(L::EPSILON).unwrap_or(u16::MAX);
+        let ell = u16::try_from(L::ELL).unwrap_or(u16::MAX);
+        let ell_prime = u16::try_from(L::ELL_PRIME).unwrap_or(u16::MAX);
+        let m = u16::try_from(L::M).unwrap_or(u16::MAX);
+        let q = L::q().to_bytes();
+
         D::new()
             .chain_update(&self.id)
             .chain_update(b"-CGGMP21-DFNS-")
@@ -59,6 +70,14 @@ impl<E: Curve, L: SecurityLevel, D: Digest> ExecutionId<E, L, D> {
             .chain_update(security_bits.to_be_bytes())
             .chain_update(b"-E-")
             .chain_update(epsilon.to_be_bytes())
+            .chain_update(b"-L-")
+            .chain_update(ell.to_be_bytes())
+            .chain_update(b"-L'-")
+            .chain_update(ell_prime.to_be_bytes())
+            .chain_update(b"-M-")
+            .chain_update(m.to_be_bytes())
+            .chain_update(b"-Q-")
+            .chain_update(q)
             .finalize()
     }
 }
