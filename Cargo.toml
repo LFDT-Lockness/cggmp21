@@ -8,8 +8,8 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = { path = "../../generic-ec/generic-ec" }
-generic-ec-zkp = { path = "../../generic-ec/generic-ec-zkp" }
+generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d" }
+generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "d" }
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
 libpaillier = "0.4"
 
@@ -24,6 +24,6 @@ phantom-type = "0.4"
 
 [dev-dependencies]
 generic-tests = "0.1"
-generic-ec = { path = "../../generic-ec/generic-ec", features = ["all-curves"] }
+generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["all-curves"] }
 
 rand_dev = "0.1"
