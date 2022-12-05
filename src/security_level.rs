@@ -72,13 +72,22 @@ pub mod _internal {
 ///
 /// ## Example
 ///
-/// Let's define security level corresponding to $\kappa=1024$ and $\varepsilon=16$:
+/// Let's define security level corresponding to $\kappa=1024$, $\varepsilon=128$, $\ell = \ell' = 1024$,
+/// $m = 50$, and $q = 2^{48}-1$:
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
+/// use libpaillier::unknown_order::BigNumber;
 ///
 /// #[derive(Clone)]
 /// pub struct MyLevel;
-/// define_security_level!(MyLevel{ security_bits = 1024, epsilon_bits = 16 });
+/// define_security_level!(MyLevel{
+///     security_bits = 1024,
+///     epsilon = 128,
+///     ell = 1024,
+///     ell_prime = 1024,
+///     m = 50,
+///     q = (BigNumber::one() << 48) - 1,
+/// });
 /// ```
 #[macro_export]
 macro_rules! define_security_level {
