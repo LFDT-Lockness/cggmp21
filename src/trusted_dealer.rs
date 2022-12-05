@@ -34,8 +34,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
             rid: rid.clone(),
             public_shares: public_shares.clone(),
             x: x_i,
-        })
-        .collect::<Vec<_>>();
+        });
 
     let primes_setups = iter::repeat_with(|| generate_primes_setup::<L, _>(rng))
         .take(n.into())
@@ -61,7 +60,6 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
         .collect::<Vec<_>>();
 
     core_shares
-        .into_iter()
         .zip(primes_setups)
         .zip(y)
         .map(|((core_share, primes_setup), y_i)| KeyShare {

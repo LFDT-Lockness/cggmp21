@@ -149,7 +149,7 @@ where
             .mix(self.i)
             .mix_bytes(&rid)
             .mix(X_i)
-            .mix(&sch_commit.0)
+            .mix(sch_commit.0)
             .commit(rng);
 
         let my_commitment = MsgRound1 {
@@ -198,7 +198,7 @@ where
                     .mix(j)
                     .mix_bytes(&decommitment.rid)
                     .mix(decommitment.X)
-                    .mix(&decommitment.sch_commit.0)
+                    .mix(decommitment.sch_commit.0)
                     .verify(&commitment.commitment, &decommitment.decommit)
                     .is_err()
             })
