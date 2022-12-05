@@ -48,7 +48,7 @@ impl<E: Curve, L: SecurityLevel, D: Digest> ExecutionId<E, L, D> {
     /// output.
     pub(crate) fn evaluate(self, protocol: ProtocolChoice) -> digest::Output<D> {
         let security_bits = u16::try_from(L::SECURITY_BITS).unwrap_or(u16::MAX);
-        let epsilon = u16::try_from(L::EPSILON_BITS).unwrap_or(u16::MAX);
+        let epsilon = u16::try_from(L::EPSILON).unwrap_or(u16::MAX);
         D::new()
             .chain_update(&self.id)
             .chain_update(b"-CGGMP21-DFNS-")
