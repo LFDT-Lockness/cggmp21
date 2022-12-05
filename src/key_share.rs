@@ -8,7 +8,7 @@ use crate::security_level::SecurityLevel;
 
 /// Core key share
 ///
-/// Core key share is obtained as an output of [key generation protocol](cggmp21::keygen).
+/// Core key share is obtained as an output of [key generation protocol](crate::keygen()).
 /// It can not be used in signing protocol as it lacks of required auxiliary information.
 /// You need to carry out [key refresh protocol](crate::refresh) to obtain "completed"
 /// [KeyShare].
@@ -30,7 +30,7 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
 
 /// Key share
 ///
-/// Key share is obtained as output of [key refresh protocol](cggmp21::refresh).
+/// Key share is obtained as output of [key refresh protocol](crate::refresh).
 /// It contains a [core share](IncompleteKeyShare) and auxiliary data required to
 /// carry out signing.
 #[derive(Clone)]

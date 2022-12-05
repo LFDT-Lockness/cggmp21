@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::hash_to_curve::{self, FromHash};
@@ -8,7 +6,6 @@ use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
 };
-use phantom_type::PhantomType;
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds::simple_store::{RoundInput, RoundInputError},
@@ -22,6 +19,7 @@ use crate::key_share::IncompleteKeyShare;
 use crate::security_level::SecurityLevel;
 use crate::ExecutionId;
 
+/// Message of key generation protocol
 #[derive(ProtocolMessage, Clone)]
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round1(MsgRound1<D>),
@@ -29,10 +27,12 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round3(MsgRound3<E>),
 }
 
+/// Message from round 1
 #[derive(Clone)]
 pub struct MsgRound1<D: Digest> {
     commitment: HashCommit<D>,
 }
+/// Message from round 2
 #[derive(Clone)]
 pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
     rid: L::Rid,
@@ -40,16 +40,17 @@ pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
     sch_commit: schnorr_pok::Commit<E>,
     decommit: hash_commitment::DecommitNonce<D>,
 }
+/// Message from round 3
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
     sch_proof: schnorr_pok::Proof<E>,
 }
 
+/// Key generation entry point
 pub struct KeygenBuilder<E: Curve, L: SecurityLevel, D: Digest> {
     i: u16,
     n: u16,
     execution_id: ExecutionId<E, L, D>,
-    _ph: PhantomType<(E, L, D)>,
 }
 
 impl<E, L, D> KeygenBuilder<E, L, D>
@@ -59,15 +60,48 @@ where
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
+    /// Constructs [KeygenBuilder]
+    ///
+    /// Takes local party index $i$ and number of parties $n$
     pub fn new(i: u16, n: u16) -> Self {
         Self {
             i,
             n,
             execution_id: ExecutionId::default(),
-            _ph: PhantomType::new(),
         }
     }
 
+    /// Specifies another hash function to use
+    ///
+    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
+    /// you specify execution ID **after** calling this function.
+    pub fn set_digest<D2>(self) -> KeygenBuilder<E, L, D2>
+    where
+        D2: Digest + Clone + 'static,
+    {
+        KeygenBuilder {
+            i: self.i,
+            n: self.n,
+            execution_id: Default::default(),
+        }
+    }
+
+    /// Specifies [security level](crate::security_level)
+    ///
+    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
+    /// you specify execution ID **after** calling this function.
+    pub fn set_security_level<L2>(self) -> KeygenBuilder<E, L2, D>
+    where
+        L2: SecurityLevel,
+    {
+        KeygenBuilder {
+            i: self.i,
+            n: self.n,
+            execution_id: Default::default(),
+        }
+    }
+
+    /// Specifies [execution ID](ExecutionId)
     pub fn set_execution_id(self, id: ExecutionId<E, L, D>) -> Self {
         Self {
             execution_id: id,
@@ -75,6 +109,7 @@ where
         }
     }
 
+    /// Starts key generation
     pub async fn start<R, M>(
         self,
         rng: &mut R,
@@ -228,24 +263,28 @@ where
     }
 }
 
-/// Keygen failed error
+/// Keygen failed
 #[derive(Debug, Error)]
 pub enum KeygenError<IErr, OErr> {
+    /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
     Aborted(
         #[source]
         #[from]
         ProtocolAborted,
     ),
+    /// Receiving message error
     #[error("receive message")]
     ReceiveMessage(#[source] CompleteRoundError<RoundInputError, IErr>),
+    /// Sending message error
     #[error("send message")]
     SendError(#[source] OErr),
+    /// Bug occurred
     #[error("bug occurred")]
     Bug(Bug),
 }
 
-/// Protocol was aborted by malicious party
+/// Error indicating that protocol was aborted by malicious party
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
@@ -256,9 +295,9 @@ pub enum ProtocolAborted {
     InvalidSchnorrProof { parties: Vec<u16> },
 }
 
-/// Bug occurred
+/// Error indicating that internal bug is detected
 ///
-/// Please, report this issue
+/// Please, report this issue if you encounter it
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct Bug(BugReason);
