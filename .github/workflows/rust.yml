@@ -1,0 +1,33 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "m" ]
+  pull_request:
+    branches: [ "m" ]
+  # schedule:
+  #   - cron: '0 5 * * *'
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.GENERIC_EC_KEY }}
+    - name: Build
+      run: cargo build
+    - name: Run tests
+      run: cargo test
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+    - name: Run clippy
+      run: cargo clippy --all --lib -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
+    - name: Run clippy tests
+      run: cargo clippy --tests -- -D clippy::all
