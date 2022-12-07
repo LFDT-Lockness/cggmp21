@@ -209,13 +209,10 @@ where
         }
 
         // Calculate challenge
-        let mut rid = L::Rid::default();
-        for decommitment in &decommitments {
-            rid.as_mut()
-                .iter_mut()
-                .zip(decommitment.rid.as_ref())
-                .for_each(|(x, r_i)| *x ^= r_i);
-        }
+        let rid = decommitments
+            .iter()
+            .map(|d| &d.rid)
+            .fold(L::Rid::default(), xor_array);
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&self.i.to_be_bytes(), rid.as_ref()])
             .map_err(BugReason::HashToScalarError)?;
         let challenge = schnorr_pok::Challenge { nonce: challenge };
@@ -229,7 +226,7 @@ where
             .await
             .map_err(KeygenError::SendError)?;
 
-        // Round 3
+        // Round 4
         let sch_proofs = rounds
             .complete(round3)
             .await
@@ -261,6 +258,18 @@ where
             x: x_i,
         })
     }
+}
+
+fn xor_array<A, B>(mut a: A, b: B) -> A
+where
+    A: AsMut<[u8]>,
+    B: AsRef<[u8]>,
+{
+    a.as_mut()
+        .iter_mut()
+        .zip(b.as_ref())
+        .for_each(|(a_i, b_i)| *a_i ^= *b_i);
+    a
 }
 
 /// Keygen failed
