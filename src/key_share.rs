@@ -1,7 +1,10 @@
 //! Key share
 
+use generic_ec::serde::{Compact, CurveName};
 use generic_ec::{Curve, Point, SecretScalar};
 use libpaillier::unknown_order::BigNumber;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use thiserror::Error;
 
 use crate::security_level::SecurityLevel;
@@ -12,19 +15,26 @@ use crate::security_level::SecurityLevel;
 /// It can not be used in signing protocol as it lacks of required auxiliary information.
 /// You need to carry out [key refresh protocol](crate::refresh) to obtain "completed"
 /// [KeyShare].
-#[derive(Clone)]
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
+    pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
     /// Public key corresponding to shared secret key
+    #[serde_as(as = "Compact")]
     pub shared_public_key: Point<E>,
     /// Randomness derived at key generation
+    #[serde(with = "hex")]
     pub rid: L::Rid,
     /// Public shares of all parties sharing the key
     ///
     /// `public_shares[i]` corresponds to public share of $\ith$ party
+    #[serde_as(as = "Vec<Compact>")]
     pub public_shares: Vec<Point<E>>,
     /// Secret share $x_i$
+    #[serde_as(as = "Compact")]
     pub x: SecretScalar<E>,
 }
 
@@ -33,7 +43,9 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
 /// Key share is obtained as output of [key refresh protocol](crate::refresh).
 /// It contains a [core share](IncompleteKeyShare) and auxiliary data required to
 /// carry out signing.
-#[derive(Clone)]
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct KeyShare<E: Curve, L: SecurityLevel> {
     /// Core key share
     pub core: IncompleteKeyShare<E, L>,
@@ -42,6 +54,7 @@ pub struct KeyShare<E: Curve, L: SecurityLevel> {
     /// Secret prime $q$
     pub q: BigNumber,
     /// El-Gamal private key
+    #[serde_as(as = "Compact")]
     pub y: SecretScalar<E>,
     /// Public auxiliary data of all parties sharing the key
     ///
@@ -50,7 +63,9 @@ pub struct KeyShare<E: Curve, L: SecurityLevel> {
 }
 
 /// Party public auxiliary data
-#[derive(Debug, Clone)]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct PartyAux<E: Curve> {
     /// $N_i = p_i \cdot q_i$
     pub N: BigNumber,
@@ -59,6 +74,7 @@ pub struct PartyAux<E: Curve> {
     /// Ring-Perdesten parameter $t_i$
     pub t: BigNumber,
     /// El-Gamal public key
+    #[serde_as(as = "Compact")]
     pub Y: Point<E>,
 }
 

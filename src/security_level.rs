@@ -32,7 +32,14 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
     const M: usize;
 
     /// Static array of $\kappa/8$ bytes
-    type Rid: AsRef<[u8]> + AsMut<[u8]> + Default + Clone + Send + Sync + 'static;
+    type Rid: AsRef<[u8]>
+        + AsMut<[u8]>
+        + Default
+        + Clone
+        + hex::FromHex<Error = hex::FromHexError>
+        + Send
+        + Sync
+        + 'static;
 
     /// $\q$ parameter
     ///
@@ -44,6 +51,7 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
 /// Internal module that's powers `define_security_level` macro
 #[doc(hidden)]
 pub mod _internal {
+    use hex::FromHex;
     pub use libpaillier::unknown_order::BigNumber;
 
     #[derive(Clone)]
@@ -64,6 +72,16 @@ pub mod _internal {
     impl<const N: usize> Default for Rid<N> {
         fn default() -> Self {
             Self([0u8; N])
+        }
+    }
+
+    impl<const N: usize> FromHex for Rid<N>
+    where
+        [u8; N]: FromHex,
+    {
+        type Error = <[u8; N] as FromHex>::Error;
+        fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+            FromHex::from_hex(hex).map(Self)
         }
     }
 }

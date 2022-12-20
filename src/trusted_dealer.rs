@@ -29,6 +29,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     let core_shares = (0u16..)
         .zip(secret_shares)
         .map(|(i, x_i)| IncompleteKeyShare::<E, L> {
+            curve: Default::default(),
             i,
             shared_public_key,
             rid: rid.clone(),

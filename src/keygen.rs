@@ -251,6 +251,7 @@ where
         }
 
         Ok(IncompleteKeyShare {
+            curve: Default::default(),
             i: self.i,
             shared_public_key: decommitments.iter().map(|d| d.X).sum(),
             rid,
