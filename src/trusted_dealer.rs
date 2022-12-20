@@ -104,28 +104,63 @@ fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
 }
 
 #[cfg(test)]
+pub mod cached_shares {
+    use std::path::Path;
+
+    use generic_ec::Curve;
+
+    use crate::{key_share::KeyShare, security_level::SecurityLevel};
+
+    pub fn load<E: Curve, L: SecurityLevel>(n: u16) -> Vec<KeyShare<E, L>> {
+        let file_path = Path::new("test-data")
+            .join("key_shares")
+            .join(format!("n{n}-{curve}.json", curve = E::CURVE_NAME));
+        let key_shares = std::fs::read(file_path).expect("read key shares");
+        serde_json::from_slice(&key_shares).expect("deserialize key shares")
+    }
+
+    pub fn save<E: Curve, L: SecurityLevel>(key_shares: &[KeyShare<E, L>]) {
+        let n = key_shares.len();
+        let file_path = Path::new("test-data")
+            .join("key_shares")
+            .join(format!("n{n}-{curve}.json", curve = E::CURVE_NAME));
+        let mut file = std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(file_path)
+            .expect("open file");
+        serde_json::to_writer_pretty(&mut file, key_shares).expect("serialize and write key shares")
+    }
+}
+
+#[cfg(test)]
 #[generic_tests::define]
 mod test {
     use generic_ec::{Curve, Point, Scalar};
     use rand_dev::DevRng;
 
-    use crate::security_level::DevelopmentOnly;
+    use crate::security_level::ReasonablySecure;
 
     use super::mock_keygen;
 
     #[test]
+    #[ignore = "key shares generation is time consuming"]
     fn trusted_dealer_generates_correct_shares<E: Curve>() {
         let mut rng = DevRng::new();
-        let shares = mock_keygen::<E, DevelopmentOnly, _>(&mut rng, 5);
-        let reconstructed_private_key: Scalar<E> = shares.iter().map(|s_i| &s_i.core.x).sum();
-        shares.iter().enumerate().for_each(|(i, s_i)| {
-            s_i.validate()
-                .unwrap_or_else(|e| panic!("{i} share not valid: {e}"))
-        });
-        assert_eq!(
-            shares[0].core.shared_public_key,
-            Point::generator() * reconstructed_private_key
-        );
+
+        for n in [2, 3, 5, 7, 10] {
+            let shares = mock_keygen::<E, ReasonablySecure, _>(&mut rng, n);
+            let reconstructed_private_key: Scalar<E> = shares.iter().map(|s_i| &s_i.core.x).sum();
+            shares.iter().enumerate().for_each(|(i, s_i)| {
+                s_i.validate()
+                    .unwrap_or_else(|e| panic!("{i} share not valid: {e}"))
+            });
+            assert_eq!(
+                shares[0].core.shared_public_key,
+                Point::generator() * reconstructed_private_key
+            );
+            super::cached_shares::save(&shares);
+        }
     }
 
     #[instantiate_tests(<generic_ec::curves::Secp256r1>)]
