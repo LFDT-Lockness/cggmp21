@@ -8,6 +8,7 @@ use generic_ec::{Curve, Point, SecretScalar};
 use crate::{
     key_share::{IncompleteKeyShare, KeyShare, PartyAux},
     security_level::SecurityLevel,
+    utils::sample_bigint_in_mult_group,
 };
 
 pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
@@ -84,17 +85,12 @@ struct PartyPrimesSetup {
 fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
 ) -> PartyPrimesSetup {
-    let p = BigNumber::safe_prime(L::SECURITY_BITS * 4);
-    let q = BigNumber::safe_prime(L::SECURITY_BITS * 4);
+    let p = BigNumber::safe_prime_from_rng(L::SECURITY_BITS * 4, rng);
+    let q = BigNumber::safe_prime_from_rng(L::SECURITY_BITS * 4, rng);
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
 
-    let r = loop {
-        let r = BigNumber::from_rng(&N, rng);
-        if r.gcd(&N) == BigNumber::one() {
-            break r;
-        }
-    };
+    let r = sample_bigint_in_mult_group(rng, &N);
     let λ = BigNumber::from_rng(&φ_N, rng);
 
     let t = BigNumber::modmul(&r, &r, &N);
