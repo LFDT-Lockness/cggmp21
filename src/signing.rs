@@ -1,5 +1,3 @@
-use std::cmp;
-
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{
@@ -59,8 +57,8 @@ impl Message {
         message_hash.try_into().map(Self).or(Err(InvalidMessage))
     }
 
-    fn to_scalar<E: Curve>(&self) -> Scalar<E> {
-        Scalar::from_be_bytes_mod_order(&self.0)
+    fn to_scalar<E: Curve>(self) -> Scalar<E> {
+        Scalar::from_be_bytes_mod_order(self.0)
     }
 }
 
@@ -82,6 +80,7 @@ pub struct Signature<E: Curve> {
 }
 
 #[derive(Clone, ProtocolMessage)]
+#[allow(clippy::large_enum_variant)]
 pub enum Msg<E: Curve> {
     Round1a(MsgRound1a),
     Round1b(MsgRound1b),
@@ -415,18 +414,17 @@ where
                 .ok_or(Bug::PaillierEnc(BugSource::Fˆ_ji))?
                 .0;
 
-            let data = π_aff::Data {
-                key0: enc_j.clone(),
-                key1: enc_i.clone(),
-                c: ciphertext.K.clone(),
-                d: D_ji.clone(),
-                y: F_ji.clone(),
-                x: Γ_i.clone(),
-            };
             let ψ_ji = π_aff::non_interactive::prove(
                 parties_shared_state.clone(),
                 &aux_j.into(),
-                &data,
+                &π_aff::Data {
+                    key0: enc_j.clone(),
+                    key1: enc_i.clone(),
+                    c: ciphertext.K.clone(),
+                    d: D_ji.clone(),
+                    y: F_ji.clone(),
+                    x: Γ_i,
+                },
                 &π_aff::PrivateData {
                     x: scalar_to_bignumber(&y_i),
                     y: β_ij.clone(),
@@ -436,23 +434,19 @@ where
                 &security_params.π_aff,
                 &mut *rng,
             )
-            .map(|ψ| fix_π_aff_proof(&data, ψ))
             .map_err(|e| Bug::ΠAffG(BugSource::ψ_ji, e))?;
 
-            let data = π_aff::Data {
-                key0: enc_j.clone(),
-                key1: enc_i.clone(),
-                // c: Dˆ_ji.clone(),
-                // d: ciphertext.K.clone(),
-                c: ciphertext.K.clone(),
-                d: Dˆ_ji.clone(),
-                y: Fˆ_ji.clone(),
-                x: Point::generator() * &self.key_share.core.x,
-            };
             let ψˆ_ji = π_aff::non_interactive::prove(
                 parties_shared_state.clone(),
                 &aux_j.into(),
-                &data,
+                &π_aff::Data {
+                    key0: enc_j.clone(),
+                    key1: enc_i.clone(),
+                    c: ciphertext.K.clone(),
+                    d: Dˆ_ji.clone(),
+                    y: Fˆ_ji.clone(),
+                    x: Point::generator() * &self.key_share.core.x,
+                },
                 &π_aff::PrivateData {
                     x: scalar_to_bignumber(&self.key_share.core.x),
                     y: βˆ_ij.clone(),
@@ -462,7 +456,6 @@ where
                 &security_params.π_aff,
                 &mut *rng,
             )
-            .map(|ψˆ| fix_π_aff_proof(&data, ψˆ))
             .map_err(|e| Bug::ΠAffG(BugSource::ψˆ_ji, e))?;
 
             let ψ_prime_ji = π_log::non_interactive::prove(
@@ -527,7 +520,7 @@ where
                     c: K_i.clone(),
                     d: msg.D.clone(),
                     y: msg.F.clone(),
-                    x: msg.Γ.clone(),
+                    x: msg.Γ,
                 };
                 π_aff::non_interactive::verify(
                     parties_shared_state.clone(),
@@ -765,15 +758,6 @@ where
     }
 }
 
-fn fix_π_aff_proof<E: Curve>(
-    data: &π_aff::Data<E>,
-    (com, mut proof): (π_aff::Commitment<E>, π_aff::Proof),
-) -> (π_aff::Commitment<E>, π_aff::Proof) {
-    // proof.z1 = proof.z1.nmod(&data.key0.n());
-    // proof.z2 = proof.z2.nmod(&data.key0.n()).nmod(&data.key1.n());
-    (com, proof)
-}
-
 impl<E> Presignature<E>
 where
     E: Curve,
@@ -862,6 +846,7 @@ pub enum SigningError<IErr, OErr> {
 /// Error indicating that protocol was aborted by malicious party
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
+#[allow(clippy::type_complexity)]
 #[derive(Debug, Error)]
 pub enum SigningAborted {
     #[error("π_enc::verify(K) failed")]
@@ -930,12 +915,10 @@ enum BugSource {
     G_i,
     K_i,
     y_i_times_K_j,
-    minus_β_ij_enc,
     β_ij_enc,
     D_ji,
     F_ji,
     x_i_times_K_j,
-    minus_βˆ_ij_enc,
     βˆ_ij_enc,
     Dˆ_ji,
     Fˆ_ji,
@@ -1012,7 +995,6 @@ mod protocol_tests {
     #[test_case::case(3; "n3")]
     #[test_case::case(5; "n5")]
     #[test_case::case(7; "n7")]
-    #[test_case::case(10; "n10")]
     #[tokio::test]
     async fn signing_works<E: Curve>(n: u16)
     where
