@@ -143,23 +143,9 @@ pub use define_security_level;
 pub struct ReasonablySecure;
 define_security_level!(ReasonablySecure{
     security_bits = 256,
-    epsilon = 128,
-    ell = 128,
-    ell_prime = 128,
+    epsilon = 512,
+    ell = 1024,
+    ell_prime = 1024,
     m = 30,
-    q = (BigNumber::one() << 256) - 1,
-});
-
-/// Security level suitable for testing
-///
-/// __Warning:__ this security level is insecure
-#[derive(Clone)]
-pub struct DevelopmentOnly;
-define_security_level!(DevelopmentOnly{
-    security_bits = 32,
-    epsilon = 8,
-    ell = 16,
-    ell_prime = 16,
-    m = 10,
     q = (BigNumber::one() << 256) - 1,
 });

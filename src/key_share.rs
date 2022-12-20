@@ -3,6 +3,7 @@
 use generic_ec::serde::{Compact, CurveName};
 use generic_ec::{Curve, Point, SecretScalar};
 use libpaillier::unknown_order::BigNumber;
+use paillier_zk::paillier_encryption_in_range as π_enc;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
@@ -134,6 +135,16 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
         }
 
         Ok(())
+    }
+}
+
+impl<E: Curve> From<&PartyAux<E>> for π_enc::Aux {
+    fn from(aux: &PartyAux<E>) -> Self {
+        Self {
+            s: aux.s.clone(),
+            t: aux.t.clone(),
+            rsa_modulo: aux.N.clone(),
+        }
     }
 }
 
