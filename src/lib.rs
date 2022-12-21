@@ -1,8 +1,11 @@
 #![allow(non_snake_case, mixed_script_confusables, uncommon_codepoints)]
 
+pub use {
+    paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order, round_based,
+};
+
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
 use key_share::{KeyShare, Valid};
-pub use round_based;
 use security_level::SecurityLevel;
 use sha2::Sha256;
 use signing::SigningBuilder;

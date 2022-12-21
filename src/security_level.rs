@@ -94,7 +94,7 @@ pub mod _internal {
 /// $m = 50$, and $q = 2^{48}-1$:
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
-/// use libpaillier::unknown_order::BigNumber;
+/// use cggmp21::unknown_order::BigNumber;
 ///
 /// #[derive(Clone)]
 /// pub struct MyLevel;
