@@ -1,5 +1,5 @@
 use generic_ec::{Curve, Scalar};
-use libpaillier::{unknown_order::BigNumber, EncryptionKey};
+use paillier_zk::libpaillier::{unknown_order::BigNumber, EncryptionKey};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as π_log,
     paillier_affine_operation_in_range as π_aff, paillier_encryption_in_range as π_enc,
@@ -45,7 +45,6 @@ impl SecurityParams {
     pub fn new<L: SecurityLevel>() -> Self {
         Self {
             π_aff: π_aff::SecurityParams {
-                q: L::q(),
                 l_x: L::ELL,
                 l_y: L::ELL_PRIME,
                 epsilon: L::EPSILON,

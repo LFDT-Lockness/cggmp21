@@ -5,7 +5,7 @@ use std::{fmt, ops};
 
 use generic_ec::serde::{Compact, CurveName};
 use generic_ec::{Curve, Point, SecretScalar};
-use libpaillier::unknown_order::BigNumber;
+use paillier_zk::libpaillier::unknown_order::BigNumber;
 use paillier_zk::paillier_encryption_in_range as π_enc;
 use serde::{de, Deserialize, Serialize};
 use serde_with::serde_as;

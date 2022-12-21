@@ -1,6 +1,6 @@
 use std::iter;
 
-use libpaillier::unknown_order::BigNumber;
+use paillier_zk::libpaillier::unknown_order::BigNumber;
 use rand_core::{CryptoRng, RngCore};
 
 use generic_ec::{Curve, Point, SecretScalar};

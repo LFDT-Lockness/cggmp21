@@ -9,7 +9,7 @@
 //! You can define your own security level using macro [define_security_level]. Be sure that you properly
 //! analyzed the paper and you understand implications.
 
-use libpaillier::unknown_order::BigNumber;
+use paillier_zk::libpaillier::unknown_order::BigNumber;
 
 /// Security level of the protocol
 ///
@@ -52,7 +52,7 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
 #[doc(hidden)]
 pub mod _internal {
     use hex::FromHex;
-    pub use libpaillier::unknown_order::BigNumber;
+    pub use paillier_zk::libpaillier::unknown_order::BigNumber;
 
     #[derive(Clone)]
     pub struct Rid<const N: usize>([u8; N]);

@@ -3,9 +3,9 @@ use futures::SinkExt;
 use generic_ec::{
     coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar, SecretScalar,
 };
-use libpaillier::{unknown_order::BigNumber, Ciphertext, DecryptionKey};
+use paillier_zk::libpaillier::{unknown_order::BigNumber, Ciphertext, DecryptionKey};
 use paillier_zk::{
-    group_element_vs_paillier_encryption_in_range as π_log,
+    group_element_vs_paillier_encryption_in_range as π_log, libpaillier,
     paillier_affine_operation_in_range as π_aff, paillier_encryption_in_range as π_enc,
 };
 use rand_core::{CryptoRng, RngCore};
@@ -931,7 +931,7 @@ impl<IErr, OErr> From<Bug> for SigningError<IErr, OErr> {
 
 #[cfg(test)]
 mod misc_tests {
-    use libpaillier::{unknown_order::BigNumber, DecryptionKey, EncryptionKey};
+    use paillier_zk::libpaillier::{unknown_order::BigNumber, DecryptionKey, EncryptionKey};
     use rand_dev::DevRng;
 
     // Since libpaillier crate encrypts vectors (not bigints), we need to be sure that

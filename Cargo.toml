@@ -12,8 +12,7 @@ generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", fe
 generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "d" }
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
 
-libpaillier = { version = "0.5", default-features = false }
-paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "temp-2022-12-20", default-features = false }
+paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "m", default-features = false }
 
 digest = "0.10"
 sha2 = "0.10"
@@ -44,4 +43,4 @@ test-case = "2.2"
 serde_json = "1"
 
 [features]
-default = ["libpaillier/gmp"]
+default = ["paillier-zk/gmp"]

@@ -114,7 +114,6 @@ dependencies = [
  "generic-ec-zkp",
  "generic-tests",
  "hex",
- "libpaillier",
  "paillier-zk",
  "phantom-type 0.4.2",
  "rand",
@@ -768,7 +767,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=temp-2022-12-20#e8a716b0a304290f629e0e7c5f6d4ae7aab3e12d"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#2737abc5abf49dd00da0027859092faaac265785"
 dependencies = [
  "generic-ec",
  "generic-ec-core",
