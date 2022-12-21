@@ -209,6 +209,16 @@ where
         if n_size < q_minus_one {
             return Err(InvalidSecurityLevel::SecurityLevelTooSmall);
         }
+
+        let q = q_minus_one + BigNumber::one();
+        if L::EPSILON < q.bit_length() {
+            return Err(InvalidSecurityLevel::EpsilonTooSmall);
+        }
+        let another_q = L::q();
+        if L::EPSILON < another_q.bit_length() {
+            return Err(InvalidSecurityLevel::EpsilonTooSmall);
+        }
+
         Ok(())
     }
 
@@ -865,6 +875,8 @@ pub enum SigningAborted {
 pub enum InvalidSecurityLevel {
     #[error("specified security level is too small to carry out protocol")]
     SecurityLevelTooSmall,
+    #[error("epsilon is too small to carry out protocol")]
+    EpsilonTooSmall,
 }
 
 /// Error indicating that internal bug was detected
