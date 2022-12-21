@@ -367,15 +367,10 @@ where
             βˆ_sum += Scalar::from_be_bytes_mod_order(βˆ_ij.to_bytes());
 
             // D_ji = (y_i * K_j) + enc_j(β_ij, s_ij)
-            // // D_ji = (y_i * K_j) + enc_j(-β_ij, s_ij)
             let D_ji = {
                 let y_i_times_K_j = enc_j
                     .mul(&ciphertext.K, &scalar_to_bignumber(&y_i))
                     .ok_or(Bug::PaillierOp(BugSource::y_i_times_K_j))?;
-                // let minus_β_ij_enc = enc_j
-                //     .encrypt((N_j - &β_ij).to_bytes(), Some(s_ij.clone()))
-                //     .ok_or(Bug::PaillierEnc(BugSource::minus_β_ij_enc))?
-                //     .0;
                 let β_ij_enc = enc_j
                     .encrypt(β_ij.to_bytes(), Some(s_ij.clone()))
                     .ok_or(Bug::PaillierEnc(BugSource::β_ij_enc))?
@@ -391,15 +386,10 @@ where
                 .0;
 
             // Dˆ_ji = (x_i * K_j) + enc_j(βˆ_ij, sˆ_ij)
-            // // Dˆ_ji = (x_i * K_j) + enc_j(-βˆ_ij, sˆ_ij)
             let Dˆ_ji = {
                 let x_i_times_K_j = enc_j
                     .mul(&ciphertext.K, &scalar_to_bignumber(&self.key_share.core.x))
                     .ok_or(Bug::PaillierOp(BugSource::x_i_times_K_j))?;
-                // let minus_βˆ_ij_enc = enc_j
-                //     .encrypt((N_j - &βˆ_ij).to_bytes(), Some(sˆ_ij.clone()))
-                //     .ok_or(Bug::PaillierEnc(BugSource::minus_βˆ_ij_enc))?
-                //     .0;
                 let βˆ_ij_enc = enc_j
                     .encrypt(βˆ_ij.to_bytes(), Some(sˆ_ij.clone()))
                     .ok_or(Bug::PaillierEnc(BugSource::βˆ_ij_enc))?
@@ -584,7 +574,7 @@ where
         }
 
         if !faulty_parties.is_empty() {
-            return Err(SigningAborted::InvalidΦ(faulty_parties).into());
+            return Err(SigningAborted::InvalidΨ(faulty_parties).into());
         }
 
         // Step 2
@@ -689,7 +679,7 @@ where
         }
 
         if !faulty_parties.is_empty() {
-            return Err(SigningAborted::InvalidΦPrimePrime(faulty_parties).into());
+            return Err(SigningAborted::InvalidΨPrimePrime(faulty_parties).into());
         }
 
         // Step 2
@@ -852,7 +842,7 @@ pub enum SigningAborted {
     #[error("π_enc::verify(K) failed")]
     EncProofOfK(Vec<(PartyIndex, MsgId, MsgId)>),
     #[error("ψ, ψˆ, or ψ' proofs are invalid")]
-    InvalidΦ(
+    InvalidΨ(
         Vec<(
             PartyIndex,
             MsgId,
@@ -865,7 +855,7 @@ pub enum SigningAborted {
         )>,
     ),
     #[error("ψ'' proof is invalid")]
-    InvalidΦPrimePrime(Vec<(PartyIndex, MsgId, MsgId)>),
+    InvalidΨPrimePrime(Vec<(PartyIndex, MsgId, MsgId)>),
     #[error("Delta != G * delta")]
     MismatchedDelta,
     #[error("resulting signature is not valid")]
