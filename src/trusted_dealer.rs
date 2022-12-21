@@ -6,7 +6,7 @@ use rand_core::{CryptoRng, RngCore};
 use generic_ec::{Curve, Point, SecretScalar};
 
 use crate::{
-    key_share::{IncompleteKeyShare, KeyShare, PartyAux},
+    key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
     security_level::SecurityLevel,
     utils::sample_bigint_in_mult_group,
 };
@@ -14,7 +14,7 @@ use crate::{
 pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
     n: u16,
-) -> Vec<KeyShare<E, L>> {
+) -> Vec<Valid<KeyShare<E, L>>> {
     let secret_shares = iter::repeat_with(|| SecretScalar::<E>::random(rng))
         .take(n.into())
         .collect::<Vec<_>>();
@@ -64,14 +64,18 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     core_shares
         .zip(primes_setups)
         .zip(y)
-        .map(|((core_share, primes_setup), y_i)| KeyShare {
-            p: primes_setup.p,
-            q: primes_setup.q,
-            y: y_i,
-            parties: parties_aux.clone(),
-            core: core_share,
+        .map(|((core_share, primes_setup), y_i)| {
+            KeyShare {
+                p: primes_setup.p,
+                q: primes_setup.q,
+                y: y_i,
+                parties: parties_aux.clone(),
+                core: core_share,
+            }
+            .try_into()
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>, _>>()
+        .expect("resulting shares are not valid")
 }
 
 struct PartyPrimesSetup {
@@ -105,9 +109,12 @@ pub mod cached_shares {
 
     use generic_ec::Curve;
 
-    use crate::{key_share::KeyShare, security_level::SecurityLevel};
+    use crate::{
+        key_share::{KeyShare, Valid},
+        security_level::SecurityLevel,
+    };
 
-    pub fn load<E: Curve, L: SecurityLevel>(n: u16) -> Vec<KeyShare<E, L>> {
+    pub fn load<E: Curve, L: SecurityLevel>(n: u16) -> Vec<Valid<KeyShare<E, L>>> {
         let file_path = Path::new("test-data")
             .join("key_shares")
             .join(format!("n{n}-{curve}.json", curve = E::CURVE_NAME));
@@ -115,7 +122,7 @@ pub mod cached_shares {
         serde_json::from_slice(&key_shares).expect("deserialize key shares")
     }
 
-    pub fn save<E: Curve, L: SecurityLevel>(key_shares: &[KeyShare<E, L>]) {
+    pub fn save<E: Curve, L: SecurityLevel>(key_shares: &[Valid<KeyShare<E, L>>]) {
         let n = key_shares.len();
         let file_path = Path::new("test-data")
             .join("key_shares")

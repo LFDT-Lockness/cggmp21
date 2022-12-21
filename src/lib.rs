@@ -1,7 +1,7 @@
 #![allow(non_snake_case, mixed_script_confusables, uncommon_codepoints)]
 
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
-use key_share::KeyShare;
+use key_share::{KeyShare, Valid};
 pub use round_based;
 use security_level::SecurityLevel;
 use sha2::Sha256;
@@ -35,7 +35,7 @@ where
     keygen::KeygenBuilder::new(i, n)
 }
 
-pub fn signing<E, L>(key_share: &KeyShare<E, L>) -> SigningBuilder<E, L, Sha256>
+pub fn signing<E, L>(key_share: &Valid<KeyShare<E, L>>) -> SigningBuilder<E, L, Sha256>
 where
     E: Curve,
     L: SecurityLevel,

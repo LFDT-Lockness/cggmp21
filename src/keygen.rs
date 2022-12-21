@@ -15,7 +15,7 @@ use round_based::{
 use thiserror::Error;
 
 use crate::execution_id::ProtocolChoice;
-use crate::key_share::IncompleteKeyShare;
+use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
 use crate::security_level::SecurityLevel;
 use crate::ExecutionId;
 
@@ -114,7 +114,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<IncompleteKeyShare<E, L>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, L, D>>,
@@ -256,7 +256,9 @@ where
             rid,
             public_shares: decommitments.iter().map(|d| d.X).collect(),
             x: x_i,
-        })
+        }
+        .try_into()
+        .map_err(Bug::InvalidKeyShare)?)
     }
 }
 
@@ -317,6 +319,8 @@ enum Bug {
     HashToScalarError(#[source] generic_ec::errors::HashError),
     #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
     InvalidHashToCurveTag,
+    #[error("resulting key share is not valid")]
+    InvalidKeyShare(#[source] InvalidKeyShare),
 }
 
 impl<IErr, OErr> From<Bug> for KeygenError<IErr, OErr> {

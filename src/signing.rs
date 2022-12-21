@@ -20,7 +20,7 @@ use thiserror::Error;
 
 use crate::{
     execution_id::ProtocolChoice,
-    key_share::{InvalidKeyShare, KeyShare},
+    key_share::{InvalidKeyShare, KeyShare, Valid},
     security_level::SecurityLevel,
     utils::{encryption_key_from_n, sample_bigint_in_mult_group, scalar_to_bignumber},
     ExecutionId,
@@ -130,7 +130,7 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    key_share: &'k KeyShare<E, L>,
+    key_share: &'k Valid<KeyShare<E, L>>,
     execution_id: ExecutionId<E, L, D>,
 }
 
@@ -142,7 +142,7 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone,
 {
-    pub fn new(secret_key_share: &'k KeyShare<E, L>) -> Self {
+    pub fn new(secret_key_share: &'k Valid<KeyShare<E, L>>) -> Self {
         Self {
             key_share: secret_key_share,
             execution_id: Default::default(),
@@ -227,7 +227,6 @@ where
 
         // Validate input
         Self::validate_security_level()?;
-        self.key_share.validate()?;
         let i = self.key_share.core.i;
         let n: u16 = self
             .key_share

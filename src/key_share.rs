@@ -1,10 +1,13 @@
 //! Key share
 
+use std::convert::TryFrom;
+use std::{fmt, ops};
+
 use generic_ec::serde::{Compact, CurveName};
 use generic_ec::{Curve, Point, SecretScalar};
 use libpaillier::unknown_order::BigNumber;
 use paillier_zk::paillier_encryption_in_range as π_enc;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
 
@@ -145,6 +148,51 @@ impl<E: Curve> From<&PartyAux<E>> for π_enc::Aux {
             t: aux.t.clone(),
             rsa_modulo: aux.N.clone(),
         }
+    }
+}
+
+/// Valid key share
+#[derive(Debug, Clone, Serialize)]
+#[serde(transparent)]
+pub struct Valid<T>(T);
+
+impl<E: Curve, L: SecurityLevel> TryFrom<IncompleteKeyShare<E, L>>
+    for Valid<IncompleteKeyShare<E, L>>
+{
+    type Error = InvalidKeyShare;
+    fn try_from(key_share: IncompleteKeyShare<E, L>) -> Result<Self, Self::Error> {
+        key_share.validate()?;
+        Ok(Self(key_share))
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> TryFrom<KeyShare<E, L>> for Valid<KeyShare<E, L>> {
+    type Error = InvalidKeyShare;
+    fn try_from(key_share: KeyShare<E, L>) -> Result<Self, Self::Error> {
+        key_share.validate()?;
+        Ok(Self(key_share))
+    }
+}
+
+impl<T> ops::Deref for Valid<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'de, T> Deserialize<'de> for Valid<T>
+where
+    T: Deserialize<'de>,
+    Valid<T>: TryFrom<T>,
+    <Valid<T> as TryFrom<T>>::Error: fmt::Display,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = T::deserialize(deserializer)?;
+        Valid::try_from(value).map_err(<D::Error as de::Error>::custom)
     }
 }
 
