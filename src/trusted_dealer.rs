@@ -2,11 +2,12 @@ use std::iter;
 
 use paillier_zk::libpaillier::unknown_order::BigNumber;
 use rand_core::{CryptoRng, RngCore};
+use thiserror::Error;
 
 use generic_ec::{Curve, Point, SecretScalar};
 
 use crate::{
-    key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
+    key_share::{IncompleteKeyShare, InvalidKeyShare, KeyShare, PartyAux, Valid},
     security_level::SecurityLevel,
     utils::sample_bigint_in_mult_group,
 };
@@ -14,7 +15,7 @@ use crate::{
 pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
     n: u16,
-) -> Vec<Valid<KeyShare<E, L>>> {
+) -> Result<Vec<Valid<KeyShare<E, L>>>, TrustedDealerError> {
     let secret_shares = iter::repeat_with(|| SecretScalar::<E>::random(rng))
         .take(n.into())
         .collect::<Vec<_>>();
@@ -75,7 +76,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
             .try_into()
         })
         .collect::<Result<Vec<_>, _>>()
-        .expect("resulting shares are not valid")
+        .map_err(TrustedDealerError)
 }
 
 struct PartyPrimesSetup {
@@ -102,6 +103,10 @@ fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
 
     PartyPrimesSetup { p, q, N, s, t }
 }
+
+#[derive(Debug, Error)]
+#[error("trusted dealer failed to generate shares due to internal error")]
+pub struct TrustedDealerError(InvalidKeyShare);
 
 #[cfg(test)]
 pub mod cached_shares {
@@ -152,7 +157,7 @@ mod test {
         let mut rng = DevRng::new();
 
         for n in [2, 3, 5, 7, 10] {
-            let shares = mock_keygen::<E, ReasonablySecure, _>(&mut rng, n);
+            let shares = mock_keygen::<E, ReasonablySecure, _>(&mut rng, n).unwrap();
             let reconstructed_private_key: Scalar<E> = shares.iter().map(|s_i| &s_i.core.x).sum();
             shares.iter().enumerate().for_each(|(i, s_i)| {
                 s_i.validate()
