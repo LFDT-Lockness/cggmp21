@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use digest::Digest;
 use generic_ec::Curve;
+use sha2::Sha256;
 
 use crate::security_level::SecurityLevel;
 
@@ -10,7 +11,7 @@ use crate::security_level::SecurityLevel;
 /// Each protocol execution should have unique execution ID for better security hygiene.
 /// All parties taking part in the protocol must share the same execution ID,
 /// otherwise protocol will abort with unverbose error.
-pub struct ExecutionId<E: Curve, L: SecurityLevel, D: Digest> {
+pub struct ExecutionId<E: Curve, L: SecurityLevel, D: Digest = Sha256> {
     id: digest::Output<D>,
     _ph: PhantomData<fn() -> (E, L)>,
 }
@@ -52,7 +53,7 @@ impl<E: Curve, L: SecurityLevel, D: Digest> ExecutionId<E, L, D> {
     ///
     /// If `H(m)` wasn't provided, it's replaced with zeroes byte string of the same size as `H(m)`
     /// output.
-    pub(crate) fn evaluate(self, protocol: ProtocolChoice) -> digest::Output<D> {
+    pub(crate) fn evaluate(&self, protocol: ProtocolChoice) -> digest::Output<D> {
         let security_bits = u16::try_from(L::SECURITY_BITS).unwrap_or(u16::MAX);
         let epsilon = u16::try_from(L::EPSILON).unwrap_or(u16::MAX);
         let ell = u16::try_from(L::ELL).unwrap_or(u16::MAX);
@@ -91,14 +92,25 @@ impl<E: Curve, L: SecurityLevel, D: Digest> Default for ExecutionId<E, L, D> {
     }
 }
 
+impl<E: Curve, L: SecurityLevel, D: Digest> Clone for ExecutionId<E, L, D> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            _ph: PhantomData,
+        }
+    }
+}
+
 pub(crate) enum ProtocolChoice {
     Keygen,
+    Presigning3,
 }
 
 impl ProtocolChoice {
     fn as_bytes(&self) -> &'static [u8] {
         match self {
-            Self::Keygen => b"keygen",
+            Self::Keygen => b"KEYGEN",
+            Self::Presigning3 => b"PRESIGNING3",
         }
     }
 }

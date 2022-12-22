@@ -15,7 +15,7 @@ use round_based::{
 use thiserror::Error;
 
 use crate::execution_id::ProtocolChoice;
-use crate::key_share::IncompleteKeyShare;
+use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
 use crate::security_level::SecurityLevel;
 use crate::ExecutionId;
 
@@ -114,7 +114,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<IncompleteKeyShare<E, L>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, L, D>>,
@@ -132,8 +132,7 @@ where
         // Round 1
         let execution_id = self.execution_id.evaluate(ProtocolChoice::Keygen);
         let sid = execution_id.as_slice();
-        let tag_htc =
-            hash_to_curve::Tag::new(&execution_id).ok_or(BugReason::InvalidHashToCurveTag)?;
+        let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
 
         let x_i = SecretScalar::<E>::random(rng);
         let X_i = Point::generator() * &x_i;
@@ -214,7 +213,7 @@ where
             .map(|d| &d.rid)
             .fold(L::Rid::default(), xor_array);
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&self.i.to_be_bytes(), rid.as_ref()])
-            .map_err(BugReason::HashToScalarError)?;
+            .map_err(Bug::HashToScalarError)?;
         let challenge = schnorr_pok::Challenge { nonce: challenge };
 
         // Prove knowledge of `x_i`
@@ -237,7 +236,7 @@ where
         for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
             let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
                 .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
-                .map_err(BugReason::HashToScalarError)?;
+                .map_err(Bug::HashToScalarError)?;
             if sch_proof
                 .sch_proof
                 .verify(&decommitment.sch_commit, &challenge, &decommitment.X)
@@ -251,12 +250,15 @@ where
         }
 
         Ok(IncompleteKeyShare {
+            curve: Default::default(),
             i: self.i,
             shared_public_key: decommitments.iter().map(|d| d.X).sum(),
             rid,
             public_shares: decommitments.iter().map(|d| d.X).collect(),
             x: x_i,
-        })
+        }
+        .try_into()
+        .map_err(Bug::InvalidKeyShare)?)
     }
 }
 
@@ -290,7 +292,7 @@ pub enum KeygenError<IErr, OErr> {
     SendError(#[source] OErr),
     /// Bug occurred
     #[error("bug occurred")]
-    Bug(Bug),
+    Bug(InternalError),
 }
 
 /// Error indicating that protocol was aborted by malicious party
@@ -304,23 +306,25 @@ pub enum ProtocolAborted {
     InvalidSchnorrProof { parties: Vec<u16> },
 }
 
-/// Error indicating that internal bug is detected
+/// Error indicating that internal bug was detected
 ///
 /// Please, report this issue if you encounter it
 #[derive(Debug, Error)]
 #[error(transparent)]
-pub struct Bug(BugReason);
+pub struct InternalError(Bug);
 
 #[derive(Debug, Error)]
-enum BugReason {
+enum Bug {
     #[error("hash to scalar returned error")]
     HashToScalarError(#[source] generic_ec::errors::HashError),
     #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
     InvalidHashToCurveTag,
+    #[error("resulting key share is not valid")]
+    InvalidKeyShare(#[source] InvalidKeyShare),
 }
 
-impl<IErr, OErr> From<BugReason> for KeygenError<IErr, OErr> {
-    fn from(err: BugReason) -> Self {
-        KeygenError::Bug(Bug(err))
+impl<IErr, OErr> From<Bug> for KeygenError<IErr, OErr> {
+    fn from(err: Bug) -> Self {
+        KeygenError::Bug(InternalError(err))
     }
 }

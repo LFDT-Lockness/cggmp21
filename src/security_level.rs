@@ -9,7 +9,7 @@
 //! You can define your own security level using macro [define_security_level]. Be sure that you properly
 //! analyzed the paper and you understand implications.
 
-use libpaillier::unknown_order::BigNumber;
+use paillier_zk::libpaillier::unknown_order::BigNumber;
 
 /// Security level of the protocol
 ///
@@ -32,7 +32,14 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
     const M: usize;
 
     /// Static array of $\kappa/8$ bytes
-    type Rid: AsRef<[u8]> + AsMut<[u8]> + Default + Clone + Send + Sync + 'static;
+    type Rid: AsRef<[u8]>
+        + AsMut<[u8]>
+        + Default
+        + Clone
+        + hex::FromHex<Error = hex::FromHexError>
+        + Send
+        + Sync
+        + 'static;
 
     /// $\q$ parameter
     ///
@@ -44,7 +51,8 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
 /// Internal module that's powers `define_security_level` macro
 #[doc(hidden)]
 pub mod _internal {
-    pub use libpaillier::unknown_order::BigNumber;
+    use hex::FromHex;
+    pub use paillier_zk::libpaillier::unknown_order::BigNumber;
 
     #[derive(Clone)]
     pub struct Rid<const N: usize>([u8; N]);
@@ -66,6 +74,16 @@ pub mod _internal {
             Self([0u8; N])
         }
     }
+
+    impl<const N: usize> FromHex for Rid<N>
+    where
+        [u8; N]: FromHex,
+    {
+        type Error = <[u8; N] as FromHex>::Error;
+        fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+            FromHex::from_hex(hex).map(Self)
+        }
+    }
 }
 
 /// Defines security level
@@ -76,7 +94,7 @@ pub mod _internal {
 /// $m = 50$, and $q = 2^{48}-1$:
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
-/// use libpaillier::unknown_order::BigNumber;
+/// use cggmp21::unknown_order::BigNumber;
 ///
 /// #[derive(Clone)]
 /// pub struct MyLevel;
@@ -125,23 +143,9 @@ pub use define_security_level;
 pub struct ReasonablySecure;
 define_security_level!(ReasonablySecure{
     security_bits = 256,
-    epsilon = 128,
-    ell = 128,
-    ell_prime = 128,
+    epsilon = 512,
+    ell = 1024,
+    ell_prime = 1024,
     m = 30,
-    q = (BigNumber::one() << 256) - 1,
-});
-
-/// Security level suitable for testing
-///
-/// __Warning:__ this security level is insecure
-#[derive(Clone)]
-pub struct DevelopmentOnly;
-define_security_level!(DevelopmentOnly{
-    security_bits = 32,
-    epsilon = 8,
-    ell = 16,
-    ell_prime = 16,
-    m = 10,
     q = (BigNumber::one() << 256) - 1,
 });
