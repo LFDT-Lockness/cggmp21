@@ -8,8 +8,8 @@ use generic_ec_zkp::{
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    rounds::simple_store::{RoundInput, RoundInputError},
-    rounds::{CompleteRoundError, Rounds},
+    rounds_router::simple_store::{RoundInput, RoundInputError},
+    rounds_router::{CompleteRoundError, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
 };
 use thiserror::Error;
@@ -123,7 +123,7 @@ where
         let (incomings, mut outgoings) = delivery.split();
 
         // Setup networking
-        let mut rounds = Rounds::<Msg<E, L, D>>::builder();
+        let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
         let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(self.i, self.n));
         let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L, D>>::broadcast(self.i, self.n));
         let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(self.i, self.n));
@@ -155,9 +155,7 @@ where
             commitment: hash_commit,
         };
         outgoings
-            .send(Outgoing::reliable_broadcast(Msg::Round1(
-                my_commitment.clone(),
-            )))
+            .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
             .await
             .map_err(KeygenError::SendError)?;
 

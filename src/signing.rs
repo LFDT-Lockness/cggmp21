@@ -10,9 +10,9 @@ use paillier_zk::{
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    rounds::{
+    rounds_router::{
         simple_store::{RoundInput, RoundInputError},
-        CompleteRoundError, Rounds,
+        CompleteRoundError, RoundsRouter,
     },
     Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex, ProtocolMessage,
 };
@@ -255,12 +255,12 @@ where
         let security_params = crate::utils::SecurityParams::new::<L>();
 
         // Setup networking
-        let mut rounds = Rounds::<Msg<E>>::builder();
-        let round1a = rounds.add_round(RoundInput::<MsgRound1a>::reliable_broadcast(i, n));
+        let mut rounds = RoundsRouter::<Msg<E>>::builder();
+        let round1a = rounds.add_round(RoundInput::<MsgRound1a>::broadcast(i, n));
         let round1b = rounds.add_round(RoundInput::<MsgRound1b>::p2p(i, n));
         let round2 = rounds.add_round(RoundInput::<MsgRound2<E>>::p2p(i, n));
         let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
-        let round4 = rounds.add_round(RoundInput::<MsgRound4<E>>::reliable_broadcast(i, n));
+        let round4 = rounds.add_round(RoundInput::<MsgRound4<E>>::broadcast(i, n));
         let mut rounds = rounds.listen(incomings);
 
         // Round 1
@@ -279,7 +279,7 @@ where
             .0;
 
         outgoings
-            .send(Outgoing::reliable_broadcast(Msg::Round1a(MsgRound1a {
+            .send(Outgoing::broadcast(Msg::Round1a(MsgRound1a {
                 K: K_i.clone(),
                 G: G_i.clone(),
             })))
@@ -721,7 +721,7 @@ where
         // Round 1
         let partial_sig = presig.partially_sign(message_to_sign);
         outgoings
-            .send(Outgoing::reliable_broadcast(Msg::Round4(MsgRound4 {
+            .send(Outgoing::broadcast(Msg::Round4(MsgRound4 {
                 σ: partial_sig.σ,
             })))
             .await
