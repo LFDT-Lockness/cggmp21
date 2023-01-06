@@ -12,39 +12,52 @@ use round_based::{
     rounds_router::{CompleteRoundError, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
 };
+use round_based::{MsgId, PartyIndex};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::execution_id::ProtocolChoice;
 use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
 use crate::security_level::SecurityLevel;
+use crate::utils::{hash_message, HashMessageError};
 use crate::ExecutionId;
 
 /// Message of key generation protocol
-#[derive(ProtocolMessage, Clone)]
+#[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round1(MsgRound1<D>),
+    Round1Sync(MsgSyncState<D>),
     Round2(MsgRound2<E, L, D>),
     Round3(MsgRound3<E>),
 }
 
 /// Message from round 1
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
-    commitment: HashCommit<D>,
+    pub commitment: HashCommit<D>,
 }
 /// Message from round 2
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
-    rid: L::Rid,
-    X: Point<E>,
-    sch_commit: schnorr_pok::Commit<E>,
-    decommit: hash_commitment::DecommitNonce<D>,
+    #[serde(with = "hex::serde")]
+    pub rid: L::Rid,
+    pub X: Point<E>,
+    pub sch_commit: schnorr_pok::Commit<E>,
+    pub decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Message from round 3
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound3<E: Curve> {
-    sch_proof: schnorr_pok::Proof<E>,
+    pub sch_proof: schnorr_pok::Proof<E>,
 }
+/// Message parties exchange to ensure reliability of broadcast channel
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct MsgSyncState<D: Digest>(pub digest::Output<D>);
 
 /// Key generation entry point
 pub struct KeygenBuilder<E: Curve, L: SecurityLevel, D: Digest> {
@@ -125,6 +138,8 @@ where
         // Setup networking
         let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
         let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(self.i, self.n));
+        let round1_sync =
+            rounds.add_round(RoundInput::<MsgSyncState<D>>::broadcast(self.i, self.n));
         let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L, D>>::broadcast(self.i, self.n));
         let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(self.i, self.n));
         let mut rounds = rounds.listen(incomings);
@@ -165,6 +180,17 @@ where
             .await
             .map_err(KeygenError::ReceiveMessage)?
             .into_vec_including_me(my_commitment);
+        let commitments_hash = commitments
+            .iter()
+            .try_fold(D::new(), hash_message)
+            .map_err(Bug::HashMessage)?
+            .finalize();
+        outgoings
+            .send(Outgoing::broadcast(Msg::Round1Sync(MsgSyncState(
+                commitments_hash.clone(),
+            ))))
+            .await
+            .map_err(KeygenError::SendError)?;
 
         let my_decommitment = MsgRound2 {
             rid,
@@ -178,6 +204,20 @@ where
             .map_err(KeygenError::SendError)?;
 
         // Round 3
+        {
+            let commitments_hashes = rounds
+                .complete(round1_sync)
+                .await
+                .map_err(KeygenError::ReceiveMessage)?;
+            let parties_have_different_hashes = commitments_hashes
+                .into_iter_indexed()
+                .filter(|(_j, _msg_id, hash)| hash.0 != commitments_hash)
+                .map(|(j, msg_id, _hash)| (j, msg_id))
+                .collect::<Vec<_>>();
+            if !parties_have_different_hashes.is_empty() {
+                return Err(KeygenAborted::Round1NotReliable(parties_have_different_hashes).into());
+            }
+        }
         let decommitments = rounds
             .complete(round2)
             .await
@@ -202,7 +242,7 @@ where
             .map(|((j, _), _)| j)
             .collect::<Vec<_>>();
         if !blame.is_empty() {
-            return Err(ProtocolAborted::InvalidDecommitment { parties: blame }.into());
+            return Err(KeygenAborted::InvalidDecommitment { parties: blame }.into());
         }
 
         // Calculate challenge
@@ -244,7 +284,7 @@ where
             }
         }
         if !blame.is_empty() {
-            return Err(ProtocolAborted::InvalidSchnorrProof { parties: blame }.into());
+            return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
         }
 
         Ok(IncompleteKeyShare {
@@ -280,7 +320,7 @@ pub enum KeygenError<IErr, OErr> {
     Aborted(
         #[source]
         #[from]
-        ProtocolAborted,
+        KeygenAborted,
     ),
     /// Receiving message error
     #[error("receive message")]
@@ -297,11 +337,13 @@ pub enum KeygenError<IErr, OErr> {
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
-pub enum ProtocolAborted {
+pub enum KeygenAborted {
     #[error("party decommitment doesn't match commitment: {parties:?}")]
     InvalidDecommitment { parties: Vec<u16> },
     #[error("party provided invalid schnorr proof: {parties:?}")]
     InvalidSchnorrProof { parties: Vec<u16> },
+    #[error("round1 wasn't reliable")]
+    Round1NotReliable(Vec<(PartyIndex, MsgId)>),
 }
 
 /// Error indicating that internal bug was detected
@@ -319,10 +361,79 @@ enum Bug {
     InvalidHashToCurveTag,
     #[error("resulting key share is not valid")]
     InvalidKeyShare(#[source] InvalidKeyShare),
+    #[error("hash message")]
+    HashMessage(#[source] HashMessageError),
 }
 
 impl<IErr, OErr> From<Bug> for KeygenError<IErr, OErr> {
     fn from(err: Bug) -> Self {
         KeygenError::Bug(InternalError(err))
     }
+}
+
+#[cfg(test)]
+#[generic_tests::define(attrs(tokio::test, test_case::case))]
+mod tests {
+    use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+    use rand_dev::DevRng;
+    use round_based::simulation::Simulation;
+    use sha2::Sha256;
+
+    use crate::{security_level::ReasonablySecure, ExecutionId};
+
+    #[test_case::case(2; "n2")]
+    #[test_case::case(3; "n3")]
+    #[test_case::case(5; "n5")]
+    #[test_case::case(7; "n7")]
+    #[test_case::case(10; "n10")]
+    #[tokio::test]
+    async fn keygen_works<E: Curve>(n: u16)
+    where
+        Scalar<E>: FromHash,
+    {
+        let mut rng = DevRng::new();
+
+        let keygen_execution_id: [u8; 32] = rng.gen();
+        let keygen_execution_id =
+            ExecutionId::<E, ReasonablySecure>::from_bytes(&keygen_execution_id);
+        let mut simulation = Simulation::<super::Msg<E, ReasonablySecure, Sha256>>::new();
+
+        let mut outputs = vec![];
+        for i in 0..n {
+            let party = simulation.add_party();
+            let keygen_execution_id = keygen_execution_id.clone();
+            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+
+            outputs.push(async move {
+                crate::keygen(i, n)
+                    .set_execution_id(keygen_execution_id)
+                    .start(&mut party_rng, party)
+                    .await
+            })
+        }
+
+        let key_shares = futures::future::try_join_all(outputs)
+            .await
+            .expect("keygen failed");
+
+        for (i, key_share) in (0u16..).zip(&key_shares) {
+            assert_eq!(key_share.i, i);
+            assert_eq!(key_share.shared_public_key, key_shares[0].shared_public_key);
+            assert_eq!(key_share.rid.as_ref(), key_shares[0].rid.as_ref());
+            assert_eq!(key_share.public_shares, key_shares[0].public_shares);
+            assert_eq!(
+                Point::<E>::generator() * &key_share.x,
+                key_share.public_shares[usize::from(i)]
+            );
+        }
+        assert_eq!(
+            key_shares[0].shared_public_key,
+            key_shares[0].public_shares.iter().sum::<Point<E>>()
+        );
+    }
+
+    #[instantiate_tests(<generic_ec::curves::Secp256r1>)]
+    mod secp256r1 {}
 }

@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["serde"] }
-generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "d" }
+generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["serde"] }
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
 
 paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "serde", default-features = false, features = ["serde"] }
