@@ -16,8 +16,10 @@ use round_based::{
     },
     Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex, ProtocolMessage,
 };
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::utils::{hash_message, HashMessageError};
 use crate::{
     execution_id::ProtocolChoice,
     key_share::{InvalidKeyShare, KeyShare, Valid},
@@ -81,26 +83,28 @@ pub struct Signature<E: Curve> {
 
 #[derive(Clone, ProtocolMessage)]
 #[allow(clippy::large_enum_variant)]
-pub enum Msg<E: Curve> {
+pub enum Msg<E: Curve, D: Digest> {
     Round1a(MsgRound1a),
     Round1b(MsgRound1b),
     Round2(MsgRound2<E>),
     Round3(MsgRound3<E>),
     Round4(MsgRound4<E>),
+    SyncState(MsgSyncState<D>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MsgRound1a {
     pub K: libpaillier::Ciphertext,
     pub G: libpaillier::Ciphertext,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MsgRound1b {
     pub ψ0: (π_enc::Commitment, π_enc::Proof),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound2<E: Curve> {
     pub Γ: Point<E>,
     pub D: Ciphertext,
@@ -112,17 +116,23 @@ pub struct MsgRound2<E: Curve> {
     pub ψ_prime: (π_log::Commitment<E>, π_log::Proof),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound3<E: Curve> {
     pub delta: Scalar<E>,
     pub Delta: Point<E>,
     pub ψ_prime_prime: (π_log::Commitment<E>, π_log::Proof),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound4<E: Curve> {
     pub σ: Scalar<E>,
 }
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct MsgSyncState<D: Digest>(digest::Output<D>);
 
 pub struct SigningBuilder<'k, E, L, D>
 where
@@ -140,7 +150,7 @@ where
     Scalar<E>: FromHash,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
     L: SecurityLevel,
-    D: Digest<OutputSize = digest::typenum::U32> + Clone,
+    D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
     pub fn new(secret_key_share: &'k Valid<KeyShare<E, L>>) -> Self {
         Self {
@@ -179,7 +189,7 @@ where
     ) -> Result<Presignature<E>, SigningError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = Msg<E>>,
+        M: Mpc<ProtocolMessage = Msg<E, D>>,
     {
         match self.run(rng, party, None).await? {
             ProtocolOutput::Presignature(presig) => Ok(presig),
@@ -195,7 +205,7 @@ where
     ) -> Result<Signature<E>, SigningError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = Msg<E>>,
+        M: Mpc<ProtocolMessage = Msg<E, D>>,
     {
         match self.run(rng, party, Some(message_to_sign)).await? {
             ProtocolOutput::Signature(sig) => Ok(sig),
@@ -230,7 +240,7 @@ where
     ) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = Msg<E>>,
+        M: Mpc<ProtocolMessage = Msg<E, D>>,
     {
         let MpcParty { delivery, .. } = party.into_party();
         let (incomings, mut outgoings) = delivery.split();
@@ -255,9 +265,10 @@ where
         let security_params = crate::utils::SecurityParams::new::<L>();
 
         // Setup networking
-        let mut rounds = RoundsRouter::<Msg<E>>::builder();
+        let mut rounds = RoundsRouter::<Msg<E, D>>::builder();
         let round1a = rounds.add_round(RoundInput::<MsgRound1a>::broadcast(i, n));
         let round1b = rounds.add_round(RoundInput::<MsgRound1b>::p2p(i, n));
+        let round1a_sync = rounds.add_round(RoundInput::<MsgSyncState<D>>::broadcast(i, n));
         let round2 = rounds.add_round(RoundInput::<MsgRound2<E>>::p2p(i, n));
         let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
         let round4 = rounds.add_round(RoundInput::<MsgRound4<E>>::broadcast(i, n));
@@ -323,6 +334,22 @@ where
             .await
             .map_err(SigningError::ReceiveMessage)?;
 
+        // Ensure reliability of round1a: broadcast hash(ciphertexts)
+        let ciphertexts_hash = ciphertexts
+            .iter_including_me(&MsgRound1a {
+                K: K_i.clone(),
+                G: G_i.clone(),
+            })
+            .try_fold(D::new(), hash_message)
+            .map_err(Bug::HashMessage)?
+            .finalize();
+        outgoings
+            .send(Outgoing::broadcast(Msg::SyncState(MsgSyncState(
+                ciphertexts_hash,
+            ))))
+            .await
+            .map_err(SigningError::SendError)?;
+
         // Step 1. Verify proofs
         {
             let mut faulty_parties = vec![];
@@ -350,6 +377,24 @@ where
 
             if !faulty_parties.is_empty() {
                 return Err(SigningAborted::EncProofOfK(faulty_parties).into());
+            }
+        }
+
+        // Ensure reliability of round1a: receive hash(ciphertexts) from others
+        {
+            let round1a_hashes = rounds
+                .complete(round1a_sync)
+                .await
+                .map_err(SigningError::ReceiveMessage)?;
+            let parties_have_different_hashes = round1a_hashes
+                .into_iter_indexed()
+                .filter(|(_j, _msg_id, hash)| hash.0 != ciphertexts_hash)
+                .map(|(j, msg_id, _)| (j, msg_id))
+                .collect::<Vec<_>>();
+            if !parties_have_different_hashes.is_empty() {
+                return Err(
+                    SigningAborted::Round1aNotReliable(parties_have_different_hashes).into(),
+                );
             }
         }
 
@@ -869,6 +914,8 @@ pub enum SigningAborted {
     MismatchedDelta,
     #[error("resulting signature is not valid")]
     SignatureInvalid,
+    #[error("other parties received different broadcast messages at round1a")]
+    Round1aNotReliable(Vec<(PartyIndex, MsgId)>),
 }
 
 #[derive(Debug, Error)]
@@ -908,6 +955,8 @@ enum Bug {
     ZeroR,
     #[error("unexpected protocol output")]
     UnexpectedProtocolOutput,
+    #[error("reliable broadcast")]
+    HashMessage(#[source] HashMessageError),
 }
 
 #[derive(Debug)]
@@ -1009,7 +1058,7 @@ mod protocol_tests {
         let signing_execution_id: [u8; 32] = rng.gen();
         let signing_execution_id =
             ExecutionId::<E, ReasonablySecure>::from_bytes(&signing_execution_id);
-        let mut simulation = Simulation::<super::Msg<E>>::new();
+        let mut simulation = Simulation::<super::Msg<E, Sha256>>::new();
 
         let message_to_sign = b"Dfns rules!";
         let message_to_sign = super::Message::new::<Sha256>(message_to_sign);

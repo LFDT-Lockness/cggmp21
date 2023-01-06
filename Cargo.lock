@@ -110,6 +110,7 @@ version = "0.0.0"
 dependencies = [
  "digest 0.10.5",
  "futures",
+ "generic-array",
  "generic-ec",
  "generic-ec-zkp",
  "generic-tests",
@@ -474,6 +475,7 @@ version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bff49e947297f3312447abdca79f45f4738097cc82b06e72054d2223f601f1b9"
 dependencies = [
+ "serde",
  "typenum",
  "version_check",
 ]
@@ -767,13 +769,14 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#2737abc5abf49dd00da0027859092faaac265785"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=serde#b909c4c3b4a4a921fb0b505a504e82a3c76b0a24"
 dependencies = [
  "generic-ec",
  "generic-ec-core",
  "libpaillier",
  "rand_chacha",
  "rand_core",
+ "serde",
  "sha2",
  "subtle",
  "zeroize",

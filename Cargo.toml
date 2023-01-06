@@ -12,7 +12,7 @@ generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", fe
 generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "d" }
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
 
-paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "m", default-features = false }
+paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "serde", default-features = false, features = ["serde"] }
 
 digest = "0.10"
 sha2 = "0.10"
@@ -25,7 +25,11 @@ phantom-type = "0.4"
 
 serde = { version = "1", features = ["derive"] }
 serde_with = "2"
+serde_json = "1"
 hex = { version = "0.4", default-features = false, features = ["serde"] }
+
+# We don't depend on this crates directly, but need to specify features to make it compile
+generic-array = { version = "0.14", features = ["serde"] }
 
 [dev-dependencies]
 generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["serde", "all-curves"] }
@@ -39,8 +43,6 @@ tokio = { version = "1", features = ["macros"] }
 
 generic-tests = "0.1"
 test-case = "2.2"
-
-serde_json = "1"
 
 [features]
 default = ["paillier-zk/gmp"]
