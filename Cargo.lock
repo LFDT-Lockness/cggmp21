@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cb2f989d18dd141ab8ae82f64d1a8cdd37e0840f73a406896cf5e99502fab61"
+
+[[package]]
 name = "async-stream"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -128,6 +134,26 @@ dependencies = [
  "sha2",
  "test-case",
  "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "cggmp21-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cggmp21",
+ "futures",
+ "generic-ec",
+ "generic-tests",
+ "lazy_static",
+ "rand",
+ "rand_chacha",
+ "rand_dev",
+ "round-based",
+ "serde_json",
+ "sha2",
+ "test-case",
  "tokio",
 ]
 
@@ -671,6 +697,12 @@ dependencies = [
  "elliptic-curve",
  "sha2",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
