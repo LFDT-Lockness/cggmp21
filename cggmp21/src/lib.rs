@@ -13,6 +13,7 @@ use signing::SigningBuilder;
 mod execution_id;
 pub mod key_share;
 pub mod keygen;
+pub mod progress;
 pub mod security_level;
 pub mod signing;
 pub mod trusted_dealer;

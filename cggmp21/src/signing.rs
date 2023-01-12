@@ -19,6 +19,7 @@ use round_based::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::progress::Tracer;
 use crate::utils::{hash_message, HashMessageError};
 use crate::{
     execution_id::ProtocolChoice,
@@ -134,17 +135,18 @@ pub struct MsgRound4<E: Curve> {
 #[serde(bound = "")]
 pub struct MsgSyncState<D: Digest>(digest::Output<D>);
 
-pub struct SigningBuilder<'k, E, L, D>
+pub struct SigningBuilder<'r, E, L, D>
 where
     E: Curve,
     L: SecurityLevel,
     D: Digest,
 {
-    key_share: &'k Valid<KeyShare<E, L>>,
+    key_share: &'r Valid<KeyShare<E, L>>,
     execution_id: ExecutionId<E, L, D>,
+    tracer: Option<&'r mut dyn Tracer>,
 }
 
-impl<'k, E, L, D> SigningBuilder<'k, E, L, D>
+impl<'r, E, L, D> SigningBuilder<'r, E, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -152,21 +154,28 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
-    pub fn new(secret_key_share: &'k Valid<KeyShare<E, L>>) -> Self {
+    pub fn new(secret_key_share: &'r Valid<KeyShare<E, L>>) -> Self {
         Self {
             key_share: secret_key_share,
             execution_id: Default::default(),
+            tracer: None,
         }
     }
 
-    pub fn set_digest<D2>(self) -> SigningBuilder<'k, E, L, D2>
+    pub fn set_digest<D2>(self) -> SigningBuilder<'r, E, L, D2>
     where
         D2: Digest,
     {
         SigningBuilder {
             key_share: self.key_share,
+            tracer: self.tracer,
             execution_id: Default::default(),
         }
+    }
+
+    pub fn set_progress_tracer(mut self, tracer: &'r mut dyn Tracer) -> Self {
+        self.tracer = Some(tracer);
+        self
     }
 
     pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
@@ -233,7 +242,7 @@ where
     }
 
     async fn run<R, M>(
-        self,
+        mut self,
         rng: &mut R,
         party: M,
         message_to_sign: Option<Message>,
@@ -242,11 +251,15 @@ where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D>>,
     {
+        self.tracer.protocol_begins();
+
         let MpcParty { delivery, .. } = party.into_party();
         let (incomings, mut outgoings) = delivery.split();
 
-        // Validate input
+        self.tracer.stage("Validate security level");
         Self::validate_security_level()?;
+
+        self.tracer.stage("Retrieve auxiliary data");
         let i = self.key_share.core.i;
         let n: u16 = self
             .key_share
@@ -261,10 +274,12 @@ where
         let dec_i = DecryptionKey::with_primes(&self.key_share.p, &self.key_share.q)
             .ok_or(Bug::InvalidOwnPaillierKey)?;
 
+        self.tracer
+            .stage("Precompute execution id and security params");
         let execution_id = self.execution_id.evaluate(ProtocolChoice::Presigning3);
         let security_params = crate::utils::SecurityParams::new::<L>();
 
-        // Setup networking
+        self.tracer.stage("Setup networking");
         let mut rounds = RoundsRouter::<Msg<E, D>>::builder();
         let round1a = rounds.add_round(RoundInput::<MsgRound1a>::broadcast(i, n));
         let round1b = rounds.add_round(RoundInput::<MsgRound1b>::p2p(i, n));
@@ -275,11 +290,16 @@ where
         let mut rounds = rounds.listen(incomings);
 
         // Round 1
+        self.tracer.round_begins();
+
+        self.tracer
+            .stage("Generate local ephemeral secrets (k_i, y_i, p_i, v_i)");
         let k_i = SecretScalar::<E>::random(rng);
         let y_i = SecretScalar::<E>::random(rng);
         let p_i = sample_bigint_in_mult_group(rng, N_i);
         let v_i = sample_bigint_in_mult_group(rng, N_i);
 
+        self.tracer.stage("Encrypt G_i and K_i");
         let G_i = enc_i
             .encrypt(y_i.as_ref().to_be_bytes(), Some(v_i.clone()))
             .ok_or(Bug::PaillierEnc(BugSource::G_i))?
@@ -289,6 +309,7 @@ where
             .ok_or(Bug::PaillierEnc(BugSource::K_i))?
             .0;
 
+        self.tracer.send_msg();
         outgoings
             .send(Outgoing::broadcast(Msg::Round1a(MsgRound1a {
                 K: K_i.clone(),
@@ -296,9 +317,11 @@ where
             })))
             .await
             .map_err(SigningError::SendError)?;
+        self.tracer.msg_sent();
 
         let parties_shared_state = D::new_with_prefix(execution_id);
         for j in self.other_parties() {
+            self.tracer.stage("Prove ψ0_j");
             let aux_j = &self.key_share.parties[usize::from(j)];
             let data = π_enc::Data {
                 key: enc_i.clone(),
@@ -317,14 +340,19 @@ where
                 &security_params.π_enc,
                 &mut *rng,
             );
+
+            self.tracer.send_msg();
             outgoings
                 .send(Outgoing::p2p(j, Msg::Round1b(MsgRound1b { ψ0: ψ0_i })))
                 .await
                 .map_err(SigningError::SendError)?;
+            self.tracer.msg_sent();
         }
 
         // Round 2
+        self.tracer.round_begins();
 
+        self.tracer.receive_msgs();
         let ciphertexts = rounds
             .complete(round1a)
             .await
@@ -333,8 +361,10 @@ where
             .complete(round1b)
             .await
             .map_err(SigningError::ReceiveMessage)?;
+        self.tracer.msgs_received();
 
         // Ensure reliability of round1a: broadcast hash(ciphertexts)
+        self.tracer.stage("Hash received msgs (reliability check)");
         let ciphertexts_hash = ciphertexts
             .iter_including_me(&MsgRound1a {
                 K: K_i.clone(),
@@ -343,14 +373,18 @@ where
             .try_fold(D::new(), hash_message)
             .map_err(Bug::HashMessage)?
             .finalize();
+
+        self.tracer.send_msg();
         outgoings
             .send(Outgoing::broadcast(Msg::SyncState(MsgSyncState(
                 ciphertexts_hash,
             ))))
             .await
             .map_err(SigningError::SendError)?;
+        self.tracer.msg_sent();
 
         // Step 1. Verify proofs
+        self.tracer.stage("Verify ψ0 proofs");
         {
             let mut faulty_parties = vec![];
             for ((j, msg1_id, ciphertext), (_, msg2_id, proof)) in
@@ -382,10 +416,14 @@ where
 
         // Ensure reliability of round1a: receive hash(ciphertexts) from others
         {
+            self.tracer.receive_msgs();
             let round1a_hashes = rounds
                 .complete(round1a_sync)
                 .await
                 .map_err(SigningError::ReceiveMessage)?;
+            self.tracer.msgs_received();
+            self.tracer
+                .stage("Assert other parties hashed messages (reliability check)");
             let parties_have_different_hashes = round1a_hashes
                 .into_iter_indexed()
                 .filter(|(_j, _msg_id, hash)| hash.0 != ciphertexts_hash)
@@ -405,6 +443,7 @@ where
         let mut β_sum = Scalar::zero();
         let mut βˆ_sum = Scalar::zero();
         for (j, _, ciphertext) in ciphertexts.iter_indexed() {
+            self.tracer.stage("Sample random r, rˆ, s, sˆ, β, βˆ");
             let aux_j = &self.key_share.parties[usize::from(j)];
             let N_j = &aux_j.N;
             let enc_j = encryption_key_from_n(N_j);
@@ -420,6 +459,7 @@ where
             β_sum += Scalar::from_be_bytes_mod_order(β_ij.to_bytes());
             βˆ_sum += Scalar::from_be_bytes_mod_order(βˆ_ij.to_bytes());
 
+            self.tracer.stage("Encrypt D_ji");
             // D_ji = (y_i * K_j) + enc_j(β_ij, s_ij)
             let D_ji = {
                 let y_i_times_K_j = enc_j
@@ -434,11 +474,13 @@ where
                     .ok_or(Bug::PaillierOp(BugSource::D_ji))?
             };
 
+            self.tracer.stage("Encrypt F_ji");
             let F_ji = enc_i
                 .encrypt(β_ij.to_bytes(), Some(r_ij.clone()))
                 .ok_or(Bug::PaillierEnc(BugSource::F_ji))?
                 .0;
 
+            self.tracer.stage("Encrypt Dˆ_ji");
             // Dˆ_ji = (x_i * K_j) + enc_j(βˆ_ij, sˆ_ij)
             let Dˆ_ji = {
                 let x_i_times_K_j = enc_j
@@ -453,11 +495,13 @@ where
                     .ok_or(Bug::PaillierOp(BugSource::Dˆ_ji))?
             };
 
+            self.tracer.stage("Encrypt Fˆ_ji");
             let Fˆ_ji = enc_i
                 .encrypt(βˆ_ij.to_bytes(), Some(rˆ_ij.clone()))
                 .ok_or(Bug::PaillierEnc(BugSource::Fˆ_ji))?
                 .0;
 
+            self.tracer.stage("Prove ψ_ji");
             let ψ_ji = π_aff::non_interactive::prove(
                 parties_shared_state.clone(),
                 &aux_j.into(),
@@ -480,6 +524,7 @@ where
             )
             .map_err(|e| Bug::ΠAffG(BugSource::ψ_ji, e))?;
 
+            self.tracer.stage("Prove ψˆ_ji");
             let ψˆ_ji = π_aff::non_interactive::prove(
                 parties_shared_state.clone(),
                 &aux_j.into(),
@@ -502,6 +547,7 @@ where
             )
             .map_err(|e| Bug::ΠAffG(BugSource::ψˆ_ji, e))?;
 
+            self.tracer.stage("Prove ψ_prime_ji ");
             let ψ_prime_ji = π_log::non_interactive::prove(
                 parties_shared_state.clone(),
                 &aux_j.into(),
@@ -520,6 +566,7 @@ where
             )
             .map_err(|e| Bug::ΠLog(BugSource::ψ_prime_ji, e))?;
 
+            self.tracer.send_msg();
             outgoings
                 .send(Outgoing::p2p(
                     j,
@@ -536,25 +583,30 @@ where
                 ))
                 .await
                 .map_err(SigningError::SendError)?;
+            self.tracer.msg_sent();
         }
 
         // Round 3
+        self.tracer.round_begins();
 
         // Step 1
+        self.tracer.receive_msgs();
         let round2_msgs = rounds
             .complete(round2)
             .await
             .map_err(SigningError::ReceiveMessage)?;
+        self.tracer.msgs_received();
 
         let mut faulty_parties = vec![];
         for ((j, msg_id, msg), (_, ciphertext_msg_id, ciphertexts)) in
             round2_msgs.iter_indexed().zip(ciphertexts.iter_indexed())
         {
+            self.tracer.stage("Retrieve auxiliary data");
             let X_j = self.key_share.core.public_shares[usize::from(j)];
             let aux_j = &self.key_share.parties[usize::from(j)];
             let enc_j = encryption_key_from_n(&aux_j.N);
 
-            // Verify ψ
+            self.tracer.stage("Validate ψ");
             let ψ_invalid = {
                 let data = π_aff::Data {
                     key0: enc_i.clone(),
@@ -577,6 +629,7 @@ where
                 .err()
             };
 
+            self.tracer.stage("Validate ψˆ");
             let ψˆ_invalid = {
                 let data = π_aff::Data {
                     key0: enc_i.clone(),
@@ -599,6 +652,7 @@ where
                 .err()
             };
 
+            self.tracer.stage("Validate ψ_prime");
             let ψ_prime_invalid = {
                 let data = π_log::Data {
                     key0: enc_j.clone(),
@@ -632,6 +686,7 @@ where
         }
 
         // Step 2
+        self.tracer.stage("Compute Γ, Delta_i, delta_i, chi_i");
         let Γ = Γ_i
             + round2_msgs
                 .iter_indexed()
@@ -664,6 +719,7 @@ where
         let chi_i = self.key_share.core.x.as_ref() * k_i.as_ref() + αˆ_sum - βˆ_sum;
 
         for j in self.other_parties() {
+            self.tracer.stage("Prove ψ_prime_prime");
             let aux_j = &self.key_share.parties[usize::from(j)];
             let ψ_prime_prime = π_log::non_interactive::prove(
                 parties_shared_state.clone(),
@@ -683,6 +739,7 @@ where
             )
             .map_err(|e| Bug::ΠLog(BugSource::ψ_prime_prime, e))?;
 
+            self.tracer.send_msg();
             outgoings
                 .send(Outgoing::p2p(
                     j,
@@ -694,16 +751,21 @@ where
                 ))
                 .await
                 .map_err(SigningError::SendError)?;
+            self.tracer.msg_sent();
         }
 
         // Output
+        self.tracer.named_round_begins("Presig output");
 
         // Step 1
+        self.tracer.receive_msgs();
         let round3_msgs = rounds
             .complete(round3)
             .await
             .map_err(SigningError::ReceiveMessage)?;
+        self.tracer.msgs_received();
 
+        self.tracer.stage("Validate ψ_prime_prime");
         let mut faulty_parties = vec![];
         for ((j, msg_id, msg), (_, ciphertext_id, ciphertext_j)) in
             round3_msgs.iter_indexed().zip(ciphertexts.iter_indexed())
@@ -737,6 +799,7 @@ where
         }
 
         // Step 2
+        self.tracer.stage("Calculate presignature");
         let delta = delta_i + round3_msgs.iter().map(|m| m.delta).sum::<Scalar<E>>();
         let Delta = Delta_i + round3_msgs.iter().map(|m| m.Delta).sum::<Point<E>>();
 
@@ -758,25 +821,34 @@ where
         // If message is not specified, protocol terminates here and outputs partial
         // signature
         let Some(message_to_sign) = message_to_sign else {
+            self.tracer.protocol_ends();
             return Ok(ProtocolOutput::Presignature(presig))
         };
 
         // Signing
+        self.tracer.named_round_begins("Partial signing");
 
         // Round 1
         let partial_sig = presig.partially_sign(message_to_sign);
+
+        self.tracer.send_msg();
         outgoings
             .send(Outgoing::broadcast(Msg::Round4(MsgRound4 {
                 σ: partial_sig.σ,
             })))
             .await
             .map_err(SigningError::SendError)?;
+        self.tracer.msg_sent();
 
         // Output
+        self.tracer.named_round_begins("Signature reconstruction");
+
+        self.tracer.receive_msgs();
         let partial_sigs = rounds
             .complete(round4)
             .await
             .map_err(SigningError::ReceiveMessage)?;
+        self.tracer.msgs_received();
         let sig = {
             let r = NonZero::from_scalar(partial_sig.r);
             let s = NonZero::from_scalar(
@@ -798,6 +870,7 @@ where
         }
         let sig = sig.ok_or(SigningAborted::SignatureInvalid)?;
 
+        self.tracer.protocol_ends();
         Ok(ProtocolOutput::Signature(sig))
     }
 }
