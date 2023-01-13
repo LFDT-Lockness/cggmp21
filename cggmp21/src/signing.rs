@@ -1098,6 +1098,6 @@ mod misc_tests {
         let sum = enc.add(&a, &b).unwrap();
         let sum = dec.decrypt(&sum).unwrap();
 
-        assert_eq!(BigNumber::from_slice(&sum), BigNumber::zero());
+        assert_eq!(BigNumber::from_slice(sum), BigNumber::zero());
     }
 }

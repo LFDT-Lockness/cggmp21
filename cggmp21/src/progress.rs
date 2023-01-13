@@ -279,6 +279,12 @@ impl PerfProfiler {
     }
 }
 
+impl Default for PerfProfiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerfReport {
     pub fn display_io(mut self, display: bool) -> Self {
         self.display_io = display;

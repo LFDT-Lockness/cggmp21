@@ -16,6 +16,7 @@ impl PrecomputedKeyShares {
             shares: Default::default(),
         }
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(shares: &str) -> Result<Self> {
         let shares = serde_json::from_str(shares).context("parse shares")?;
         Ok(Self { shares })
