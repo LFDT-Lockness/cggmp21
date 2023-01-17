@@ -363,7 +363,7 @@ where
             .map_err(SigningError::ReceiveMessage)?;
         self.tracer.msgs_received();
 
-        // Ensure reliability of round1a: broadcast hash(ciphertexts)
+        // Step 1. Ensure reliability of round1a: broadcast hash(ciphertexts)
         self.tracer.stage("Hash received msgs (reliability check)");
         let ciphertexts_hash = ciphertexts
             .iter_including_me(&MsgRound1a {
@@ -383,7 +383,7 @@ where
             .map_err(SigningError::SendError)?;
         self.tracer.msg_sent();
 
-        // Step 1. Verify proofs
+        // Step 2. Verify proofs
         self.tracer.stage("Verify ψ0 proofs");
         {
             let mut faulty_parties = vec![];
@@ -414,29 +414,7 @@ where
             }
         }
 
-        // Ensure reliability of round1a: receive hash(ciphertexts) from others
-        {
-            self.tracer.receive_msgs();
-            let round1a_hashes = rounds
-                .complete(round1a_sync)
-                .await
-                .map_err(SigningError::ReceiveMessage)?;
-            self.tracer.msgs_received();
-            self.tracer
-                .stage("Assert other parties hashed messages (reliability check)");
-            let parties_have_different_hashes = round1a_hashes
-                .into_iter_indexed()
-                .filter(|(_j, _msg_id, hash)| hash.0 != ciphertexts_hash)
-                .map(|(j, msg_id, _)| (j, msg_id))
-                .collect::<Vec<_>>();
-            if !parties_have_different_hashes.is_empty() {
-                return Err(
-                    SigningAborted::Round1aNotReliable(parties_have_different_hashes).into(),
-                );
-            }
-        }
-
-        // Step 2
+        // Step 3
         let Γ_i = Point::generator() * &y_i;
         let J = BigNumber::one() << (L::ELL_PRIME + 1);
 
@@ -589,7 +567,29 @@ where
         // Round 3
         self.tracer.round_begins();
 
-        // Step 1
+        // Step 1. Ensure reliability of round1a: receive hash(ciphertexts) from others
+        {
+            self.tracer.receive_msgs();
+            let round1a_hashes = rounds
+                .complete(round1a_sync)
+                .await
+                .map_err(SigningError::ReceiveMessage)?;
+            self.tracer.msgs_received();
+            self.tracer
+                .stage("Assert other parties hashed messages (reliability check)");
+            let parties_have_different_hashes = round1a_hashes
+                .into_iter_indexed()
+                .filter(|(_j, _msg_id, hash)| hash.0 != ciphertexts_hash)
+                .map(|(j, msg_id, _)| (j, msg_id))
+                .collect::<Vec<_>>();
+            if !parties_have_different_hashes.is_empty() {
+                return Err(
+                    SigningAborted::Round1aNotReliable(parties_have_different_hashes).into(),
+                );
+            }
+        }
+
+        // Step 2
         self.tracer.receive_msgs();
         let round2_msgs = rounds
             .complete(round2)
@@ -607,69 +607,56 @@ where
             let enc_j = encryption_key_from_n(&aux_j.N);
 
             self.tracer.stage("Validate ψ");
-            let ψ_invalid = {
-                let data = π_aff::Data {
+            let ψ_invalid = π_aff::non_interactive::verify(
+                parties_shared_state.clone(),
+                &aux_i.into(),
+                &π_aff::Data {
                     key0: enc_i.clone(),
                     key1: enc_j.clone(),
-                    // c: msg.D.clone(),
-                    // d: K_i.clone(),
                     c: K_i.clone(),
                     d: msg.D.clone(),
                     y: msg.F.clone(),
                     x: msg.Γ,
-                };
-                π_aff::non_interactive::verify(
-                    parties_shared_state.clone(),
-                    &aux_i.into(),
-                    &data,
-                    &msg.ψ.0,
-                    &security_params.π_aff,
-                    &msg.ψ.1,
-                )
-                .err()
-            };
+                },
+                &msg.ψ.0,
+                &security_params.π_aff,
+                &msg.ψ.1,
+            )
+            .err();
 
             self.tracer.stage("Validate ψˆ");
-            let ψˆ_invalid = {
-                let data = π_aff::Data {
+            let ψˆ_invalid = π_aff::non_interactive::verify(
+                parties_shared_state.clone(),
+                &aux_i.into(),
+                &π_aff::Data {
                     key0: enc_i.clone(),
                     key1: enc_j.clone(),
-                    // c: msg.Dˆ.clone(),
-                    // d: K_i.clone(),
                     c: K_i.clone(),
                     d: msg.Dˆ.clone(),
                     y: msg.Fˆ.clone(),
                     x: X_j,
-                };
-                π_aff::non_interactive::verify(
-                    parties_shared_state.clone(),
-                    &aux_i.into(),
-                    &data,
-                    &msg.ψˆ.0,
-                    &security_params.π_aff,
-                    &msg.ψˆ.1,
-                )
-                .err()
-            };
+                },
+                &msg.ψˆ.0,
+                &security_params.π_aff,
+                &msg.ψˆ.1,
+            )
+            .err();
 
             self.tracer.stage("Validate ψ_prime");
-            let ψ_prime_invalid = {
-                let data = π_log::Data {
+            let ψ_prime_invalid = π_log::non_interactive::verify(
+                parties_shared_state.clone(),
+                &aux_i.into(),
+                &π_log::Data {
                     key0: enc_j.clone(),
                     c: ciphertexts.G.clone(),
                     x: msg.Γ,
                     g: Point::<E>::generator().to_point(),
-                };
-                π_log::non_interactive::verify(
-                    parties_shared_state.clone(),
-                    &aux_i.into(),
-                    &data,
-                    &msg.ψ_prime.0,
-                    &security_params.π_log,
-                    &msg.ψ_prime.1,
-                )
-                .err()
-            };
+                },
+                &msg.ψ_prime.0,
+                &security_params.π_log,
+                &msg.ψ_prime.1,
+            )
+            .err();
 
             if ψ_invalid.is_some() || ψˆ_invalid.is_some() || ψ_prime_invalid.is_some() {
                 faulty_parties.push((
@@ -685,13 +672,9 @@ where
             return Err(SigningAborted::InvalidΨ(faulty_parties).into());
         }
 
-        // Step 2
+        // Step 3
         self.tracer.stage("Compute Γ, Delta_i, delta_i, chi_i");
-        let Γ = Γ_i
-            + round2_msgs
-                .iter_indexed()
-                .map(|(_, _, msg)| msg.Γ)
-                .sum::<Point<E>>();
+        let Γ = Γ_i + round2_msgs.iter().map(|msg| msg.Γ).sum::<Point<E>>();
         let Delta_i = Γ * &k_i;
 
         let α_sum =
