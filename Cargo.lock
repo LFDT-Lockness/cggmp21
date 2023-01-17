@@ -917,7 +917,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=serde#b909c4c3b4a4a921fb0b505a504e82a3c76b0a24"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#8a4d95b8aaebaae7b660cb9b9670c3bcb3b1b052"
 dependencies = [
  "generic-ec",
  "generic-ec-core",
