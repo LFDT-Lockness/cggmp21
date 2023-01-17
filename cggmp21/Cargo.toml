@@ -28,7 +28,7 @@ serde_with = "2"
 serde_json = "1"
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
-# We don't depend on this crates directly, but need to specify features to make it compile
+# We don't depend on this crates directly, but need this crate to have `serde` feature enabled
 generic-array = { version = "0.14", features = ["serde"] }
 
 [dev-dependencies]
