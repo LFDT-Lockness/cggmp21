@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cggmp21 = { path = "../cggmp21" }
+cggmp21 = { path = "../cggmp21", features = ["all-curves"] }
 
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }

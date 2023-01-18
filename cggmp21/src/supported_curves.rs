@@ -7,7 +7,11 @@
 //! might not be compatible with another curve, which might result into unexpected runtime error or
 //! reduced security of the protocol.
 
+#[cfg(feature = "curve-secp256k1")]
+pub use generic_ec::curves::Secp256k1;
+#[cfg(feature = "curve-secp256r1")]
 pub use generic_ec::curves::Secp256r1;
+
 pub use generic_ec::Curve;
 
 #[cfg(test)]
@@ -25,7 +29,9 @@ mod check_compatibility {
     }
 
     fn supported_curves_are_compatible() {
-        // curve_is_compatible::<super::Secp256k1>(); // secp256k1 is not yet supported
+        #[cfg(feature = "curve-secp256k1")]
+        curve_is_compatible::<super::Secp256k1>();
+        #[cfg(feature = "curve-secp256r1")]
         curve_is_compatible::<super::Secp256r1>();
     }
 }

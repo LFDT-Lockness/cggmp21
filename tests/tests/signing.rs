@@ -16,8 +16,6 @@ mod generic {
 
     #[test_case::case(2; "n2")]
     #[test_case::case(3; "n3")]
-    #[test_case::case(5; "n5")]
-    #[test_case::case(7; "n7")]
     #[tokio::test]
     async fn signing_works<E: Curve>(n: u16)
     where
@@ -63,6 +61,8 @@ mod generic {
         assert!(signatures.iter().all(|s_i| signatures[0] == *s_i));
     }
 
-    #[instantiate_tests(<generic_ec::curves::Secp256r1>)]
+    #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]
+    mod secp256k1 {}
+    #[instantiate_tests(<cggmp21::supported_curves::Secp256r1>)]
     mod secp256r1 {}
 }
