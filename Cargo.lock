@@ -110,6 +110,7 @@ version = "0.0.0"
 dependencies = [
  "digest 0.10.5",
  "futures",
+ "generic-array",
  "generic-ec",
  "generic-ec-zkp",
  "generic-tests",
@@ -474,6 +475,7 @@ version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bff49e947297f3312447abdca79f45f4738097cc82b06e72054d2223f601f1b9"
 dependencies = [
+ "serde",
  "typenum",
  "version_check",
 ]
@@ -481,7 +483,7 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.0.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#8e1c966d2995884a9c15b5decd7b5c02f4b4a1a4"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#804095b37b06320f7781e664cddab1826cbf0141"
 dependencies = [
  "generic-array",
  "generic-ec-core",
@@ -498,7 +500,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#8e1c966d2995884a9c15b5decd7b5c02f4b4a1a4"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#804095b37b06320f7781e664cddab1826cbf0141"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -510,7 +512,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#8e1c966d2995884a9c15b5decd7b5c02f4b4a1a4"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#804095b37b06320f7781e664cddab1826cbf0141"
 dependencies = [
  "elliptic-curve",
  "generic-ec-core",
@@ -525,11 +527,13 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#8e1c966d2995884a9c15b5decd7b5c02f4b4a1a4"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#804095b37b06320f7781e664cddab1826cbf0141"
 dependencies = [
  "digest 0.10.5",
+ "generic-array",
  "generic-ec",
  "rand_core",
+ "serde",
  "subtle",
 ]
 
@@ -767,13 +771,14 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#2737abc5abf49dd00da0027859092faaac265785"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=serde#b909c4c3b4a4a921fb0b505a504e82a3c76b0a24"
 dependencies = [
  "generic-ec",
  "generic-ec-core",
  "libpaillier",
  "rand_chacha",
  "rand_core",
+ "serde",
  "sha2",
  "subtle",
  "zeroize",
@@ -922,7 +927,7 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#b39d3ed43f74d194d9ec2b6fa1aba33d39c14d0b"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#16bb42a435fc00197bdce55b667d975b4775f547"
 dependencies = [
  "async-stream",
  "bincode",
@@ -940,7 +945,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.1.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#b39d3ed43f74d194d9ec2b6fa1aba33d39c14d0b"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#16bb42a435fc00197bdce55b667d975b4775f547"
 dependencies = [
  "proc-macro2",
  "quote",
