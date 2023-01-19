@@ -182,8 +182,7 @@ where
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?
-        .into_vec_including_me(commitment);
+        .map_err(KeyRefreshError::ReceiveMessage)?;
     let decommitment = MsgRound2 {
         x: Xs.clone(),
         sch_commits_a: sch_commits_a.clone(),
@@ -208,17 +207,14 @@ where
     let decommitments = rounds
         .complete(round2)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?
-        .into_vec_including_me(decommitment);
+        .map_err(KeyRefreshError::ReceiveMessage)?;
 
     // validate decommitments
-    debug_assert_eq!(decommitments.len(), commitments.len());
     let blame = commitments
-        .iter()
-        .zip(&decommitments)
-        .enumerate()
-        .filter(|(j, (commitment, decommitment))| {
-            let j = *j as u16;
+        .iter_indexed()
+        .zip(decommitments.iter_indexed())
+        .filter(|((j, _, commitment), (j_, _, decommitment))| {
+            debug_assert_eq!(j, j_);
             HashCommit::<D>::builder()
                 .mix_bytes(sid)
                 .mix(n)
@@ -234,7 +230,7 @@ where
                 .verify(&commitment.commitment, &decommitment.decommit)
                 .is_err()
         })
-        .map(|(j, _)| j as u16)
+        .map(|tuple| tuple.0.0)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
@@ -246,7 +242,7 @@ where
     // TODO: validate everyone sent the correct amount of bytes
 
     let party_auxes = decommitments
-        .iter()
+        .iter_including_me(&decommitment)
         .map(|d| PartyAux {
             N: d.N.clone(),
             s: d.s.clone(),
@@ -262,7 +258,7 @@ where
     let rho_bytes = decommitments
         .iter()
         .map(|d| &d.rho_bytes)
-        .fold(vec_of(L::SECURITY_BYTES, 0u8), xor_array);
+        .fold(rho_bytes, xor_array);
 
     // pi_i
     let sch_proof_y = {
@@ -273,6 +269,7 @@ where
     };
 
     // commond data for messages
+    let mod_proof = ();
     let challenge =
         Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
             .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
@@ -282,13 +279,16 @@ where
     // message to each party
     for (j, ((x, enc), secret)) in xs.iter().zip(&encs).zip(&sch_secrets_a).enumerate() {
         let j = j as u16;
+
         let sch_proof_x = schnorr_pok::prove(secret, &challenge, &x);
         let C = enc.encrypt(x.as_ref().to_be_bytes(), None)
             .ok_or(KeyRefreshError::Bug("encryption failed"))?
             .0;
+        let fac_proof = ();
+
         let msg = MsgRound3 {
-            mod_proof: (),
-            fac_proof: (),
+            mod_proof,
+            fac_proof,
             sch_proof_y: sch_proof_y.clone(),
             sch_proof_x,
             C,
@@ -310,10 +310,9 @@ where
     let shares_msg_b = rounds
         .complete(round3)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?
-        .into_vec_including_me(my_msg);
+        .map_err(KeyRefreshError::ReceiveMessage)?;
 
-    let shares = shares_msg_b.iter().map(|m| {
+    let shares = shares_msg_b.iter_including_me(&my_msg).map(|m| {
         let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
         Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
     }).collect::<Result<Vec<_>, _>>()?;
@@ -322,10 +321,9 @@ where
     // TODO: verify mod_proofs
     // TODO: verify fac_proofs
     // verify sch proofs for y and x
-    debug_assert_eq!(decommitments.len(), shares_msg_b.len());
     let mut blame = Vec::new();
-    for (j, (decommitment, proof_msg)) in decommitments.iter().zip(&shares_msg_b).enumerate() {
-        let j = j as u16;
+    for ((j, _, decommitment), (j_, _, proof_msg)) in decommitments.iter_indexed().zip(shares_msg_b.iter_indexed()) {
+        debug_assert_eq!(j, j_);
         let i = i as usize;
 
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
@@ -355,13 +353,12 @@ where
             ProtocolAborted::InvalidSchnorrProof { parties: blame },
         ));
     }
-    // verify sch proofs for x
 
     let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x);
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
         let k = k as usize;
-        decommitments.iter().map(|d| d.x[k]).sum::<Point<E>>()
+        decommitments.iter_including_me(&decommitment).map(|d| d.x[k]).sum::<Point<E>>()
     });
     let X_stars = core_share
         .public_shares
