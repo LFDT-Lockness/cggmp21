@@ -56,19 +56,20 @@ pub struct MsgRound2<E: Curve, D: Digest> {
     decommit: hash_commitment::DecommitNonce<D>,
 }
 
+/// Unicast message of round 3, sent to each participant
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
     mod_proof: (), // TODO
     /// phi_i^j in paper
-    fac_proofs: Vec<()>, // TODO
+    fac_proof: (), // TODO
     /// pi_i in paper
     sch_proof_y: schnorr_pok::Proof<E>,
     /// C_i^j in paper
-    C: Vec<BigNumber>, // TODO: each participant receives their own C and
+    C: BigNumber, // TODO: each participant receives their own C and
     // sch_proof_x
     /// psi_i_j in paper
-    sch_proof_xs: Vec<schnorr_pok::Proof<E>>,
+    sch_proof_x: schnorr_pok::Proof<E>,
 }
 
 pub async fn refresh<R, M, E, L, D>(
@@ -94,7 +95,7 @@ where
     let mut rounds = RoundsRouter::<Msg<E, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round2 = rounds.add_round(RoundInput::<MsgRound2<E, D>>::broadcast(i, n));
-    let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(i, n));
+    let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
 
     let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
@@ -263,33 +264,6 @@ where
         .map(|d| &d.rho_bytes)
         .fold(vec_of(L::SECURITY_BYTES, 0u8), xor_array);
 
-    // psi_i
-    let mod_proof = (); // TODO
-                        // phi_j,i
-    let fac_proofs = Vec::new(); //TODO
-                                 // psi_i^j
-    let sch_proof_xs = sch_secrets_a
-        .iter()
-        .zip(xs.iter())
-        .map(|(secret, x)| {
-            let challenge =
-                Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-                    .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
-            let challenge = schnorr_pok::Challenge { nonce: challenge };
-            Ok(schnorr_pok::prove(secret, &challenge, &x))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    // C_i^j
-    let Cs = xs
-        .iter()
-        .zip(encs.iter())
-        .map(|(x, enc)| {
-            enc.encrypt(x.as_ref().to_be_bytes(), None)
-                .ok_or(KeyRefreshError::Bug("encryption failed"))
-                .map(|x| x.0)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
     // pi_i
     let sch_proof_y = {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
@@ -298,42 +272,59 @@ where
         schnorr_pok::prove(&sch_secret_b, &challenge, &y)
     };
 
-    let msg = MsgRound3 {
-        mod_proof,
-        fac_proofs,
-        sch_proof_xs,
-        sch_proof_y,
-        C: Cs,
-    };
-    outgoings
-        .send(Outgoing::broadcast(Msg::Round3(msg.clone())))
-        .await
-        .map_err(KeyRefreshError::SendError)?;
+    // commond data for messages
+    let challenge =
+        Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
+            .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+    let challenge = schnorr_pok::Challenge { nonce: challenge };
+    // save a message we would send to ourself
+    let mut my_msg = None;
+    // message to each party
+    for (j, ((x, enc), secret)) in xs.iter().zip(&encs).zip(&sch_secrets_a).enumerate() {
+        let j = j as u16;
+        let sch_proof_x = schnorr_pok::prove(secret, &challenge, &x);
+        let C = enc.encrypt(x.as_ref().to_be_bytes(), None)
+            .ok_or(KeyRefreshError::Bug("encryption failed"))?
+            .0;
+        let msg = MsgRound3 {
+            mod_proof: (),
+            fac_proof: (),
+            sch_proof_y: sch_proof_y.clone(),
+            sch_proof_x,
+            C,
+        };
+        if j == i {
+            my_msg = Some(msg);
+        } else {
+            outgoings
+                .send(Outgoing::p2p(j, Msg::Round3(msg)))
+                .await
+                .map_err(KeyRefreshError::SendError)?;
+        }
+    }
+    // safe because j, i <- 0..n
+    let my_msg = my_msg.unwrap();
 
     // Output
 
-    let shares_msg = rounds
+    let shares_msg_b = rounds
         .complete(round3)
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?
-        .into_vec_including_me(msg);
-    let shares = shares_msg
-        .iter()
-        .map(|m| {
-            // TODO: in fact you should only receive your c in the first place
-            let my_c = m.C[i as usize].clone();
-            let bytes = dec.decrypt(&my_c).ok_or(KeyRefreshError::PaillierDec)?;
-            Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        .into_vec_including_me(my_msg);
+
+    let shares = shares_msg_b.iter().map(|m| {
+        let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
+        Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
+    }).collect::<Result<Vec<_>, _>>()?;
 
     // TODO: verify shares are well formed
     // TODO: verify mod_proofs
     // TODO: verify fac_proofs
     // verify sch proofs for y and x
-    debug_assert_eq!(decommitments.len(), shares_msg.len());
+    debug_assert_eq!(decommitments.len(), shares_msg_b.len());
     let mut blame = Vec::new();
-    for (j, (decommitment, proof_msg)) in decommitments.iter().zip(&shares_msg).enumerate() {
+    for (j, (decommitment, proof_msg)) in decommitments.iter().zip(&shares_msg_b).enumerate() {
         let j = j as u16;
         let i = i as usize;
 
@@ -351,7 +342,7 @@ where
         }
 
         // proof for x, i.e. psi_j^k
-        let sch_proof = &proof_msg.sch_proof_xs[i];
+        let sch_proof = &proof_msg.sch_proof_x;
         if sch_proof
             .verify(&decommitment.sch_commits_a[i], &challenge, &decommitment.x[i])
             .is_err()
@@ -456,7 +447,7 @@ mod test {
     use crate::key_share::Valid;
     use crate::{security_level::ReasonablySecure, ExecutionId};
 
-    #[test_case::case(2; "n2")]
+    #[test_case::case(5; "n3")]
     #[tokio::test]
     async fn keygen_works<E: generic_ec::Curve>(n: u16)
     where
