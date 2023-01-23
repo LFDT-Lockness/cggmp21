@@ -69,8 +69,19 @@ pub struct MsgRound3<E: Curve> {
     C: BigNumber, // TODO: each participant receives their own C and
     // sch_proof_x
     /// psi_i_j in paper
-    sch_proof_x: schnorr_pok::Proof<E>,
+    ///
+    /// Here in the paper you only send one proof, but later they require you to
+    /// verify by all the other proofs, that are never sent. We fix this here
+    /// and require each party to send every proof to everyone
+    sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
 }
+
+/*
+sch - denis's code as `schnorr_pok`
+prm - cggmp page 37
+mod - paillier_zk::paillier_blum_modulus
+fac - cggmp page 66
+*/
 
 pub async fn refresh<R, M, E, L, D>(
     rng: &mut R,
@@ -141,15 +152,15 @@ where
     let t = r.modmul(&r, &N);
     let s = t.modpow(&λ, &N);
 
-    let my_aux = PartyAux { N, s, t, Y };
-
     let params_proof = (); // TODO
 
     // tau_j and A_i^j in paper
+    // TODO: don't commit for myself
     let (sch_secrets_a, sch_commits_a) = (0..n)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip::<_, _, Vec<_>, Vec<_>>();
 
+    // rho_i in paper, this signer's share of bytes
     let mut rho_bytes = Vec::new();
     rho_bytes.resize(L::SECURITY_BYTES, 0);
     rng.fill_bytes(&mut rho_bytes);
@@ -161,9 +172,9 @@ where
         .mix_many(&Xs)
         .mix_many(sch_commits_a.iter().map(|a| a.0))
         .mix(&Y)
-        .mix_bytes(&my_aux.N.to_bytes())
-        .mix_bytes(&my_aux.s.to_bytes())
-        .mix_bytes(&my_aux.t.to_bytes())
+        .mix_bytes(&N.to_bytes())
+        .mix_bytes(&s.to_bytes())
+        .mix_bytes(&t.to_bytes())
         // mix param proof
         .mix_bytes(&rho_bytes)
         .commit(rng);
@@ -186,11 +197,11 @@ where
     let decommitment = MsgRound2 {
         x: Xs.clone(),
         sch_commits_a: sch_commits_a.clone(),
-        Y: my_aux.Y.clone(),
+        Y,
         sch_commit_b: sch_commit_b.clone(),
-        N: my_aux.N.clone(),
-        s: my_aux.s.clone(),
-        t: my_aux.t.clone(),
+        N,
+        s,
+        t,
         params_proof,
         rho_bytes: rho_bytes.clone(),
         decommit,
@@ -250,11 +261,13 @@ where
             Y: d.Y.clone(),
         })
         .collect::<Vec<_>>();
+    // TODO: don't create key for self
     let encs = party_auxes
         .iter()
         .map(|aux| utils::encryption_key_from_n(&aux.N))
         .collect::<Vec<_>>();
 
+    // rho in paper, collective random bytes
     let rho_bytes = decommitments
         .iter()
         .map(|d| &d.rho_bytes)
@@ -268,19 +281,21 @@ where
         schnorr_pok::prove(&sch_secret_b, &challenge, &y)
     };
 
-    // commond data for messages
+    // common data for messages
     let mod_proof = ();
     let challenge =
         Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
             .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     // save a message we would send to ourself
+    // TODO: don't do that. Don't encrypt message for self
     let mut my_msg = None;
     // message to each party
     for (j, ((x, enc), secret)) in xs.iter().zip(&encs).zip(&sch_secrets_a).enumerate() {
         let j = j as u16;
 
-        let sch_proof_x = schnorr_pok::prove(secret, &challenge, &x);
+        let sch_proofs_x = xs.iter().map(|x_j| schnorr_pok::prove(secret, &challenge, &x_j))
+            .collect();
         let C = enc.encrypt(x.as_ref().to_be_bytes(), None)
             .ok_or(KeyRefreshError::Bug("encryption failed"))?
             .0;
@@ -290,7 +305,7 @@ where
             mod_proof,
             fac_proof,
             sch_proof_y: sch_proof_y.clone(),
-            sch_proof_x,
+            sch_proofs_x,
             C,
         };
         if j == i {
@@ -312,6 +327,7 @@ where
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?;
 
+    // TODO: don't decrypt message for self
     let shares = shares_msg_b.iter_including_me(&my_msg).map(|m| {
         let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
         Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
@@ -339,13 +355,13 @@ where
             blame.push(j);
         }
 
-        // proof for x, i.e. psi_j^k
-        let sch_proof = &proof_msg.sch_proof_x;
-        if sch_proof
-            .verify(&decommitment.sch_commits_a[i], &challenge, &decommitment.x[i])
-            .is_err()
-        {
-            blame.push(j);
+        // proof for x, i.e. psi_j^k for every k
+        for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
+            // TODO: when the commit for self isn't sent, this can't be obtained by
+            // simple indexing
+            if sch_proof.verify(&decommitment.sch_commits_a[i], &challenge, x).is_err() {
+                blame.push(j);
+            }
         }
     }
     if !blame.is_empty() {
