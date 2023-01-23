@@ -16,6 +16,7 @@ pub mod keygen;
 pub mod progress;
 pub mod security_level;
 pub mod signing;
+pub mod supported_curves;
 pub mod trusted_dealer;
 mod utils;
 
