@@ -13,8 +13,10 @@ use signing::SigningBuilder;
 mod execution_id;
 pub mod key_share;
 pub mod keygen;
+pub mod progress;
 pub mod security_level;
 pub mod signing;
+pub mod supported_curves;
 pub mod trusted_dealer;
 mod utils;
 

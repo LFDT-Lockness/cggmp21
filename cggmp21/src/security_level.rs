@@ -1,13 +1,13 @@
 //! Security level of CGGMP protocol
 //!
-//! Security level is measured in bits and defined as $\kappa$ and $\varepsilon$ in paper. Higher
-//! security level gives more security but makes protocol execution slower.
+//! Security level is defined as set of parameters in the CGGMP paper. Higher security level gives more
+//! security but makes protocol execution slower.
 //!
-//! We provide two predefined security levels: [ReasonablySecure], which should be used in production,
-//! and [DevelopmentOnly], which is insecure but fast and can be used for testing.
+//! We provide a predefined [ReasonablySecure] security level which is recommended to use for most use-cases.
 //!
 //! You can define your own security level using macro [define_security_level]. Be sure that you properly
-//! analyzed the paper and you understand implications.
+//! analyzed the CGGMP paper and you understand implications. Inconsistent security level may cause unexpected
+//! unverbose runtime error or reduced security of the protocol.
 
 use paillier_zk::libpaillier::unknown_order::BigNumber;
 
@@ -90,7 +90,7 @@ pub mod _internal {
 ///
 /// ## Example
 ///
-/// Let's define security level corresponding to $\kappa=1024$, $\varepsilon=128$, $\ell = \ell' = 1024$,
+/// This code defines security level corresponding to $\kappa=1024$, $\varepsilon=128$, $\ell = \ell' = 1024$,
 /// $m = 50$, and $q = 2^{48}-1$:
 /// ```rust
 /// use cggmp21::security_level::define_security_level;

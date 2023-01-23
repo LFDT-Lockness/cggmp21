@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "m" ]
   pull_request:
-    branches: [ "m" ]
+    branches: [ "*" ]
   # schedule:
   #   - cron: '0 5 * * *'
 
@@ -24,7 +24,11 @@ jobs:
           ${{ secrets.GENERIC_EC_KEY }}
           ${{ secrets.PAILLIER_ZK_KEY }}
     - name: Build
-      run: cargo build
+      run: cargo build --release
+    - uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-tool
+        path: target/release/measure_perf
     - name: Run tests
       run: cargo test
     - name: Check formatting
@@ -33,3 +37,23 @@ jobs:
       run: cargo clippy --all --lib -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
     - name: Run clippy tests
       run: cargo clippy --tests -- -D clippy::all
+  bench:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      with:
+        name: benchmark-tool
+    - name: Set file permissions
+      run: chmod +x ./measure_perf
+    - name: Run benchmarks
+      run: |
+        ./measure_perf -n 3 > perf_output
+        sed -e '/PERF_OUTPUT/{r perf_output' -e 'd}' .github/pr-comment.tpl > pr-comment
+    - name: Leave PR comment
+      continue-on-error: true
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: bench
+        path: pr-comment
