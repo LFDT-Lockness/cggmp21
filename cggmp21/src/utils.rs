@@ -115,3 +115,18 @@ pub fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber 
         }
     }
 }
+
+pub fn collect_blame<I, T, F, E>(iter: I, mut f: F) -> Result<Vec<u16>, E>
+where
+    I: Iterator<Item = T>,
+    F: FnMut(T) -> Result<Option<u16>, E>,
+{
+    let mut r = Vec::new();
+    for x in iter {
+        match f(x)? {
+            Some(i) => r.push(i),
+            None => (),
+        }
+    }
+    Ok(r)
+}

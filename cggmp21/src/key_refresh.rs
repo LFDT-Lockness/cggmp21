@@ -8,7 +8,7 @@ use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
 };
-use paillier_zk::{libpaillier, unknown_order::BigNumber};
+use paillier_zk::{libpaillier, unknown_order::BigNumber, paillier_blum_modulus as π_mod};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -61,7 +61,7 @@ pub struct MsgRound2<E: Curve, D: Digest> {
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
-    mod_proof: (), // TODO
+    mod_proof: (π_mod::Commitment, π_mod::Proof<{π_prm::SECURITY}>), // TODO
     /// phi_i^j in paper
     fac_proof: (), // TODO
     /// pi_i in paper
@@ -205,7 +205,7 @@ where
         sch_commits_a: sch_commits_a.clone(),
         Y,
         sch_commit_b: sch_commit_b.clone(),
-        N,
+        N: N.clone(),
         s,
         t,
         params_proof,
@@ -321,7 +321,16 @@ where
     };
 
     // common data for messages
-    let mod_proof = ();
+    let mod_proof = {
+        let data = π_mod::Data {
+            n: N.clone(),
+        };
+        let pdata = π_mod::PrivateData {
+            p: p.clone(),
+            q: q.clone(),
+        };
+        π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, rng)
+    };
     let challenge =
         Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
             .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
@@ -341,7 +350,7 @@ where
         let fac_proof = ();
 
         let msg = MsgRound3 {
-            mod_proof,
+            mod_proof: mod_proof.clone(),
             fac_proof,
             sch_proof_y: sch_proof_y.clone(),
             sch_proofs_x,
@@ -373,38 +382,61 @@ where
     }).collect::<Result<Vec<_>, _>>()?;
 
     // TODO: verify shares are well formed
-    // TODO: verify mod_proofs
     // TODO: verify fac_proofs
     // verify sch proofs for y and x
-    let mut blame = Vec::new();
-    for ((j, _, decommitment), (j_, _, proof_msg)) in decommitments.iter_indexed().zip(shares_msg_b.iter_indexed()) {
-        debug_assert_eq!(j, j_);
-        let i = i as usize;
+    let blame = utils::collect_blame(
+        decommitments.iter_indexed().zip(shares_msg_b.iter_indexed()),
+        |((j, _, decommitment), (j_, _, proof_msg))| {
+            debug_assert_eq!(j, j_);
+            let i = i as usize;
 
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
-            .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
-        let challenge = schnorr_pok::Challenge { nonce: challenge };
+            let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
+                .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+            let challenge = schnorr_pok::Challenge { nonce: challenge };
 
-        // proof for y, i.e. pi_j
-        let sch_proof = &proof_msg.sch_proof_y;
-        if sch_proof
-            .verify(&decommitment.sch_commit_b, &challenge, &decommitment.Y)
-            .is_err()
-        {
-            blame.push(j);
-        }
-
-        // proof for x, i.e. psi_j^k for every k
-        for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
-            // TODO: when the commit for self isn't sent, this can't be obtained by
-            // simple indexing
-            if sch_proof.verify(&decommitment.sch_commits_a[i], &challenge, x).is_err() {
-                blame.push(j);
+            // proof for y, i.e. pi_j
+            let sch_proof = &proof_msg.sch_proof_y;
+            if sch_proof
+                .verify(&decommitment.sch_commit_b, &challenge, &decommitment.Y)
+                .is_err()
+            {
+                return Ok(Some(j))
             }
+
+            // proof for x, i.e. psi_j^k for every k
+            for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
+                // TODO: when the commit for self isn't sent, this can't be obtained by
+                // simple indexing
+                if sch_proof.verify(&decommitment.sch_commits_a[i], &challenge, x).is_err() {
+                    return Ok(Some(j))
+                }
+            }
+            Ok(None)
         }
-    }
+    )?;
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::InvalidSchnorrProof { parties: blame },
+        ));
+    }
+
+    // verify mod proofs
+    let blame = decommitments.iter_indexed().zip(shares_msg_b.iter()).filter_map(
+        |((j, _, decommitment), proof_msg)| {
+            let data = π_mod::Data {
+                n: decommitment.N.clone(),
+            };
+            let (ref comm, ref proof) = proof_msg.mod_proof;
+            if π_mod::non_interactive::verify(parties_shared_state.clone(), &data, &comm, &proof).is_err() {
+                Some(j)
+            } else {
+                None
+            }
+        },
+    ).collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            // TODO: not schnorr
             ProtocolAborted::InvalidSchnorrProof { parties: blame },
         ));
     }
