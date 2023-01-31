@@ -154,10 +154,11 @@ where
         .mix_bytes(&rho_bytes)
         .commit(rng);
 
+    let commitment = MsgRound1 {
+        commitment: hash_commit,
+    };
     outgoings
-        .send(Outgoing::broadcast(Msg::Round1(MsgRound1 {
-            commitment: hash_commit,
-        })))
+        .send(Outgoing::broadcast(Msg::Round1(commitment.clone())))
         .await
         .map_err(KeyRefreshError::SendError)?;
 
@@ -166,7 +167,7 @@ where
         .complete(round1)
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?
-        .into_vec_without_me();
+        .into_vec_including_me(commitment);
     let decommitment = MsgRound2 {
         x: Xs.clone(),
         sch_commits_a: sch_commits_a.clone(),
@@ -192,8 +193,33 @@ where
         .map_err(KeyRefreshError::ReceiveMessage)?
         .into_vec_including_me(decommitment);
 
+    // validate decommitments
+    debug_assert_eq!(decommitments.len(), commitments.len());
+    let blame = commitments.iter().zip(&decommitments).enumerate().
+        filter(|(j, (commitment, decommitment))| {
+            let j = *j as u16;
+            HashCommit::<D>::builder()
+                .mix_bytes(sid)
+                .mix(n)
+                .mix(j)
+                .mix_many(&decommitment.x)
+                .mix_many(decommitment.sch_commits_a.iter().map(|a| a.0))
+                .mix(&decommitment.Y)
+                .mix_bytes(&decommitment.N.to_bytes())
+                .mix_bytes(&decommitment.s.to_bytes())
+                .mix_bytes(&decommitment.t.to_bytes())
+                // mix param proof
+                .mix_bytes(&decommitment.rho_bytes)
+                .verify(&commitment.commitment, &decommitment.decommit)
+                .is_err()
+        })
+        .map(|(j, _)| j as u16)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(ProtocolAborted::InvalidDecommitment { parties: blame }));
+    }
+
     // TODO: validate params_proofs
-    // TODO: validate decommitments
     // TODO: validate everyone sent the correct amount of bytes
 
     let party_auxes = decommitments
@@ -268,7 +294,8 @@ where
     let shares = shares_msg.iter().map(|m| {
         // TODO: in fact you should only receive your c in the first place
         let my_c = m.C[i as usize].clone();
-        dec.decrypt(&my_c).ok_or(KeyRefreshError::PaillierDec)
+        let bytes = dec.decrypt(&my_c).ok_or(KeyRefreshError::PaillierDec)?;
+        Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
     }).collect::<Result<Vec<_>, _>>()?;
 
     // TODO: verify shares are well formed
@@ -276,7 +303,7 @@ where
     // TODO: verify fac_proofs
     // TODO: verify sch_proofs
 
-    let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + Scalar::from_be_bytes(x).unwrap());
+    let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x);
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
         let k = k as usize;
@@ -316,7 +343,10 @@ fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
 pub enum KeyRefreshError<IErr, OErr> {
     /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
-    Aborted(&'static str),
+    Aborted(
+        #[source]
+        ProtocolAborted
+    ),
     /// Receiving message error
     #[error("receive message")]
     ReceiveMessage(
@@ -334,6 +364,19 @@ pub enum KeyRefreshError<IErr, OErr> {
     Bug(&'static str),
     #[error("couldn't decrypt a message")]
     PaillierDec,
+    #[error("couldn't decode scalar bytes")]
+    InvalidScalar(generic_ec::errors::InvalidScalar),
+}
+
+/// Error indicating that protocol was aborted by malicious party
+///
+/// It _can be_ cryptographically proven, but we do not support it yet.
+#[derive(Debug, Error)]
+pub enum ProtocolAborted {
+    #[error("party decommitment doesn't match commitment: {parties:?}")]
+    InvalidDecommitment { parties: Vec<u16> },
+    #[error("party provided invalid schnorr proof: {parties:?}")]
+    InvalidSchnorrProof { parties: Vec<u16> },
 }
 
 #[cfg(test)]
