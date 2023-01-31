@@ -11,7 +11,6 @@ use sha2::Sha256;
 use signing::SigningBuilder;
 
 mod execution_id;
-mod util;
 pub mod key_share;
 pub mod key_refresh;
 pub mod keygen;

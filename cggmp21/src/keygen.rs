@@ -21,7 +21,7 @@ use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
 use crate::security_level::SecurityLevel;
 use crate::utils::{hash_message, HashMessageError};
 use crate::ExecutionId;
-use crate::util::xor_array;
+use crate::utils::xor_array;
 
 /// Message of key generation protocol
 #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]

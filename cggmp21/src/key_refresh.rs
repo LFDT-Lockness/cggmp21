@@ -20,7 +20,7 @@ use crate::{
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux},
     security_level::SecurityLevel,
-    util::{vec_of, xor_array},
+    utils::{vec_of, xor_array},
     utils, ExecutionId,
 };
 
