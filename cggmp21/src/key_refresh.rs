@@ -8,7 +8,7 @@ use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
 };
-use paillier_zk::{unknown_order::BigNumber, libpaillier};
+use paillier_zk::{libpaillier, unknown_order::BigNumber};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -20,7 +20,7 @@ use crate::{
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux},
     security_level::SecurityLevel,
-    util::xor_array,
+    util::{vec_of, xor_array},
     utils, ExecutionId,
 };
 
@@ -38,26 +38,36 @@ pub struct MsgRound1<D: Digest> {
 
 #[derive(Clone)]
 pub struct MsgRound2<E: Curve, D: Digest> {
-    /// **X_j** in paper
+    /// **X_i** in paper
     x: Vec<Point<E>>,
+    /// **A_i** in paper
     sch_commits_a: Vec<schnorr_pok::Commit<E>>,
     Y: Point<E>,
+    /// B_i in paper
     sch_commit_b: schnorr_pok::Commit<E>,
     N: BigNumber,
     s: BigNumber,
     t: BigNumber,
-    params_proof: (),   // TODO
+    /// psi_circonflexe_i in paper
+    params_proof: (), // TODO
+    /// rho_i in paper
     rho_bytes: Vec<u8>, // FIXME: [u8; L::SECURITY_BYTES]
+    /// u_i in paper
     decommit: hash_commitment::DecommitNonce<D>,
 }
 
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
-    mod_proof: (),       // TODO
+    /// psi_i in paper
+    mod_proof: (), // TODO
+    /// phi_i^j in paper
     fac_proofs: Vec<()>, // TODO
+    /// pi_i in paper
     sch_proof_y: schnorr_pok::Proof<E>,
+    /// C_i^j in paper
     C: Vec<BigNumber>, // TODO: each participant receives their own C and
-                       // sch_proof_x
+    // sch_proof_x
+    /// psi_i_j in paper
     sch_proof_xs: Vec<schnorr_pok::Proof<E>>,
 }
 
@@ -103,12 +113,15 @@ where
 
     let y = SecretScalar::<E>::random(rng);
     let Y = Point::generator() * &y;
+    // tau and B_i in paper
     let (sch_secret_b, sch_commit_b) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
     // *x_i* in paper
+    // generate n-1 values first..
     let mut xs = (0..n - 1)
         .map(|_| SecretScalar::<E>::random(rng))
         .collect::<Vec<_>>();
+    // then create a last element such that the sum is zero
     let mut x_last = -xs.iter().fold(Scalar::<E>::zero(), |s, x| s + x.as_ref());
     xs.push(SecretScalar::new(&mut x_last));
     drop(x_last);
@@ -131,8 +144,8 @@ where
 
     let params_proof = (); // TODO
 
-    // tau_j and A_i^j
-    let (sch_secrets_a, sch_commits_a) = (0..(n - 1))
+    // tau_j and A_i^j in paper
+    let (sch_secrets_a, sch_commits_a) = (0..n)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip::<_, _, Vec<_>, Vec<_>>();
 
@@ -158,7 +171,9 @@ where
         commitment: hash_commit,
     };
     outgoings
-        .send(Outgoing::broadcast(Msg::Round1(commitment.clone())))
+        .send(Outgoing::broadcast(Msg::Round1(
+            commitment.clone(),
+        )))
         .await
         .map_err(KeyRefreshError::SendError)?;
 
@@ -181,7 +196,9 @@ where
         decommit,
     };
     outgoings
-        .send(Outgoing::broadcast(Msg::Round2(decommitment.clone())))
+        .send(Outgoing::broadcast(Msg::Round2(
+            decommitment.clone(),
+        )))
         .await
         .map_err(KeyRefreshError::SendError)?;
 
@@ -195,8 +212,11 @@ where
 
     // validate decommitments
     debug_assert_eq!(decommitments.len(), commitments.len());
-    let blame = commitments.iter().zip(&decommitments).enumerate().
-        filter(|(j, (commitment, decommitment))| {
+    let blame = commitments
+        .iter()
+        .zip(&decommitments)
+        .enumerate()
+        .filter(|(j, (commitment, decommitment))| {
             let j = *j as u16;
             HashCommit::<D>::builder()
                 .mix_bytes(sid)
@@ -216,7 +236,9 @@ where
         .map(|(j, _)| j as u16)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::InvalidDecommitment { parties: blame }));
+        return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::InvalidDecommitment { parties: blame },
+        ));
     }
 
     // TODO: validate params_proofs
@@ -239,7 +261,7 @@ where
     let rho_bytes = decommitments
         .iter()
         .map(|d| &d.rho_bytes)
-        .fold(rho_bytes, xor_array);
+        .fold(vec_of(L::SECURITY_BYTES, 0u8), xor_array);
 
     // psi_i
     let mod_proof = (); // TODO
@@ -268,6 +290,7 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    // pi_i
     let sch_proof_y = {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
             .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
@@ -289,19 +312,59 @@ where
 
     // Output
 
-    let shares_msg = rounds.complete(round3).await.map_err(KeyRefreshError::ReceiveMessage)?
+    let shares_msg = rounds
+        .complete(round3)
+        .await
+        .map_err(KeyRefreshError::ReceiveMessage)?
         .into_vec_including_me(msg);
-    let shares = shares_msg.iter().map(|m| {
-        // TODO: in fact you should only receive your c in the first place
-        let my_c = m.C[i as usize].clone();
-        let bytes = dec.decrypt(&my_c).ok_or(KeyRefreshError::PaillierDec)?;
-        Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
-    }).collect::<Result<Vec<_>, _>>()?;
+    let shares = shares_msg
+        .iter()
+        .map(|m| {
+            // TODO: in fact you should only receive your c in the first place
+            let my_c = m.C[i as usize].clone();
+            let bytes = dec.decrypt(&my_c).ok_or(KeyRefreshError::PaillierDec)?;
+            Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     // TODO: verify shares are well formed
     // TODO: verify mod_proofs
     // TODO: verify fac_proofs
-    // TODO: verify sch_proofs
+    // verify sch proofs for y and x
+    debug_assert_eq!(decommitments.len(), shares_msg.len());
+    let mut blame = Vec::new();
+    for (j, (decommitment, proof_msg)) in decommitments.iter().zip(&shares_msg).enumerate() {
+        let j = j as u16;
+        let i = i as usize;
+
+        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
+            .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+        let challenge = schnorr_pok::Challenge { nonce: challenge };
+
+        // proof for y, i.e. pi_j
+        let sch_proof = &proof_msg.sch_proof_y;
+        if sch_proof
+            .verify(&decommitment.sch_commit_b, &challenge, &decommitment.Y)
+            .is_err()
+        {
+            blame.push(j);
+        }
+
+        // proof for x, i.e. psi_j^k
+        let sch_proof = &proof_msg.sch_proof_xs[i];
+        if sch_proof
+            .verify(&decommitment.sch_commits_a[i], &challenge, &decommitment.x[i])
+            .is_err()
+        {
+            blame.push(j);
+        }
+    }
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::InvalidSchnorrProof { parties: blame },
+        ));
+    }
+    // verify sch proofs for x
 
     let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x);
     let mut x_star = core_share.x + x_sum;
@@ -309,7 +372,12 @@ where
         let k = k as usize;
         decommitments.iter().map(|d| d.x[k]).sum::<Point<E>>()
     });
-    let X_stars = core_share.public_shares.into_iter().zip(X_prods).map(|(x, p)| x + p).collect();
+    let X_stars = core_share
+        .public_shares
+        .into_iter()
+        .zip(X_prods)
+        .map(|(x, p)| x + p)
+        .collect();
 
     let new_core_share = IncompleteKeyShare {
         curve: core_share.curve,
@@ -343,10 +411,7 @@ fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
 pub enum KeyRefreshError<IErr, OErr> {
     /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
-    Aborted(
-        #[source]
-        ProtocolAborted
-    ),
+    Aborted(#[source] ProtocolAborted),
     /// Receiving message error
     #[error("receive message")]
     ReceiveMessage(
@@ -388,15 +453,15 @@ mod test {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use crate::{security_level::ReasonablySecure, ExecutionId};
     use crate::key_share::Valid;
+    use crate::{security_level::ReasonablySecure, ExecutionId};
 
     #[test_case::case(2; "n2")]
     #[tokio::test]
     async fn keygen_works<E: generic_ec::Curve>(n: u16)
     where
-        generic_ec::Scalar<E> : FromHash,
-        Point<E>: generic_ec::coords::HasAffineX<E> ,
+        generic_ec::Scalar<E>: FromHash,
+        Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         let mut rng = rand_dev::DevRng::new();
 
@@ -428,21 +493,25 @@ mod test {
         // Create keyshares proper
 
         let mut simulation = Simulation::<super::Msg<E, Sha256>>::new();
-        let outputs = key_shares.into_iter().enumerate().map(|(i, incomplete_share)| {
-            let party = simulation.add_party();
-            let keygen_execution_id = keygen_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
-            async move {
-                super::refresh(
-                    &mut party_rng,
-                    party,
-                    i as u16,
-                    n,
-                    keygen_execution_id,
-                    incomplete_share.into(),
-                ).await
-            }
-        });
+        let outputs = key_shares
+            .into_iter()
+            .enumerate()
+            .map(|(i, incomplete_share)| {
+                let party = simulation.add_party();
+                let keygen_execution_id = keygen_execution_id.clone();
+                let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+                async move {
+                    super::refresh(
+                        &mut party_rng,
+                        party,
+                        i as u16,
+                        n,
+                        keygen_execution_id,
+                        incomplete_share.into(),
+                    )
+                    .await
+                }
+            });
 
         let key_shares = futures::future::try_join_all(outputs)
             .await
@@ -451,9 +520,15 @@ mod test {
         for (i, key_share) in key_shares.iter().enumerate() {
             let i = i as u16;
             assert_eq!(i, key_share.core.i);
-            assert_eq!(key_share.core.shared_public_key, key_shares[0].core.shared_public_key);
+            assert_eq!(
+                key_share.core.shared_public_key,
+                key_shares[0].core.shared_public_key
+            );
             assert_eq!(key_share.core.rid.as_ref(), key_shares[0].core.rid.as_ref());
-            assert_eq!(key_share.core.public_shares, key_shares[0].core.public_shares);
+            assert_eq!(
+                key_share.core.public_shares,
+                key_shares[0].core.public_shares
+            );
             assert_eq!(
                 Point::<E>::generator() * &key_share.core.x,
                 key_share.core.public_shares[usize::from(i)]
@@ -463,7 +538,10 @@ mod test {
             key_shares[0].core.shared_public_key,
             key_shares[0].core.public_shares.iter().sum::<Point<E>>()
         );
-        let key_shares = key_shares.into_iter().map(|s| s.try_into().unwrap()).collect::<Vec<Valid<_>>>();
+        let key_shares = key_shares
+            .into_iter()
+            .map(|s| s.try_into().unwrap())
+            .collect::<Vec<Valid<_>>>();
 
         // Sign and verify the signature
 

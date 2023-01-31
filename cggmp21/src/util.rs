@@ -9,3 +9,9 @@ where
         .for_each(|(a_i, b_i)| *a_i ^= *b_i);
     a
 }
+
+pub fn vec_of<A: Copy>(len: usize, a: A) -> Vec<A> {
+    let mut r = Vec::with_capacity(len);
+    r.resize(len, a);
+    r
+}
