@@ -11,13 +11,16 @@ use sha2::Sha256;
 use signing::SigningBuilder;
 
 mod execution_id;
+mod util;
 pub mod key_share;
+pub mod key_refresh;
 pub mod keygen;
 pub mod progress;
 pub mod security_level;
 pub mod signing;
 pub mod supported_curves;
 pub mod trusted_dealer;
+pub mod zk;
 mod utils;
 
 pub use self::execution_id::ExecutionId;
