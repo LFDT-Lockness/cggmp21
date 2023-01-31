@@ -17,6 +17,7 @@ paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "m", 
 digest = "0.10"
 sha2 = "0.10"
 rand_core = "0.6"
+rand_chacha = { version = "0.3", default-features = false }
 
 futures = "0.3"
 

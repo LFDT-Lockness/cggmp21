@@ -106,3 +106,12 @@ pub fn vec_of<A: Copy>(len: usize, a: A) -> Vec<A> {
     r.resize(len, a);
     r
 }
+
+pub fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
+    loop {
+        let r = BigNumber::from_rng(&modulo, rng);
+        if r.gcd(&modulo) == BigNumber::one() {
+            break r;
+        }
+    }
+}

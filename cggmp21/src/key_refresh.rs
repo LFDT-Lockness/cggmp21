@@ -20,8 +20,9 @@ use crate::{
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux},
     security_level::SecurityLevel,
-    utils::{vec_of, xor_array},
+    utils::xor_array,
     utils, ExecutionId,
+    zk::ring_pedersen_parameters as π_prm,
 };
 
 #[derive(ProtocolMessage, Clone)]
@@ -49,7 +50,7 @@ pub struct MsgRound2<E: Curve, D: Digest> {
     s: BigNumber,
     t: BigNumber,
     /// psi_circonflexe_i in paper
-    params_proof: (), // TODO
+    params_proof: π_prm::Proof<{π_prm::SECURITY}>, // TODO
     /// rho_i in paper
     rho_bytes: Vec<u8>, // FIXME: [u8; L::SECURITY_BYTES]
     /// u_i in paper
@@ -66,8 +67,7 @@ pub struct MsgRound3<E: Curve> {
     /// pi_i in paper
     sch_proof_y: schnorr_pok::Proof<E>,
     /// C_i^j in paper
-    C: BigNumber, // TODO: each participant receives their own C and
-    // sch_proof_x
+    C: BigNumber,
     /// psi_i_j in paper
     ///
     /// Here in the paper you only send one proof, but later they require you to
@@ -78,13 +78,13 @@ pub struct MsgRound3<E: Curve> {
 
 /*
 sch - denis's code as `schnorr_pok`
-prm - cggmp page 37
+prm - cggmp page 37, crate::zk::ring_pedersen_parameters
 mod - paillier_zk::paillier_blum_modulus
 fac - cggmp page 66
 */
 
 pub async fn refresh<R, M, E, L, D>(
-    rng: &mut R,
+    mut rng: &mut R,
     party: M,
     i: u16,
     n: u16,
@@ -97,7 +97,7 @@ where
     E: Curve,
     Scalar<E>: FromHash,
     L: SecurityLevel,
-    D: Digest + Clone + 'static,
+    D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
@@ -113,6 +113,7 @@ where
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id)
         .ok_or(KeyRefreshError::Bug("invalid hash to curve tag"))?;
+    let parties_shared_state = D::new_with_prefix(&execution_id);
 
     // Round 1
 
@@ -147,12 +148,17 @@ where
         .map(|x| Point::generator() * x)
         .collect::<Vec<_>>();
 
-    let r = gen_invertible(&N, rng);
+    let r = utils::gen_invertible(&N, rng);
     let λ = BigNumber::from_rng(&φ_N, rng);
     let t = r.modmul(&r, &N);
     let s = t.modpow(&λ, &N);
 
-    let params_proof = (); // TODO
+    let proof_data = π_prm::Data {
+        N: &N,
+        s: &s,
+        t: &t,
+    };
+    let params_proof = π_prm::prove(parties_shared_state.clone(), &mut rng, proof_data, &φ_N, &λ);
 
     // tau_j and A_i^j in paper
     // TODO: don't commit for myself
@@ -248,9 +254,42 @@ where
             ProtocolAborted::InvalidDecommitment { parties: blame },
         ));
     }
-
-    // TODO: validate params_proofs
-    // TODO: validate everyone sent the correct amount of bytes
+    // validate parameters and param_proofs
+    let blame = decommitments
+        .iter_indexed()
+        .filter(|(_, _, d)| {
+            if d.N.bit_length() < L::SECURITY_BYTES {
+                true
+            } else {
+                let data = π_prm::Data {
+                    N: &d.N,
+                    s: &d.s,
+                    t: &d.t,
+                };
+                π_prm::verify(parties_shared_state.clone(), data, &d.params_proof).is_err()
+            }
+        })
+        .map(|t| t.0)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::InvalidRingPedersenParameters { parties: blame },
+        ));
+    }
+    // validate Xs add to zero
+    let blame = decommitments
+        .iter_indexed()
+        .filter(|(_, _, d)| {
+            d.x.len() != (n as usize) || d.x.iter().sum::<Point<E>>() != Point::zero()
+        })
+        .map(|t| t.0)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            // TODO reason
+            ProtocolAborted::InvalidX { parties: blame },
+        ));
+    }
 
     let party_auxes = decommitments
         .iter_including_me(&decommitment)
@@ -402,15 +441,6 @@ where
     Ok(key_share)
 }
 
-fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
-    loop {
-        let r = BigNumber::from_rng(&modulo, rng);
-        if r.gcd(&modulo) == BigNumber::one() {
-            break r;
-        }
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum KeyRefreshError<IErr, OErr> {
     /// Protocol was maliciously aborted by another party
@@ -446,6 +476,10 @@ pub enum ProtocolAborted {
     InvalidDecommitment { parties: Vec<u16> },
     #[error("party provided invalid schnorr proof: {parties:?}")]
     InvalidSchnorrProof { parties: Vec<u16> },
+    #[error("party N, s and t parameters are invalid")]
+    InvalidRingPedersenParameters { parties: Vec<u16> },
+    #[error("party X is malformed")]
+    InvalidX { parties: Vec<u16> },
 }
 
 #[cfg(test)]
