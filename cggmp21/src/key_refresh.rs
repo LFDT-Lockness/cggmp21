@@ -8,7 +8,7 @@ use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
 };
-use paillier_zk::{libpaillier, unknown_order::BigNumber, paillier_blum_modulus as π_mod};
+use paillier_zk::{libpaillier, paillier_blum_modulus as π_mod, unknown_order::BigNumber};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -20,11 +20,13 @@ use crate::{
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux},
     security_level::SecurityLevel,
+    utils,
     utils::xor_array,
-    utils, ExecutionId,
     zk::ring_pedersen_parameters as π_prm,
+    ExecutionId,
 };
 
+/// Message of key refresh protocol
 #[derive(ProtocolMessage, Clone)]
 pub enum Msg<E: Curve, D: Digest> {
     Round1(MsgRound1<D>),
@@ -32,11 +34,12 @@ pub enum Msg<E: Curve, D: Digest> {
     Round3(MsgRound3<E>),
 }
 
+/// Message from round 1
 #[derive(Clone)]
 pub struct MsgRound1<D: Digest> {
     commitment: HashCommit<D>,
 }
-
+/// Message from round 2
 #[derive(Clone)]
 pub struct MsgRound2<E: Curve, D: Digest> {
     /// **X_i** in paper
@@ -50,18 +53,17 @@ pub struct MsgRound2<E: Curve, D: Digest> {
     s: BigNumber,
     t: BigNumber,
     /// psi_circonflexe_i in paper
-    params_proof: π_prm::Proof<{π_prm::SECURITY}>, // TODO
+    params_proof: π_prm::Proof<{ π_prm::SECURITY }>, // TODO
     /// rho_i in paper
     rho_bytes: Vec<u8>, // FIXME: [u8; L::SECURITY_BYTES]
     /// u_i in paper
     decommit: hash_commitment::DecommitNonce<D>,
 }
-
 /// Unicast message of round 3, sent to each participant
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
-    mod_proof: (π_mod::Commitment, π_mod::Proof<{π_prm::SECURITY}>), // TODO
+    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>), // TODO
     /// phi_i^j in paper
     fac_proof: (), // TODO
     /// pi_i in paper
@@ -83,11 +85,62 @@ mod - paillier_zk::paillier_blum_modulus
 fac - cggmp page 66
 */
 
-pub async fn refresh<R, M, E, L, D>(
+pub struct KeyRefreshBuilder<E: Curve, L: SecurityLevel, D: Digest> {
+    core_share: IncompleteKeyShare<E, L>,
+    execution_id: ExecutionId<E, L, D>,
+}
+
+impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
+    pub fn new(core_share: IncompleteKeyShare<E, L>) -> Self {
+        Self {
+            core_share,
+            execution_id: Default::default(),
+        }
+    }
+
+    pub fn new_refresh(key_share: KeyShare<E, L>) -> Self {
+        Self {
+            core_share: key_share.core,
+            execution_id: Default::default(),
+        }
+    }
+
+    pub fn with_digest<D2: Digest>(this: KeyRefreshBuilder<E, L, D2>) -> KeyRefreshBuilder<E, L, D2> {
+        this
+    }
+
+    pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
+        Self {
+            execution_id,
+            ..self
+        }
+    }
+
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
+        party: M,
+    ) -> Result<KeyShare<E, L>, KeyRefreshError<M::ReceiveError, M::SendError>>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = Msg<E, D>>,
+        E: Curve,
+        Scalar<E>: FromHash,
+        L: SecurityLevel,
+        D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
+    {
+        run_refresh(
+            rng,
+            party,
+            self.execution_id,
+            self.core_share,
+        ).await
+    }
+}
+
+pub async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
-    i: u16,
-    n: u16,
     execution_id: ExecutionId<E, L, D>,
     core_share: IncompleteKeyShare<E, L>,
 ) -> Result<KeyShare<E, L>, KeyRefreshError<M::ReceiveError, M::SendError>>
@@ -99,6 +152,9 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
+    let i = core_share.i;
+    let n = core_share.public_shares.len() as u16;
+
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
@@ -189,9 +245,7 @@ where
         commitment: hash_commit,
     };
     outgoings
-        .send(Outgoing::broadcast(Msg::Round1(
-            commitment.clone(),
-        )))
+        .send(Outgoing::broadcast(Msg::Round1(commitment.clone())))
         .await
         .map_err(KeyRefreshError::SendError)?;
 
@@ -213,9 +267,7 @@ where
         decommit,
     };
     outgoings
-        .send(Outgoing::broadcast(Msg::Round2(
-            decommitment.clone(),
-        )))
+        .send(Outgoing::broadcast(Msg::Round2(decommitment.clone())))
         .await
         .map_err(KeyRefreshError::SendError)?;
 
@@ -247,7 +299,7 @@ where
                 .verify(&commitment.commitment, &decommitment.decommit)
                 .is_err()
         })
-        .map(|tuple| tuple.0.0)
+        .map(|tuple| tuple.0 .0)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
@@ -322,18 +374,15 @@ where
 
     // common data for messages
     let mod_proof = {
-        let data = π_mod::Data {
-            n: N.clone(),
-        };
+        let data = π_mod::Data { n: N.clone() };
         let pdata = π_mod::PrivateData {
             p: p.clone(),
             q: q.clone(),
         };
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, rng)
     };
-    let challenge =
-        Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-            .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
+        .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     // save a message we would send to ourself
     // TODO: don't do that. Don't encrypt message for self
@@ -342,9 +391,12 @@ where
     for (j, ((x, enc), secret)) in xs.iter().zip(&encs).zip(&sch_secrets_a).enumerate() {
         let j = j as u16;
 
-        let sch_proofs_x = xs.iter().map(|x_j| schnorr_pok::prove(secret, &challenge, &x_j))
+        let sch_proofs_x = xs
+            .iter()
+            .map(|x_j| schnorr_pok::prove(secret, &challenge, &x_j))
             .collect();
-        let C = enc.encrypt(x.as_ref().to_be_bytes(), None)
+        let C = enc
+            .encrypt(x.as_ref().to_be_bytes(), None)
             .ok_or(KeyRefreshError::Bug("encryption failed"))?
             .0;
         let fac_proof = ();
@@ -376,22 +428,28 @@ where
         .map_err(KeyRefreshError::ReceiveMessage)?;
 
     // TODO: don't decrypt message for self
-    let shares = shares_msg_b.iter_including_me(&my_msg).map(|m| {
-        let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
-        Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
-    }).collect::<Result<Vec<_>, _>>()?;
+    let shares = shares_msg_b
+        .iter_including_me(&my_msg)
+        .map(|m| {
+            let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
+            Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     // TODO: verify shares are well formed
     // TODO: verify fac_proofs
     // verify sch proofs for y and x
     let blame = utils::collect_blame(
-        decommitments.iter_indexed().zip(shares_msg_b.iter_indexed()),
+        decommitments
+            .iter_indexed()
+            .zip(shares_msg_b.iter_indexed()),
         |((j, _, decommitment), (j_, _, proof_msg))| {
             debug_assert_eq!(j, j_);
             let i = i as usize;
 
-            let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
-                .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+            let challenge =
+                Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
+                    .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // proof for y, i.e. pi_j
@@ -400,19 +458,22 @@ where
                 .verify(&decommitment.sch_commit_b, &challenge, &decommitment.Y)
                 .is_err()
             {
-                return Ok(Some(j))
+                return Ok(Some(j));
             }
 
             // proof for x, i.e. psi_j^k for every k
             for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
                 // TODO: when the commit for self isn't sent, this can't be obtained by
                 // simple indexing
-                if sch_proof.verify(&decommitment.sch_commits_a[i], &challenge, x).is_err() {
-                    return Ok(Some(j))
+                if sch_proof
+                    .verify(&decommitment.sch_commits_a[i], &challenge, x)
+                    .is_err()
+                {
+                    return Ok(Some(j));
                 }
             }
             Ok(None)
-        }
+        },
     )?;
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
@@ -421,19 +482,23 @@ where
     }
 
     // verify mod proofs
-    let blame = decommitments.iter_indexed().zip(shares_msg_b.iter()).filter_map(
-        |((j, _, decommitment), proof_msg)| {
+    let blame = decommitments
+        .iter_indexed()
+        .zip(shares_msg_b.iter())
+        .filter_map(|((j, _, decommitment), proof_msg)| {
             let data = π_mod::Data {
                 n: decommitment.N.clone(),
             };
             let (ref comm, ref proof) = proof_msg.mod_proof;
-            if π_mod::non_interactive::verify(parties_shared_state.clone(), &data, &comm, &proof).is_err() {
+            if π_mod::non_interactive::verify(parties_shared_state.clone(), &data, &comm, &proof)
+                .is_err()
+            {
                 Some(j)
             } else {
                 None
             }
-        },
-    ).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             // TODO: not schnorr
@@ -445,7 +510,10 @@ where
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
         let k = k as usize;
-        decommitments.iter_including_me(&decommitment).map(|d| d.x[k]).sum::<Point<E>>()
+        decommitments
+            .iter_including_me(&decommitment)
+            .map(|d| d.x[k])
+            .sum::<Point<E>>()
     });
     let X_stars = core_share
         .public_shares
@@ -565,17 +633,14 @@ mod test {
         let mut simulation = Simulation::<super::Msg<E, Sha256>>::new();
         let outputs = key_shares
             .into_iter()
-            .enumerate()
-            .map(|(i, incomplete_share)| {
+            .map(|incomplete_share| {
                 let party = simulation.add_party();
                 let keygen_execution_id = keygen_execution_id.clone();
                 let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
                 async move {
-                    super::refresh(
+                    super::run_refresh(
                         &mut party_rng,
                         party,
-                        i as u16,
-                        n,
                         keygen_execution_id,
                         incomplete_share.into(),
                     )
