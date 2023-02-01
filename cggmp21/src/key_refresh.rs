@@ -384,12 +384,12 @@ where
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
-    // save a message we would send to ourself
-    // TODO: don't do that. Don't encrypt message for self
-    let mut my_msg = None;
     // message to each party
     for (j, ((x, enc), secret)) in xs.iter().zip(&encs).zip(&sch_secrets_a).enumerate() {
         let j = j as u16;
+        if j == i {
+            continue;
+        }
 
         let sch_proofs_x = xs
             .iter()
@@ -408,17 +408,11 @@ where
             sch_proofs_x,
             C,
         };
-        if j == i {
-            my_msg = Some(msg);
-        } else {
-            outgoings
-                .send(Outgoing::p2p(j, Msg::Round3(msg)))
-                .await
-                .map_err(KeyRefreshError::SendError)?;
-        }
+        outgoings
+            .send(Outgoing::p2p(j, Msg::Round3(msg)))
+            .await
+            .map_err(KeyRefreshError::SendError)?;
     }
-    // safe because j, i <- 0..n
-    let my_msg = my_msg.unwrap();
 
     // Output
 
@@ -427,9 +421,11 @@ where
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?;
 
-    // TODO: don't decrypt message for self
+    // x_j^i in paper. x_i^i is a share from self to self, so it was never sent,
+    // so it's handled separately
+    let my_share = &xs[i as usize];
     let shares = shares_msg_b
-        .iter_including_me(&my_msg)
+        .iter()
         .map(|m| {
             let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
             Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
@@ -506,7 +502,7 @@ where
         ));
     }
 
-    let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x);
+    let x_sum = shares.iter().fold(Scalar::zero().clone(), |s, x| s + x) + my_share;
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
         let k = k as usize;
