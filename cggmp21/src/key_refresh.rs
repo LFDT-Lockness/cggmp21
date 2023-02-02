@@ -302,6 +302,20 @@ where
             ProtocolAborted::invalid_decommitment(blame),
         ));
     }
+    // Validate parties didn't skip any data
+    let blame = decommitments.iter_indexed().filter(|(_, _, decommitment)| {
+            let n = n as usize;
+            decommitment.x.len() != n
+                || decommitment.sch_commits_a.len() != n - 1
+                || decommitment.rho_bytes.len() != L::SECURITY_BYTES
+        })
+        .map(|(j, _, _)| j)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::invalid_data_size(blame),
+        ));
+    }
     // validate parameters and param_proofs
     let blame = decommitments
         .iter_indexed()
@@ -328,7 +342,7 @@ where
     let blame = decommitments
         .iter_indexed()
         .filter(|(_, _, d)| {
-            d.x.len() != (n as usize) || d.x.iter().sum::<Point<E>>() != Point::zero()
+            d.x.iter().sum::<Point<E>>() != Point::zero()
         })
         .map(|t| t.0)
         .collect::<Vec<_>>();
@@ -348,7 +362,7 @@ where
     // encryption keys for each party
     let encs = decommitments
         .iter()
-        .map(|d| (j, utils::encryption_key_from_n(&d.N)))
+        .map(|d| utils::encryption_key_from_n(&d.N))
         .collect::<Vec<_>>();
 
     // rho in paper, collective random bytes
@@ -449,6 +463,10 @@ where
                 return Ok(Some(j));
             }
 
+            // x length is verified above
+            if proof_msg.sch_proofs_x.len() != decommitment.x.len() {
+                return Ok(Some(j))
+            }
             // proof for x, i.e. psi_j^k for every k
             for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
                 if sch_proof
@@ -571,6 +589,7 @@ pub enum ProtocolAbortReason {
     InvalidRingPedersenParameters,
     /// party X is malformed
     InvalidX,
+    InvalidDataSize,
 }
 
 impl std::fmt::Display for ProtocolAborted {
@@ -583,6 +602,7 @@ impl std::fmt::Display for ProtocolAborted {
                 "N, s and t parameters are invalid"
             }
             ProtocolAbortReason::InvalidX => "X is malformed",
+            ProtocolAbortReason::InvalidDataSize => "invalid vector of party data",
         };
         write!(
             f,
@@ -611,6 +631,7 @@ impl ProtocolAborted {
         InvalidRingPedersenParameters
     );
     make_factory!(invalid_x, InvalidX);
+    make_factory!(invalid_data_size, InvalidDataSize);
 }
 
 fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
