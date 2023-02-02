@@ -63,7 +63,7 @@ pub struct MsgRound2<E: Curve, D: Digest> {
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
-    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>), // TODO
+    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>), // even more TODO
     /// phi_i^j in paper
     fac_proof: (), // TODO
     /// pi_i in paper
@@ -105,7 +105,9 @@ impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
         }
     }
 
-    pub fn with_digest<D2: Digest>(this: KeyRefreshBuilder<E, L, D2>) -> KeyRefreshBuilder<E, L, D2> {
+    pub fn with_digest<D2: Digest>(
+        this: KeyRefreshBuilder<E, L, D2>,
+    ) -> KeyRefreshBuilder<E, L, D2> {
         this
     }
 
@@ -129,12 +131,7 @@ impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
         L: SecurityLevel,
         D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
     {
-        run_refresh(
-            rng,
-            party,
-            self.execution_id,
-            self.core_share,
-        ).await
+        run_refresh(rng, party, self.execution_id, self.core_share).await
     }
 }
 
@@ -303,7 +300,7 @@ where
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::InvalidDecommitment { parties: blame },
+            ProtocolAborted::invalid_decommitment(blame),
         ));
     }
     // validate parameters and param_proofs
@@ -325,7 +322,7 @@ where
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::InvalidRingPedersenParameters { parties: blame },
+            ProtocolAborted::invalid_ring_pedersen_parameters(blame),
         ));
     }
     // validate Xs add to zero
@@ -337,10 +334,7 @@ where
         .map(|t| t.0)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            // TODO reason
-            ProtocolAborted::InvalidX { parties: blame },
-        ));
+        return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
     }
 
     let party_auxes = decommitments
@@ -473,7 +467,7 @@ where
     )?;
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::InvalidSchnorrProof { parties: blame },
+            ProtocolAborted::invalid_schnorr_proof(blame),
         ));
     }
 
@@ -497,8 +491,7 @@ where
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
-            // TODO: not schnorr
-            ProtocolAborted::InvalidSchnorrProof { parties: blame },
+            ProtocolAborted::invalid_mod_proof(blame),
         ));
     }
 
@@ -519,12 +512,9 @@ where
         .collect();
 
     let new_core_share = IncompleteKeyShare {
-        curve: core_share.curve,
-        i, // FIXME: known in core_share as well
-        shared_public_key: core_share.shared_public_key,
-        rid: core_share.rid,
         public_shares: X_stars,
         x: SecretScalar::new(&mut x_star),
+        ..core_share
     };
     let key_share = KeyShare {
         core: new_core_share,
@@ -567,15 +557,64 @@ pub enum KeyRefreshError<IErr, OErr> {
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
-pub enum ProtocolAborted {
-    #[error("party decommitment doesn't match commitment: {parties:?}")]
-    InvalidDecommitment { parties: Vec<u16> },
-    #[error("party provided invalid schnorr proof: {parties:?}")]
-    InvalidSchnorrProof { parties: Vec<u16> },
-    #[error("party N, s and t parameters are invalid")]
-    InvalidRingPedersenParameters { parties: Vec<u16> },
-    #[error("party X is malformed")]
-    InvalidX { parties: Vec<u16> },
+pub struct ProtocolAborted {
+    pub reason: ProtocolAbortReason,
+    pub parties: Vec<u16>,
+}
+
+/// Reason for protocol abort: which exact check has failed
+#[derive(Debug)]
+pub enum ProtocolAbortReason {
+    /// party decommitment doesn't match commitment
+    InvalidDecommitment,
+    /// party provided invalid schnorr proof
+    InvalidSchnorrProof,
+    /// party provided invalid proof for Rmod
+    InvalidModProof,
+    /// party N, s and t parameters are invalid
+    InvalidRingPedersenParameters,
+    /// party X is malformed
+    InvalidX,
+}
+
+impl std::fmt::Display for ProtocolAborted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let reason = match self.reason {
+            ProtocolAbortReason::InvalidDecommitment => "decommitment doesn't match commitment",
+            ProtocolAbortReason::InvalidSchnorrProof => "invalid schnorr proof",
+            ProtocolAbortReason::InvalidModProof => "invalid Rmod proof",
+            ProtocolAbortReason::InvalidRingPedersenParameters => {
+                "N, s and t parameters are invalid"
+            }
+            ProtocolAbortReason::InvalidX => "X is malformed",
+        };
+        write!(
+            f,
+            "ProtocolAborted {{ reason = {}, blame = {:?} }}",
+            reason, self.parties
+        )
+    }
+}
+
+macro_rules! make_factory {
+    ($function:ident, $reason:ident) => {
+        fn $function(parties: Vec<u16>) -> Self {
+            Self {
+                reason: ProtocolAbortReason::$reason,
+                parties,
+            }
+        }
+    };
+}
+impl ProtocolAborted {
+    make_factory!(invalid_decommitment, InvalidDecommitment);
+    make_factory!(invalid_schnorr_proof, InvalidSchnorrProof);
+    make_factory!(invalid_mod_proof, InvalidModProof);
+    make_factory!(
+        invalid_ring_pedersen_parameters,
+        InvalidRingPedersenParameters
+    );
+    make_factory!(invalid_x, InvalidX);
 }
 
 #[cfg(test)]
@@ -627,22 +666,20 @@ mod test {
         // Create keyshares proper
 
         let mut simulation = Simulation::<super::Msg<E, Sha256>>::new();
-        let outputs = key_shares
-            .into_iter()
-            .map(|incomplete_share| {
-                let party = simulation.add_party();
-                let keygen_execution_id = keygen_execution_id.clone();
-                let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
-                async move {
-                    super::run_refresh(
-                        &mut party_rng,
-                        party,
-                        keygen_execution_id,
-                        incomplete_share.into(),
-                    )
-                    .await
-                }
-            });
+        let outputs = key_shares.into_iter().map(|incomplete_share| {
+            let party = simulation.add_party();
+            let keygen_execution_id = keygen_execution_id.clone();
+            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            async move {
+                super::run_refresh(
+                    &mut party_rng,
+                    party,
+                    keygen_execution_id,
+                    incomplete_share.into(),
+                )
+                .await
+            }
+        });
 
         let key_shares = futures::future::try_join_all(outputs)
             .await
