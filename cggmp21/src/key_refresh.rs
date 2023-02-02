@@ -214,8 +214,7 @@ where
     let params_proof = π_prm::prove(parties_shared_state.clone(), &mut rng, proof_data, &φ_N, &λ);
 
     // tau_j and A_i^j in paper
-    // TODO: don't commit for myself
-    let (sch_secrets_a, sch_commits_a) = (0..n)
+    let (sch_secrets_a, sch_commits_a) = iter_peers(i, n)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip::<_, _, Vec<_>, Vec<_>>();
 
@@ -346,10 +345,10 @@ where
             Y: d.Y.clone(),
         })
         .collect::<Vec<_>>();
-    // TODO: don't create key for self
-    let encs = party_auxes
+    // encryption keys for each party
+    let encs = decommitments
         .iter()
-        .map(|aux| utils::encryption_key_from_n(&aux.N))
+        .map(|d| (j, utils::encryption_key_from_n(&d.N)))
         .collect::<Vec<_>>();
 
     // rho in paper, collective random bytes
@@ -379,12 +378,13 @@ where
         .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     // message to each party
-    for (j, ((x, enc), secret)) in xs.iter().zip(&encs).zip(&sch_secrets_a).enumerate() {
-        let j = j as u16;
-        if j == i {
-            continue;
-        }
-
+    let iterator =
+        // use every share except ours
+        but_nth(i, xs.iter())
+        .zip(&encs)
+        .zip(&sch_secrets_a)
+        .zip(iter_peers(i, n));
+    for (((x, enc), secret), j) in iterator {
         let sch_proofs_x = xs
             .iter()
             .map(|x_j| schnorr_pok::prove(secret, &challenge, &x_j))
@@ -435,8 +435,6 @@ where
             .zip(shares_msg_b.iter_indexed()),
         |((j, _, decommitment), (j_, _, proof_msg))| {
             debug_assert_eq!(j, j_);
-            let i = i as usize;
-
             let challenge =
                 Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
                     .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
@@ -453,10 +451,8 @@ where
 
             // proof for x, i.e. psi_j^k for every k
             for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
-                // TODO: when the commit for self isn't sent, this can't be obtained by
-                // simple indexing
                 if sch_proof
-                    .verify(&decommitment.sch_commits_a[i], &challenge, x)
+                    .verify(mine_from(i, j, &decommitment.sch_commits_a), &challenge, x)
                     .is_err()
                 {
                     return Ok(Some(j));
@@ -615,6 +611,27 @@ impl ProtocolAborted {
         InvalidRingPedersenParameters
     );
     make_factory!(invalid_x, InvalidX);
+}
+
+fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
+    (0..n).filter(move |x| *x != i)
+}
+
+fn mine_from<V, O>(i: u16, j: u16, v: &V) -> &O
+where
+    V: std::ops::Index<usize, Output = O>,
+{
+    if i < j {
+        v.index(i as usize)
+    } else {
+        v.index(i as usize - 1)
+    }
+}
+
+fn but_nth<T, I: Iterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
+    iter.enumerate()
+        .filter(move |(i, _)| *i != n as usize)
+        .map(|(_, x)| x)
 }
 
 #[cfg(test)]
