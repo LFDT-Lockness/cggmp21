@@ -53,7 +53,7 @@ where
 }
 
 /// Protocol for performing key refresh
-pub fn key_refresh<E, L>(key_share: KeyShare<E, L>) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
+pub fn key_refresh<E, L>(key_share: Valid<KeyShare<E, L>>) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
 where
     E: Curve,
     L: SecurityLevel,

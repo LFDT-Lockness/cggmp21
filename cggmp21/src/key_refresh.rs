@@ -18,7 +18,7 @@ use thiserror::Error;
 
 use crate::{
     execution_id::ProtocolChoice,
-    key_share::{IncompleteKeyShare, KeyShare, PartyAux},
+    key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
     security_level::SecurityLevel,
     utils,
     utils::xor_array,
@@ -98,7 +98,8 @@ impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
         }
     }
 
-    pub fn new_refresh(key_share: KeyShare<E, L>) -> Self {
+    pub fn new_refresh(key_share: Valid<KeyShare<E, L>>) -> Self {
+        let key_share: KeyShare<E, L> = key_share.into();
         Self {
             core_share: key_share.core,
             execution_id: Default::default(),

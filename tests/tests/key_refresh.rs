@@ -1,3 +1,5 @@
+mod precomputed_shares;
+
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
     use generic_ec::{hash_to_curve::FromHash, Point};
@@ -9,6 +11,8 @@ mod generic {
     use cggmp21::key_share::Valid;
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
+    use super::precomputed_shares::CACHED_SHARES;
+
     #[test_case::case(5; "n3")]
     #[tokio::test]
     async fn key_refresh_works<E: generic_ec::Curve>(n: u16)
@@ -18,52 +22,33 @@ mod generic {
     {
         let mut rng = rand_dev::DevRng::new();
 
-        let keygen_execution_id: [u8; 32] = rng.gen();
-        let keygen_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&keygen_execution_id);
+        let shares = CACHED_SHARES
+            .get_shares::<E>(n)
+            .expect("retrieve cached shares");
 
-        // Create keyshare cores
+        // Perform refresh
 
-        let mut simulation = Simulation::<cggmp21::keygen::Msg<E, ReasonablySecure, Sha256>>::new();
-        let mut outputs = vec![];
-        for i in 0..n {
-            let party = simulation.add_party();
-            let keygen_execution_id = keygen_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
-
-            outputs.push(async move {
-                cggmp21::keygen(i, n)
-                    .set_execution_id(keygen_execution_id)
-                    .start(&mut party_rng, party)
-                    .await
-            })
-        }
-
-        let key_shares = futures::future::try_join_all(outputs)
-            .await
-            .expect("keygen failed");
-
-        // Create keyshares proper
-
+        let refresh_execution_id: [u8; 32] = rng.gen();
+        let refresh_execution_id =
+            ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
         let mut simulation = Simulation::<cggmp21::key_refresh::Msg<E,Sha256> >::new();
-        let outputs = key_shares.into_iter().map(|incomplete_share| {
+        let outputs = shares.into_iter().map(|share| {
             let party = simulation.add_party();
-            let keygen_execution_id = keygen_execution_id.clone();
+            let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
             async move {
-                cggmp21::key_refresh::run_refresh(
-                    &mut party_rng,
-                    party,
-                    keygen_execution_id,
-                    incomplete_share.into(),
-                )
-                .await
+                cggmp21::key_refresh(share)
+                    .set_execution_id(refresh_execution_id)
+                    .start(&mut party_rng, party)
+                    .await
             }
         });
 
         let key_shares = futures::future::try_join_all(outputs)
             .await
             .expect("keygen failed");
+
+        // validate key shares
 
         for (i, key_share) in key_shares.iter().enumerate() {
             let i = i as u16;
@@ -88,7 +73,7 @@ mod generic {
         );
         let key_shares = key_shares
             .into_iter()
-            .map(|s| s.try_into().unwrap())
+            .map(|s| s.try_into().expect("Key share did not validate"))
             .collect::<Vec<Valid<_>>>();
 
         // Sign and verify the signature
@@ -100,7 +85,7 @@ mod generic {
         let mut outputs = vec![];
         for share in &key_shares {
             let party = simulation.add_party();
-            let signing_execution_id = keygen_execution_id.clone();
+            let signing_execution_id = refresh_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
 
             outputs.push(async move {
