@@ -132,3 +132,41 @@ where
     }
     Ok(r)
 }
+
+/// Binary search for square root
+pub fn sqrt(x: &BigNumber) -> BigNumber {
+    let mut low = BigNumber::one();
+    let mut high = x.clone();
+    while low < &high - 1 {
+        let mid = (&high + &low) / 2;
+        let test: BigNumber = &mid * &mid;
+        match test.cmp(x) {
+            std::cmp::Ordering::Equal => return mid,
+            std::cmp::Ordering::Less => {
+                low = mid;
+            }
+            std::cmp::Ordering::Greater => {
+                high = mid;
+            }
+        }
+    }
+    low
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_sqrt() {
+        use super::{sqrt, BigNumber};
+        assert_eq!(sqrt(&BigNumber::from(1)), BigNumber::from(1));
+        assert_eq!(sqrt(&BigNumber::from(2)), BigNumber::from(1));
+        assert_eq!(sqrt(&BigNumber::from(3)), BigNumber::from(1));
+        assert_eq!(sqrt(&BigNumber::from(4)), BigNumber::from(2));
+        assert_eq!(sqrt(&BigNumber::from(5)), BigNumber::from(2));
+        assert_eq!(sqrt(&BigNumber::from(6)), BigNumber::from(2));
+        assert_eq!(sqrt(&BigNumber::from(7)), BigNumber::from(2));
+        assert_eq!(sqrt(&BigNumber::from(8)), BigNumber::from(2));
+        assert_eq!(sqrt(&BigNumber::from(9)), BigNumber::from(3));
+        assert_eq!(sqrt(&(BigNumber::from(1) << 1024)), BigNumber::from(1) << 512);
+    }
+}

@@ -8,7 +8,7 @@ use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
 };
-use paillier_zk::{libpaillier, paillier_blum_modulus as π_mod, unknown_order::BigNumber};
+use paillier_zk::{libpaillier, paillier_blum_modulus as π_mod, no_small_factor::non_interactive as π_fac, unknown_order::BigNumber};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -65,7 +65,7 @@ pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
     mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>), // even more TODO
     /// phi_i^j in paper
-    fac_proof: (), // TODO
+    fac_proof: π_fac::Proof,
     /// pi_i in paper
     sch_proof_y: schnorr_pok::Proof<E>,
     /// C_i^j in paper
@@ -256,8 +256,8 @@ where
         Y,
         sch_commit_b: sch_commit_b.clone(),
         N: N.clone(),
-        s,
-        t,
+        s: s.clone(),
+        t: t.clone(),
         params_proof,
         rho_bytes: rho_bytes.clone(),
         decommit,
@@ -386,11 +386,21 @@ where
             p: p.clone(),
             q: q.clone(),
         };
-        π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, rng)
+        π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
     };
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
+    let π_fac_aux = π_fac::Aux {
+        s: s.clone(),
+        t: t.clone(),
+        rsa_modulo: N.clone(),
+    };
+    let π_fac_security = π_fac::SecurityParams {
+        l: L::ELL,
+        epsilon: L::EPSILON,
+        q: L::q(),
+    };
     // message to each party
     let iterator =
         // use every share except ours
@@ -407,7 +417,20 @@ where
             .encrypt(x.as_ref().to_be_bytes(), None)
             .ok_or(KeyRefreshError::Bug("encryption failed"))?
             .0;
-        let fac_proof = ();
+        let fac_proof = π_fac::prove(
+            parties_shared_state.clone(),
+            &π_fac_aux,
+            π_fac::Data {
+                n: &N,
+                n_root: &utils::sqrt(&N),
+            },
+            π_fac::PrivateData {
+                p: &p,
+                q: &q,
+            },
+            &π_fac_security,
+            &mut rng,
+        );
 
         let msg = MsgRound3 {
             mod_proof: mod_proof.clone(),
@@ -509,6 +532,38 @@ where
         ));
     }
 
+    // verify fac proofs
+    let blame = decommitments
+        .iter_indexed()
+        .zip(shares_msg_b.iter())
+        .filter_map(|((j, _, decommitment), proof_msg)| {
+            let verdict = π_fac::verify(
+                parties_shared_state.clone(),
+                &π_fac::Aux {
+                    s: decommitment.s.clone(),
+                    t: decommitment.t.clone(),
+                    rsa_modulo: decommitment.N.clone(),
+                },
+                π_fac::Data {
+                    n: &decommitment.N,
+                    n_root: &utils::sqrt(&decommitment.N),
+                },
+                &π_fac_security,
+                &proof_msg.fac_proof,
+            );
+            if verdict.is_err() {
+                Some(j)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::invalid_fac_proof(blame),
+        ));
+    }
+
     let x_sum = shares.iter().fold(Scalar::zero().clone(), |s, x| s + x) + my_share;
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
@@ -585,6 +640,8 @@ pub enum ProtocolAbortReason {
     InvalidSchnorrProof,
     /// party provided invalid proof for Rmod
     InvalidModProof,
+    /// party provided invalid proof for Rfac
+    InvalidFacProof,
     /// party N, s and t parameters are invalid
     InvalidRingPedersenParameters,
     /// party X is malformed
@@ -598,6 +655,7 @@ impl std::fmt::Display for ProtocolAborted {
             ProtocolAbortReason::InvalidDecommitment => "decommitment doesn't match commitment",
             ProtocolAbortReason::InvalidSchnorrProof => "invalid schnorr proof",
             ProtocolAbortReason::InvalidModProof => "invalid Rmod proof",
+            ProtocolAbortReason::InvalidFacProof => "invalid Rfac proof",
             ProtocolAbortReason::InvalidRingPedersenParameters => {
                 "N, s and t parameters are invalid"
             }
@@ -626,6 +684,7 @@ impl ProtocolAborted {
     make_factory!(invalid_decommitment, InvalidDecommitment);
     make_factory!(invalid_schnorr_proof, InvalidSchnorrProof);
     make_factory!(invalid_mod_proof, InvalidModProof);
+    make_factory!(invalid_fac_proof, InvalidFacProof);
     make_factory!(
         invalid_ring_pedersen_parameters,
         InvalidRingPedersenParameters
