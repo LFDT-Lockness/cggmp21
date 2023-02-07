@@ -105,8 +105,8 @@ where
 
 pub fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
     loop {
-        let r = BigNumber::from_rng(&modulo, rng);
-        if r.gcd(&modulo) == BigNumber::one() {
+        let r = BigNumber::from_rng(modulo, rng);
+        if r.gcd(modulo) == BigNumber::one() {
             break r;
         }
     }
@@ -119,9 +119,8 @@ where
 {
     let mut r = Vec::new();
     for x in iter {
-        match f(x)? {
-            Some(i) => r.push(i),
-            None => (),
+        if let Some(i) = f(x)? {
+            r.push(i);
         }
     }
     Ok(r)
@@ -185,6 +184,9 @@ mod test {
         assert_eq!(sqrt(&BigNumber::from(7)), BigNumber::from(2));
         assert_eq!(sqrt(&BigNumber::from(8)), BigNumber::from(2));
         assert_eq!(sqrt(&BigNumber::from(9)), BigNumber::from(3));
-        assert_eq!(sqrt(&(BigNumber::from(1) << 1024)), BigNumber::from(1) << 512);
+        assert_eq!(
+            sqrt(&(BigNumber::from(1) << 1024)),
+            BigNumber::from(1) << 512
+        );
     }
 }

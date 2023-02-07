@@ -24,13 +24,15 @@ use crate::{
     key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
     security_level::SecurityLevel,
     utils,
-    utils::{xor_array, iter_peers, mine_from, but_nth},
+    utils::{but_nth, iter_peers, mine_from, xor_array},
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
 };
 
 /// Message of key refresh protocol
 #[derive(ProtocolMessage, Clone)]
+// 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
+#[allow(clippy::large_enum_variant)]
 pub enum Msg<E: Curve, D: Digest> {
     Round1(MsgRound1<D>),
     Round2(MsgRound2<E, D>),
@@ -180,7 +182,7 @@ where
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id)
         .ok_or(KeyRefreshError::InternalError(Bug::InvalidHashToCurveTag))?;
-    let parties_shared_state = D::new_with_prefix(&execution_id);
+    let parties_shared_state = D::new_with_prefix(execution_id);
 
     // Round 1
 
@@ -204,7 +206,6 @@ where
     // then create a last element such that the sum is zero
     let mut x_last = -xs.iter().fold(Scalar::<E>::zero(), |s, x| s + x.as_ref());
     xs.push(SecretScalar::new(&mut x_last));
-    drop(x_last);
     debug_assert_eq!(
         xs.iter().fold(Scalar::<E>::zero(), |s, x| s + x.as_ref()),
         Scalar::zero()
@@ -244,7 +245,7 @@ where
         .mix(i)
         .mix_many(&Xs)
         .mix_many(sch_commits_a.iter().map(|a| a.0))
-        .mix(&Y)
+        .mix(Y)
         .mix_bytes(&N.to_bytes())
         .mix_bytes(&s.to_bytes())
         .mix_bytes(&t.to_bytes())
@@ -300,10 +301,10 @@ where
                 .mix(j)
                 .mix_many(&decommitment.x)
                 .mix_many(decommitment.sch_commits_a.iter().map(|a| a.0))
-                .mix(&decommitment.Y)
-                .mix_bytes(&decommitment.N.to_bytes())
-                .mix_bytes(&decommitment.s.to_bytes())
-                .mix_bytes(&decommitment.t.to_bytes())
+                .mix(decommitment.Y)
+                .mix_bytes(decommitment.N.to_bytes())
+                .mix_bytes(decommitment.s.to_bytes())
+                .mix_bytes(decommitment.t.to_bytes())
                 // mix param proof
                 .mix_bytes(&decommitment.rho_bytes)
                 .verify(&commitment.commitment, &decommitment.decommit)
@@ -416,7 +417,7 @@ where
     for (((x, enc), secret), j) in iterator {
         let sch_proofs_x = xs
             .iter()
-            .map(|x_j| schnorr_pok::prove(secret, &challenge, &x_j))
+            .map(|x_j| schnorr_pok::prove(secret, &challenge, x_j))
             .collect();
         let nonce = BigNumber::from_rng(enc.n(), &mut rng);
         let C = enc
@@ -462,7 +463,7 @@ where
         .iter()
         .map(|m| {
             let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
-            Scalar::from_be_bytes(bytes).map_err(|e| KeyRefreshError::InvalidScalar(e))
+            Scalar::from_be_bytes(bytes).map_err(KeyRefreshError::InvalidScalar)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -481,18 +482,16 @@ where
         })
         .collect::<Vec<_>>();
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_x_share(blame),
-        ));
+        return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x_share(
+            blame,
+        )));
     }
     // It is possible at this point to report a bad party to others, but we
     // don't implement it now
 
     // verify sch proofs for y and x
     let blame = utils::collect_blame(
-        decommitments
-            .iter_indexed()
-            .zip(shares_msg_b.iter()),
+        decommitments.iter_indexed().zip(shares_msg_b.iter()),
         |((j, _, decommitment), proof_msg)| {
             let challenge =
                 Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
@@ -539,7 +538,7 @@ where
                 n: decommitment.N.clone(),
             };
             let (ref comm, ref proof) = proof_msg.mod_proof;
-            if π_mod::non_interactive::verify(parties_shared_state.clone(), &data, &comm, &proof)
+            if π_mod::non_interactive::verify(parties_shared_state.clone(), &data, comm, proof)
                 .is_err()
             {
                 Some(j)
@@ -588,7 +587,7 @@ where
 
     // verifications passed, compute final key shares
 
-    let x_sum = shares.iter().fold(Scalar::zero().clone(), |s, x| s + x) + my_share;
+    let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x) + my_share;
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
         let k = k as usize;
@@ -615,7 +614,7 @@ where
             N: d.N.clone(),
             s: d.s.clone(),
             t: d.t.clone(),
-            Y: d.Y.clone(),
+            Y: d.Y,
         })
         .collect();
     let key_share = KeyShare {

@@ -1,5 +1,5 @@
-//! Пprm or Rprm in the paper. Proof that s ⋮ t modulo N. The non-interactive
-//! version
+//! Пprm or Rprm in the paper. Proof that s ⋮ t modulo N. Non-interactive
+//! version only.
 use digest::{typenum::U32, Digest};
 use paillier_zk::unknown_order::BigNumber;
 use rand_core::{RngCore, SeedableRng};
@@ -30,12 +30,9 @@ pub struct Proof<const M: usize> {
     pub zs: [BigNumber; M],
 }
 
-fn derive_challenge<const M: usize, D>(
-    shared_state: D,
-    data: Data,
-) -> Challenge<M>
+fn derive_challenge<const M: usize, D>(shared_state: D, data: Data) -> Challenge<M>
 where
-    D: Digest<OutputSize = U32>
+    D: Digest<OutputSize = U32>,
 {
     let seed = shared_state
         .chain_update(&data.N.to_bytes())
@@ -75,8 +72,10 @@ where
     D: Digest<OutputSize = U32>,
     R: RngCore,
 {
-    let private_commitment = [(); M].map(|()| BigNumber::from_rng(&phi, &mut rng));
-    let commitment = private_commitment.clone().map(|a| data.t.modpow(&a, &data.N));
+    let private_commitment = [(); M].map(|()| BigNumber::from_rng(phi, &mut rng));
+    let commitment = private_commitment
+        .clone()
+        .map(|a| data.t.modpow(&a, data.N));
     let challenge: Challenge<M> = derive_challenge(shared_state, data);
 
     let mut zs = private_commitment;
@@ -85,10 +84,7 @@ where
             *z_ref = z_ref.modadd(lambda, phi);
         }
     }
-    Proof {
-        commitment,
-        zs,
-    }
+    Proof { commitment, zs }
 }
 
 /// Verify the proof. Derives determenistic challenge based on `shared_state`
@@ -103,17 +99,15 @@ where
 {
     let challenge: Challenge<M> = derive_challenge(shared_state, data);
     for ((z, a), e) in proof.zs.iter().zip(&proof.commitment).zip(&challenge.es) {
-        let lhs = data.t.modpow(z, &data.N);
+        let lhs = data.t.modpow(z, data.N);
         if *e {
-            let rhs = data.s.modmul(a, &data.N);
+            let rhs = data.s.modmul(a, data.N);
             if lhs != rhs {
                 return Err(InvalidProof);
             }
-        } else {
-            if lhs != *a {
-                return Err(InvalidProof);
-            }
-        };
+        } else if lhs != *a {
+            return Err(InvalidProof);
+        }
     }
     Ok(())
 }
@@ -148,7 +142,13 @@ mod test {
             t: &t,
         };
 
-        let proof: super::Proof<16> = super::prove(shared_state.clone(), rand_core::OsRng::default(), data, &phi, &lambda);
+        let proof: super::Proof<16> = super::prove(
+            shared_state.clone(),
+            rand_core::OsRng::default(),
+            data,
+            &phi,
+            &lambda,
+        );
         super::verify(shared_state, data, &proof).expect("proof should pass");
     }
 
@@ -174,7 +174,13 @@ mod test {
             t: &t,
         };
 
-        let proof: super::Proof<16> = super::prove(shared_state.clone(), rand_core::OsRng::default(), data, &phi, &lambda);
+        let proof: super::Proof<16> = super::prove(
+            shared_state.clone(),
+            rand_core::OsRng::default(),
+            data,
+            &phi,
+            &lambda,
+        );
         if super::verify(shared_state, data, &proof).is_ok() {
             panic!("proof should fail");
         }

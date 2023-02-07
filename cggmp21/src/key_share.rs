@@ -175,7 +175,9 @@ impl<E: Curve, L: SecurityLevel> TryFrom<KeyShare<E, L>> for Valid<KeyShare<E, L
     }
 }
 
-impl<E: Curve, L: SecurityLevel> From<Valid<IncompleteKeyShare<E, L>>> for IncompleteKeyShare<E, L> {
+impl<E: Curve, L: SecurityLevel> From<Valid<IncompleteKeyShare<E, L>>>
+    for IncompleteKeyShare<E, L>
+{
     fn from(x: Valid<IncompleteKeyShare<E, L>>) -> Self {
         x.0
     }

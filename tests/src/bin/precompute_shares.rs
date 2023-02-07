@@ -9,7 +9,7 @@ fn main() -> Result<()> {
     let mut cache = PrecomputedKeyShares::empty();
     precompute_shares_for_curve::<Secp256r1, _>(&mut rng, &mut cache)?;
     let cache_json = cache.to_string().context("serialize cache")?;
-    println!("{}", cache_json);
+    println!("{cache_json}");
     Ok(())
 }
 
