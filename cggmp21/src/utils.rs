@@ -103,12 +103,6 @@ where
     a
 }
 
-pub fn vec_of<A: Copy>(len: usize, a: A) -> Vec<A> {
-    let mut r = Vec::with_capacity(len);
-    r.resize(len, a);
-    r
-}
-
 pub fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
     loop {
         let r = BigNumber::from_rng(&modulo, rng);
@@ -131,6 +125,30 @@ where
         }
     }
     Ok(r)
+}
+
+/// Iterate peers of i-th party
+pub fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
+    (0..n).filter(move |x| *x != i)
+}
+
+/// Get i-th message from j-th party in vector
+pub fn mine_from<V, O>(i: u16, j: u16, v: &V) -> &O
+where
+    V: std::ops::Index<usize, Output = O>,
+{
+    if i < j {
+        v.index(i as usize)
+    } else {
+        v.index(i as usize - 1)
+    }
+}
+
+/// Drop n-th item from iteration
+pub fn but_nth<T, I: Iterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
+    iter.enumerate()
+        .filter(move |(i, _)| *i != n as usize)
+        .map(|(_, x)| x)
 }
 
 /// Binary search for square root

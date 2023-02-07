@@ -24,7 +24,7 @@ use crate::{
     key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
     security_level::SecurityLevel,
     utils,
-    utils::xor_array,
+    utils::{xor_array, iter_peers, mine_from, but_nth},
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
 };
@@ -646,7 +646,6 @@ pub enum KeyRefreshError<IErr, OErr> {
     /// Sending message error
     #[error("send message")]
     SendError(#[source] OErr),
-    /// Bug occurred
     #[error("internal error")]
     InternalError(#[source] Bug),
     #[error("couldn't decrypt a message")]
@@ -655,6 +654,7 @@ pub enum KeyRefreshError<IErr, OErr> {
     InvalidScalar(generic_ec::errors::InvalidScalar),
 }
 
+/// Unexpected error in operation not caused by other parties
 #[derive(Debug, Error)]
 pub enum Bug {
     #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
@@ -671,52 +671,31 @@ pub enum Bug {
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
+#[error("Protocol aborted; malicious parties: {parties:?}; reason: {reason}")]
 pub struct ProtocolAborted {
     pub reason: ProtocolAbortReason,
     pub parties: Vec<u16>,
 }
 
 /// Reason for protocol abort: which exact check has failed
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ProtocolAbortReason {
-    /// party decommitment doesn't match commitment
+    #[error("decommitment doesn't match commitment")]
     InvalidDecommitment,
-    /// party provided invalid schnorr proof
+    #[error("provided invalid schnorr proof")]
     InvalidSchnorrProof,
-    /// party provided invalid proof for Rmod
+    #[error("provided invalid proof for Rmod")]
     InvalidModProof,
-    /// party provided invalid proof for Rfac
+    #[error("provided invalid proof for Rfac")]
     InvalidFacProof,
-    /// party N, s and t parameters are invalid
+    #[error("N, s and t parameters are invalid")]
     InvalidRingPedersenParameters,
-    /// party X is malformed
+    #[error("X is malformed")]
     InvalidX,
-    /// party x doesn't correspond to X
+    #[error("x doesn't correspond to X")]
     InvalidXShare,
-    /// party sent a message with missing data
+    #[error("party sent a message with missing data")]
     InvalidDataSize,
-}
-
-impl std::fmt::Display for ProtocolAborted {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let reason = match self.reason {
-            ProtocolAbortReason::InvalidDecommitment => "decommitment doesn't match commitment",
-            ProtocolAbortReason::InvalidSchnorrProof => "invalid schnorr proof",
-            ProtocolAbortReason::InvalidModProof => "invalid Rmod proof",
-            ProtocolAbortReason::InvalidFacProof => "invalid Rfac proof",
-            ProtocolAbortReason::InvalidRingPedersenParameters => {
-                "N, s and t parameters are invalid"
-            }
-            ProtocolAbortReason::InvalidX => "X is malformed",
-            ProtocolAbortReason::InvalidXShare => "x doesn't correspond to X",
-            ProtocolAbortReason::InvalidDataSize => "invalid vector of party data",
-        };
-        write!(
-            f,
-            "ProtocolAborted {{ reason: {}, blame: {:?} }}",
-            reason, self.parties
-        )
-    }
 }
 
 macro_rules! make_factory {
@@ -741,25 +720,4 @@ impl ProtocolAborted {
     make_factory!(invalid_x, InvalidX);
     make_factory!(invalid_x_share, InvalidXShare);
     make_factory!(invalid_data_size, InvalidDataSize);
-}
-
-fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
-    (0..n).filter(move |x| *x != i)
-}
-
-fn mine_from<V, O>(i: u16, j: u16, v: &V) -> &O
-where
-    V: std::ops::Index<usize, Output = O>,
-{
-    if i < j {
-        v.index(i as usize)
-    } else {
-        v.index(i as usize - 1)
-    }
-}
-
-fn but_nth<T, I: Iterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
-    iter.enumerate()
-        .filter(move |(i, _)| *i != n as usize)
-        .map(|(_, x)| x)
 }
