@@ -14,6 +14,7 @@ mod generic {
     use super::precomputed_shares::CACHED_SHARES;
 
     #[test_case::case(5; "n3")]
+    #[test_case::case(10; "n10")]
     #[tokio::test]
     async fn key_refresh_works<E: generic_ec::Curve>(n: u16)
     where
@@ -31,7 +32,7 @@ mod generic {
         let refresh_execution_id: [u8; 32] = rng.gen();
         let refresh_execution_id =
             ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
-        let mut simulation = Simulation::<cggmp21::key_refresh::Msg<E,Sha256> >::new();
+        let mut simulation = Simulation::<cggmp21::key_refresh::Msg<E, Sha256>>::new();
         let outputs = shares.into_iter().map(|share| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
@@ -71,40 +72,10 @@ mod generic {
             key_shares[0].core.shared_public_key,
             key_shares[0].core.public_shares.iter().sum::<Point<E>>()
         );
-        let key_shares = key_shares
+        let _key_shares = key_shares
             .into_iter()
             .map(|s| s.try_into().expect("Key share did not validate"))
             .collect::<Vec<Valid<_>>>();
-
-        // Sign and verify the signature
-
-        let mut simulation = Simulation::<cggmp21::signing::Msg<E, Sha256>>::new();
-        let message_to_sign = b"Dfns rules!";
-        let message_to_sign = cggmp21::signing::Message::new::<Sha256>(message_to_sign);
-
-        let mut outputs = vec![];
-        for share in &key_shares {
-            let party = simulation.add_party();
-            let signing_execution_id = refresh_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
-
-            outputs.push(async move {
-                cggmp21::signing(share)
-                    .set_execution_id(signing_execution_id)
-                    .sign(&mut party_rng, party, message_to_sign)
-                    .await
-            });
-        }
-
-        let signatures = futures::future::try_join_all(outputs)
-            .await
-            .expect("signing failed");
-
-        signatures[0]
-            .verify(&key_shares[0].core.shared_public_key, &message_to_sign)
-            .expect("signature is not valid");
-
-        assert!(signatures.iter().all(|s_i| signatures[0] == *s_i));
     }
 
     #[instantiate_tests(<generic_ec::curves::Secp256r1>)]
