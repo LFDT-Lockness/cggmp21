@@ -8,7 +8,10 @@ use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
 };
-use paillier_zk::{libpaillier, paillier_blum_modulus as π_mod, no_small_factor::non_interactive as π_fac, unknown_order::BigNumber};
+use paillier_zk::{
+    libpaillier, no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
+    unknown_order::BigNumber,
+};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -53,9 +56,11 @@ pub struct MsgRound2<E: Curve, D: Digest> {
     s: BigNumber,
     t: BigNumber,
     /// psi_circonflexe_i in paper
-    params_proof: π_prm::Proof<{ π_prm::SECURITY }>, // TODO
+    // this should be L::M instead, but no rustc support yet
+    params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
     /// rho_i in paper
-    rho_bytes: Vec<u8>, // FIXME: [u8; L::SECURITY_BYTES]
+    // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
+    rho_bytes: Vec<u8>,
     /// u_i in paper
     decommit: hash_commitment::DecommitNonce<D>,
 }
@@ -63,7 +68,8 @@ pub struct MsgRound2<E: Curve, D: Digest> {
 #[derive(Clone)]
 pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
-    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>), // even more TODO
+    // this should be L::M instead, but no rustc support yet
+    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
     /// phi_i^j in paper
     fac_proof: π_fac::Proof,
     /// pi_i in paper
@@ -78,19 +84,23 @@ pub struct MsgRound3<E: Curve> {
     sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
 }
 
-/*
-sch - denis's code as `schnorr_pok`
-prm - cggmp page 37, crate::zk::ring_pedersen_parameters
-mod - paillier_zk::paillier_blum_modulus
-fac - cggmp page 66
-*/
-
-pub struct KeyRefreshBuilder<E: Curve, L: SecurityLevel, D: Digest> {
+pub struct KeyRefreshBuilder<E, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest,
+{
     core_share: IncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
 }
 
-impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
+impl<E, L, D> KeyRefreshBuilder<E, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest,
+{
+    /// Build aux info generating operation. Start it with [`start`]
     pub fn new(core_share: IncompleteKeyShare<E, L>) -> Self {
         Self {
             core_share,
@@ -98,6 +108,7 @@ impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
         }
     }
 
+    /// Build key refresh operation. Start it with [`start`]
     pub fn new_refresh(key_share: Valid<KeyShare<E, L>>) -> Self {
         let key_share: KeyShare<E, L> = key_share.into();
         Self {
@@ -106,6 +117,7 @@ impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
         }
     }
 
+    /// Assert digest having a concrete type
     pub fn with_digest<D2: Digest>(
         this: KeyRefreshBuilder<E, L, D2>,
     ) -> KeyRefreshBuilder<E, L, D2> {
@@ -119,6 +131,7 @@ impl<E: Curve, L: SecurityLevel, D: Digest> KeyRefreshBuilder<E, L, D> {
         }
     }
 
+    /// Carry out the refresh procedure. Takes a lot of time
     pub async fn start<R, M>(
         self,
         rng: &mut R,
@@ -166,7 +179,7 @@ where
     let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id)
-        .ok_or(KeyRefreshError::Bug("invalid hash to curve tag"))?;
+        .ok_or(KeyRefreshError::InternalError(Bug::InvalidHashToCurveTag))?;
     let parties_shared_state = D::new_with_prefix(&execution_id);
 
     // Round 1
@@ -176,7 +189,7 @@ where
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
     let dec = libpaillier::DecryptionKey::with_primes_unchecked(&p, &q)
-        .ok_or(KeyRefreshError::Bug("Creating decryption key"))?;
+        .ok_or(KeyRefreshError::InternalError(Bug::PaillierKeyError))?;
 
     let y = SecretScalar::<E>::random(rng);
     let Y = Point::generator() * &y;
@@ -224,6 +237,7 @@ where
     rho_bytes.resize(L::SECURITY_BYTES, 0);
     rng.fill_bytes(&mut rho_bytes);
 
+    // V_i and u_i in paper
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
         .mix(n)
@@ -278,9 +292,8 @@ where
     // validate decommitments
     let blame = commitments
         .iter_indexed()
-        .zip(decommitments.iter_indexed())
-        .filter(|((j, _, commitment), (j_, _, decommitment))| {
-            debug_assert_eq!(j, j_);
+        .zip(decommitments.iter())
+        .filter(|((j, _, commitment), decommitment)| {
             HashCommit::<D>::builder()
                 .mix_bytes(sid)
                 .mix(n)
@@ -304,7 +317,9 @@ where
         ));
     }
     // Validate parties didn't skip any data
-    let blame = decommitments.iter_indexed().filter(|(_, _, decommitment)| {
+    let blame = decommitments
+        .iter_indexed()
+        .filter(|(_, _, decommitment)| {
             let n = n as usize;
             decommitment.x.len() != n
                 || decommitment.sch_commits_a.len() != n - 1
@@ -332,7 +347,7 @@ where
                 π_prm::verify(parties_shared_state.clone(), data, &d.params_proof).is_err()
             }
         })
-        .map(|t| t.0)
+        .map(|(j, _, _)| j)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
@@ -342,24 +357,13 @@ where
     // validate Xs add to zero
     let blame = decommitments
         .iter_indexed()
-        .filter(|(_, _, d)| {
-            d.x.iter().sum::<Point<E>>() != Point::zero()
-        })
+        .filter(|(_, _, d)| d.x.iter().sum::<Point<E>>() != Point::zero())
         .map(|t| t.0)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
     }
 
-    let party_auxes = decommitments
-        .iter_including_me(&decommitment)
-        .map(|d| PartyAux {
-            N: d.N.clone(),
-            s: d.s.clone(),
-            t: d.t.clone(),
-            Y: d.Y.clone(),
-        })
-        .collect::<Vec<_>>();
     // encryption keys for each party
     let encs = decommitments
         .iter()
@@ -375,7 +379,7 @@ where
     // pi_i
     let sch_proof_y = {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-            .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+            .map_err(|e| KeyRefreshError::InternalError(Bug::HashToScalarError(e)))?;
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         schnorr_pok::prove(&sch_secret_b, &challenge, &y)
     };
@@ -390,7 +394,7 @@ where
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
     };
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-        .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+        .map_err(|e| KeyRefreshError::InternalError(Bug::HashToScalarError(e)))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     let π_fac_aux = π_fac::Aux {
         s: s.clone(),
@@ -414,9 +418,10 @@ where
             .iter()
             .map(|x_j| schnorr_pok::prove(secret, &challenge, &x_j))
             .collect();
+        let nonce = BigNumber::from_rng(enc.n(), &mut rng);
         let C = enc
-            .encrypt(x.as_ref().to_be_bytes(), None)
-            .ok_or(KeyRefreshError::Bug("encryption failed"))?
+            .encrypt(x.as_ref().to_be_bytes(), Some(nonce))
+            .ok_or(KeyRefreshError::InternalError(Bug::PaillierEnc))?
             .0;
         let fac_proof = π_fac::prove(
             parties_shared_state.clone(),
@@ -425,10 +430,7 @@ where
                 n: &N,
                 n_root: &utils::sqrt(&N),
             },
-            π_fac::PrivateData {
-                p: &p,
-                q: &q,
-            },
+            π_fac::PrivateData { p: &p, q: &q },
             &π_fac_security,
             &mut rng,
         );
@@ -464,18 +466,37 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    // TODO: verify shares are well formed
-    // TODO: verify fac_proofs
+    // verify shares are well-formed
+    let blame = shares
+        .iter()
+        .zip(decommitments.iter_indexed())
+        .filter_map(|(share, (j, _, decommitment))| {
+            let i = i as usize;
+            let X = Point::generator() * share;
+            if X != decommitment.x[i] {
+                Some(j)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(
+            ProtocolAborted::invalid_x_share(blame),
+        ));
+    }
+    // It is possible at this point to report a bad party to others, but we
+    // don't implement it now
+
     // verify sch proofs for y and x
     let blame = utils::collect_blame(
         decommitments
             .iter_indexed()
-            .zip(shares_msg_b.iter_indexed()),
-        |((j, _, decommitment), (j_, _, proof_msg))| {
-            debug_assert_eq!(j, j_);
+            .zip(shares_msg_b.iter()),
+        |((j, _, decommitment), proof_msg)| {
             let challenge =
                 Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
-                    .map_err(|_| KeyRefreshError::Bug("hash failed"))?;
+                    .map_err(|e| KeyRefreshError::InternalError(Bug::HashToScalarError(e)))?;
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // proof for y, i.e. pi_j
@@ -489,7 +510,7 @@ where
 
             // x length is verified above
             if proof_msg.sch_proofs_x.len() != decommitment.x.len() {
-                return Ok(Some(j))
+                return Ok(Some(j));
             }
             // proof for x, i.e. psi_j^k for every k
             for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
@@ -565,6 +586,8 @@ where
         ));
     }
 
+    // verifications passed, compute final key shares
+
     let x_sum = shares.iter().fold(Scalar::zero().clone(), |s, x| s + x) + my_share;
     let mut x_star = core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
@@ -586,6 +609,15 @@ where
         x: SecretScalar::new(&mut x_star),
         ..core_share
     };
+    let party_auxes = decommitments
+        .iter_including_me(&decommitment)
+        .map(|d| PartyAux {
+            N: d.N.clone(),
+            s: d.s.clone(),
+            t: d.t.clone(),
+            Y: d.Y.clone(),
+        })
+        .collect();
     let key_share = KeyShare {
         core: new_core_share,
         p,
@@ -615,12 +647,24 @@ pub enum KeyRefreshError<IErr, OErr> {
     #[error("send message")]
     SendError(#[source] OErr),
     /// Bug occurred
-    #[error("bug occurred")]
-    Bug(&'static str),
+    #[error("internal error")]
+    InternalError(#[source] Bug),
     #[error("couldn't decrypt a message")]
     PaillierDec,
     #[error("couldn't decode scalar bytes")]
     InvalidScalar(generic_ec::errors::InvalidScalar),
+}
+
+#[derive(Debug, Error)]
+pub enum Bug {
+    #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
+    InvalidHashToCurveTag,
+    #[error("Unexpected error when creating paillier decryption key")]
+    PaillierKeyError,
+    #[error("hash to scalar returned error")]
+    HashToScalarError(#[source] generic_ec::errors::HashError),
+    #[error("paillier enctyption failed")]
+    PaillierEnc,
 }
 
 /// Error indicating that protocol was aborted by malicious party
@@ -647,6 +691,9 @@ pub enum ProtocolAbortReason {
     InvalidRingPedersenParameters,
     /// party X is malformed
     InvalidX,
+    /// party x doesn't correspond to X
+    InvalidXShare,
+    /// party sent a message with missing data
     InvalidDataSize,
 }
 
@@ -661,11 +708,12 @@ impl std::fmt::Display for ProtocolAborted {
                 "N, s and t parameters are invalid"
             }
             ProtocolAbortReason::InvalidX => "X is malformed",
+            ProtocolAbortReason::InvalidXShare => "x doesn't correspond to X",
             ProtocolAbortReason::InvalidDataSize => "invalid vector of party data",
         };
         write!(
             f,
-            "ProtocolAborted {{ reason = {}, blame = {:?} }}",
+            "ProtocolAborted {{ reason: {}, blame: {:?} }}",
             reason, self.parties
         )
     }
@@ -691,6 +739,7 @@ impl ProtocolAborted {
         InvalidRingPedersenParameters
     );
     make_factory!(invalid_x, InvalidX);
+    make_factory!(invalid_x_share, InvalidXShare);
     make_factory!(invalid_data_size, InvalidDataSize);
 }
 
