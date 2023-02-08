@@ -35,7 +35,7 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
     /// Public shares of all parties sharing the key
     ///
     /// `public_shares[i]` corresponds to public share of $\ith$ party.
-    /// Corresponds to **X** in paper
+    /// Corresponds to **X** = $(X_i)_i$ in paper
     #[serde_as(as = "Vec<Compact>")]
     pub public_shares: Vec<Point<E>>,
     /// Secret share $x_i$

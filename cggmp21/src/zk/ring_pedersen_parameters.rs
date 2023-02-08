@@ -131,7 +131,7 @@ mod test {
         let n = &p * &q;
         let phi = (&p - 1) * (&q - 1);
 
-        let r = crate::utils::gen_invertible(&n, &mut rng);
+        let r = crate::utils::sample_bigint_in_mult_group(&mut rng, &n);
         let lambda = BigNumber::from_rng(&phi, &mut rng);
         let t = r.modmul(&r, &n);
         let s = t.modpow(&lambda, &n);
@@ -162,7 +162,7 @@ mod test {
         let n = &p * &q;
         let phi = (&p - 1) * (&q - 1);
 
-        let r = crate::utils::gen_invertible(&n, &mut rng);
+        let r = crate::utils::sample_bigint_in_mult_group(&mut rng, &n);
         let lambda = BigNumber::from_rng(&phi, &mut rng);
         let t = r.modmul(&r, &n);
         let correct_s = t.modpow(&lambda, &n);

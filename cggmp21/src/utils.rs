@@ -103,15 +103,6 @@ where
     a
 }
 
-pub fn gen_invertible<R: RngCore>(modulo: &BigNumber, rng: &mut R) -> BigNumber {
-    loop {
-        let r = BigNumber::from_rng(modulo, rng);
-        if r.gcd(modulo) == BigNumber::one() {
-            break r;
-        }
-    }
-}
-
 pub fn collect_blame<I, T, F, E>(iter: I, mut f: F) -> Result<Vec<u16>, E>
 where
     I: Iterator<Item = T>,
@@ -137,20 +128,21 @@ where
     V: std::ops::Index<usize, Output = O>,
 {
     if i < j {
-        v.index(i as usize)
+        v.index(usize::from(i))
     } else {
-        v.index(i as usize - 1)
+        v.index(usize::from(i) - 1)
     }
 }
 
 /// Drop n-th item from iteration
 pub fn but_nth<T, I: Iterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
     iter.enumerate()
-        .filter(move |(i, _)| *i != n as usize)
+        .filter(move |(i, _)| *i != usize::from(n))
         .map(|(_, x)| x)
 }
 
-/// Binary search for square root
+/// Binary search for rounded down square root. For non-positive numbers returns
+/// one
 pub fn sqrt(x: &BigNumber) -> BigNumber {
     let mut low = BigNumber::one();
     let mut high = x.clone();
@@ -175,6 +167,7 @@ mod test {
     #[test]
     fn test_sqrt() {
         use super::{sqrt, BigNumber};
+        assert_eq!(sqrt(&BigNumber::from(-5)), BigNumber::from(1));
         assert_eq!(sqrt(&BigNumber::from(1)), BigNumber::from(1));
         assert_eq!(sqrt(&BigNumber::from(2)), BigNumber::from(1));
         assert_eq!(sqrt(&BigNumber::from(3)), BigNumber::from(1));

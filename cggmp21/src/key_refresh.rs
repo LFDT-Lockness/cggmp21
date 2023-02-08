@@ -86,24 +86,24 @@ pub struct MsgRound3<E: Curve> {
     sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
 }
 
-pub struct KeyRefreshBuilder<E, L, D>
+pub struct KeyRefreshBuilder<'a, E, L, D>
 where
     E: Curve,
     L: SecurityLevel,
     D: Digest,
 {
-    core_share: IncompleteKeyShare<E, L>,
+    core_share: &'a IncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
 }
 
-impl<E, L, D> KeyRefreshBuilder<E, L, D>
+impl<'a, E, L, D> KeyRefreshBuilder<'a, E, L, D>
 where
     E: Curve,
     L: SecurityLevel,
     D: Digest,
 {
     /// Build aux info generating operation. Start it with [`start`]
-    pub fn new(core_share: IncompleteKeyShare<E, L>) -> Self {
+    pub fn new(core_share: &'a Valid<IncompleteKeyShare<E, L>>) -> Self {
         Self {
             core_share,
             execution_id: Default::default(),
@@ -111,10 +111,9 @@ where
     }
 
     /// Build key refresh operation. Start it with [`start`]
-    pub fn new_refresh(key_share: Valid<KeyShare<E, L>>) -> Self {
-        let key_share: KeyShare<E, L> = key_share.into();
+    pub fn new_refresh(key_share: &'a Valid<KeyShare<E, L>>) -> Self {
         Self {
-            core_share: key_share.core,
+            core_share: &key_share.core,
             execution_id: Default::default(),
         }
     }
@@ -138,7 +137,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<KeyShare<E, L>, KeyRefreshError<M::ReceiveError, M::SendError>>
+    ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -151,12 +150,12 @@ where
     }
 }
 
-pub async fn run_refresh<R, M, E, L, D>(
+async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
     execution_id: ExecutionId<E, L, D>,
-    core_share: IncompleteKeyShare<E, L>,
-) -> Result<KeyShare<E, L>, KeyRefreshError<M::ReceiveError, M::SendError>>
+    core_share: &IncompleteKeyShare<E, L>,
+) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -166,7 +165,7 @@ where
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
     let i = core_share.i;
-    let n = core_share.public_shares.len() as u16;
+    let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
@@ -181,7 +180,7 @@ where
     let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id)
-        .ok_or(KeyRefreshError::InternalError(Bug::InvalidHashToCurveTag))?;
+        .ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(execution_id);
 
     // Round 1
@@ -191,7 +190,7 @@ where
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
     let dec = libpaillier::DecryptionKey::with_primes_unchecked(&p, &q)
-        .ok_or(KeyRefreshError::InternalError(Bug::PaillierKeyError))?;
+        .ok_or(Bug::PaillierKeyError)?;
 
     let y = SecretScalar::<E>::random(rng);
     let Y = Point::generator() * &y;
@@ -216,7 +215,7 @@ where
         .map(|x| Point::generator() * x)
         .collect::<Vec<_>>();
 
-    let r = utils::gen_invertible(&N, rng);
+    let r = utils::sample_bigint_in_mult_group(rng, &N);
     let λ = BigNumber::from_rng(&φ_N, rng);
     let t = r.modmul(&r, &N);
     let s = t.modpow(&λ, &N);
@@ -321,7 +320,7 @@ where
     let blame = decommitments
         .iter_indexed()
         .filter(|(_, _, decommitment)| {
-            let n = n as usize;
+            let n = usize::from(n);
             decommitment.x.len() != n
                 || decommitment.sch_commits_a.len() != n - 1
                 || decommitment.rho_bytes.len() != L::SECURITY_BYTES
@@ -380,7 +379,7 @@ where
     // pi_i
     let sch_proof_y = {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-            .map_err(|e| KeyRefreshError::InternalError(Bug::HashToScalarError(e)))?;
+            .map_err(|e| Bug::HashToScalarError(e))?;
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         schnorr_pok::prove(&sch_secret_b, &challenge, &y)
     };
@@ -395,7 +394,7 @@ where
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
     };
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-        .map_err(|e| KeyRefreshError::InternalError(Bug::HashToScalarError(e)))?;
+        .map_err(|e| Bug::HashToScalarError(e))?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     let π_fac_aux = π_fac::Aux {
         s: s.clone(),
@@ -422,7 +421,7 @@ where
         let nonce = BigNumber::from_rng(enc.n(), &mut rng);
         let C = enc
             .encrypt(x.as_ref().to_be_bytes(), Some(nonce))
-            .ok_or(KeyRefreshError::InternalError(Bug::PaillierEnc))?
+            .ok_or(Bug::PaillierEnc)?
             .0;
         let fac_proof = π_fac::prove(
             parties_shared_state.clone(),
@@ -458,7 +457,7 @@ where
 
     // x_j^i in paper. x_i^i is a share from self to self, so it was never sent,
     // so it's handled separately
-    let my_share = &xs[i as usize];
+    let my_share = &xs[usize::from(i)];
     let shares = shares_msg_b
         .iter()
         .map(|m| {
@@ -472,7 +471,7 @@ where
         .iter()
         .zip(decommitments.iter_indexed())
         .filter_map(|(share, (j, _, decommitment))| {
-            let i = i as usize;
+            let i = usize::from(i);
             let X = Point::generator() * share;
             if X != decommitment.x[i] {
                 Some(j)
@@ -490,12 +489,12 @@ where
     // don't implement it now
 
     // verify sch proofs for y and x
-    let blame = utils::collect_blame(
+    let blame = utils::collect_blame::<_, _, _, Bug>(
         decommitments.iter_indexed().zip(shares_msg_b.iter()),
         |((j, _, decommitment), proof_msg)| {
             let challenge =
                 Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
-                    .map_err(|e| KeyRefreshError::InternalError(Bug::HashToScalarError(e)))?;
+                    .map_err(|e| Bug::HashToScalarError(e))?;
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // proof for y, i.e. pi_j
@@ -587,16 +586,17 @@ where
 
     // verifications passed, compute final key shares
 
+    let old_core_share = core_share.clone();
     let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x) + my_share;
-    let mut x_star = core_share.x + x_sum;
+    let mut x_star = old_core_share.x + x_sum;
     let X_prods = (0..n).map(|k| {
-        let k = k as usize;
+        let k = usize::from(k);
         decommitments
             .iter_including_me(&decommitment)
             .map(|d| d.x[k])
             .sum::<Point<E>>()
     });
-    let X_stars = core_share
+    let X_stars = old_core_share
         .public_shares
         .into_iter()
         .zip(X_prods)
@@ -606,7 +606,7 @@ where
     let new_core_share = IncompleteKeyShare {
         public_shares: X_stars,
         x: SecretScalar::new(&mut x_star),
-        ..core_share
+        ..old_core_share
     };
     let party_auxes = decommitments
         .iter_including_me(&decommitment)
@@ -625,7 +625,7 @@ where
         parties: party_auxes,
     };
 
-    Ok(key_share)
+    Ok(key_share.try_into().map_err(Bug::InvalidShareGenerated)?)
 }
 
 #[derive(Debug, Error)]
@@ -646,7 +646,7 @@ pub enum KeyRefreshError<IErr, OErr> {
     #[error("send message")]
     SendError(#[source] OErr),
     #[error("internal error")]
-    InternalError(#[source] Bug),
+    InternalError(#[from] Bug),
     #[error("couldn't decrypt a message")]
     PaillierDec,
     #[error("couldn't decode scalar bytes")]
@@ -664,6 +664,10 @@ pub enum Bug {
     HashToScalarError(#[source] generic_ec::errors::HashError),
     #[error("paillier enctyption failed")]
     PaillierEnc,
+    #[error("Attempting to run protocol with too many parties")]
+    TooManyParties,
+    #[error("Invalid key share geenrated")]
+    InvalidShareGenerated(#[source] crate::key_share::InvalidKeyShare),
 }
 
 /// Error indicating that protocol was aborted by malicious party

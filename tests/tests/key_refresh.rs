@@ -38,7 +38,7 @@ mod generic {
             let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
             async move {
-                cggmp21::key_refresh(share)
+                cggmp21::key_refresh(&share)
                     .set_execution_id(refresh_execution_id)
                     .start(&mut party_rng, party)
                     .await
