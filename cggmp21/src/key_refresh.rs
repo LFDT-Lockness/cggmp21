@@ -120,11 +120,15 @@ where
         }
     }
 
-    /// Assert digest having a concrete type
-    pub fn with_digest<D2: Digest>(
-        this: KeyRefreshBuilder<E, L, D2>,
-    ) -> KeyRefreshBuilder<E, L, D2> {
-        this
+    /// Specifies another hash function to use
+    ///
+    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
+    /// you specify execution ID **after** calling this function.
+    pub fn set_digest<D2: Digest>(self) -> KeyRefreshBuilder<'a, E, L, D2> {
+        KeyRefreshBuilder {
+            core_share: self.core_share,
+            execution_id: Default::default(),
+        }
     }
 
     pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
