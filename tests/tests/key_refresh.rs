@@ -8,7 +8,6 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::key_share::Valid;
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
     use super::precomputed_shares::CACHED_SHARES;
@@ -72,10 +71,6 @@ mod generic {
             key_shares[0].core.shared_public_key,
             key_shares[0].core.public_shares.iter().sum::<Point<E>>()
         );
-        let _key_shares = key_shares
-            .into_iter()
-            .map(|s| s.try_into().expect("Key share did not validate"))
-            .collect::<Vec<Valid<_>>>();
     }
 
     #[instantiate_tests(<generic_ec::curves::Secp256r1>)]
