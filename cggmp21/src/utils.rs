@@ -243,5 +243,15 @@ mod test {
             sqrt(&(BigNumber::from(1) << 1024)),
             BigNumber::from(1) << 512
         );
+
+        let modulo = BigNumber::one() << 1024;
+        let mut rng = rand_dev::DevRng::new();
+        for _ in 0..100 {
+            let x = BigNumber::from_rng(&modulo, &mut rng);
+            let root = sqrt(&x);
+            assert!(&root * &root <= x);
+            let root = root + 1;
+            assert!(&root * &root > x);
+        }
     }
 }
