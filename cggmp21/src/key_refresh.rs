@@ -24,7 +24,9 @@ use crate::{
     key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
     security_level::SecurityLevel,
     utils,
-    utils::{but_nth, iter_peers, mine_from, xor_array},
+    utils::{
+        but_nth, collect_blame, collect_simple_blame, iter_peers, mine_from, xor_array, AbortBlame,
+    },
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
 };
@@ -179,8 +181,7 @@ where
 
     let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
     let sid = execution_id.as_slice();
-    let tag_htc = hash_to_curve::Tag::new(&execution_id)
-        .ok_or(Bug::InvalidHashToCurveTag)?;
+    let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(execution_id);
 
     // Round 1
@@ -189,8 +190,8 @@ where
     let q = BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng);
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
-    let dec = libpaillier::DecryptionKey::with_primes_unchecked(&p, &q)
-        .ok_or(Bug::PaillierKeyError)?;
+    let dec =
+        libpaillier::DecryptionKey::with_primes_unchecked(&p, &q).ok_or(Bug::PaillierKeyError)?;
 
     let y = SecretScalar::<E>::random(rng);
     let Y = Point::generator() * &y;
@@ -290,10 +291,10 @@ where
         .map_err(KeyRefreshError::ReceiveMessage)?;
 
     // validate decommitments
-    let blame = commitments
-        .iter_indexed()
-        .zip(decommitments.iter())
-        .filter(|((j, _, commitment), decommitment)| {
+    let blame = collect_blame(
+        &decommitments,
+        &commitments,
+        |j, decommitment, commitment| {
             HashCommit::<D>::builder()
                 .mix_bytes(sid)
                 .mix(n)
@@ -308,58 +309,47 @@ where
                 .mix_bytes(&decommitment.rho_bytes)
                 .verify(&commitment.commitment, &decommitment.decommit)
                 .is_err()
-        })
-        .map(|tuple| tuple.0 .0)
-        .collect::<Vec<_>>();
+        },
+    );
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             ProtocolAborted::invalid_decommitment(blame),
         ));
     }
     // Validate parties didn't skip any data
-    let blame = decommitments
-        .iter_indexed()
-        .filter(|(_, _, decommitment)| {
-            let n = usize::from(n);
-            decommitment.x.len() != n
-                || decommitment.sch_commits_a.len() != n - 1
-                || decommitment.rho_bytes.len() != L::SECURITY_BYTES
-        })
-        .map(|(j, _, _)| j)
-        .collect::<Vec<_>>();
+    let blame = collect_simple_blame(&decommitments, |decommitment| {
+        let n = usize::from(n);
+        decommitment.x.len() != n
+            || decommitment.sch_commits_a.len() != n - 1
+            || decommitment.rho_bytes.len() != L::SECURITY_BYTES
+    });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             ProtocolAborted::invalid_data_size(blame),
         ));
     }
     // validate parameters and param_proofs
-    let blame = decommitments
-        .iter_indexed()
-        .filter(|(_, _, d)| {
-            if d.N.bit_length() < L::SECURITY_BYTES {
-                true
-            } else {
-                let data = π_prm::Data {
-                    N: &d.N,
-                    s: &d.s,
-                    t: &d.t,
-                };
-                π_prm::verify(parties_shared_state.clone(), data, &d.params_proof).is_err()
-            }
-        })
-        .map(|(j, _, _)| j)
-        .collect::<Vec<_>>();
+    let blame = collect_simple_blame(&decommitments, |d| {
+        if d.N.bit_length() < L::SECURITY_BYTES {
+            true
+        } else {
+            let data = π_prm::Data {
+                N: &d.N,
+                s: &d.s,
+                t: &d.t,
+            };
+            π_prm::verify(parties_shared_state.clone(), data, &d.params_proof).is_err()
+        }
+    });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             ProtocolAborted::invalid_ring_pedersen_parameters(blame),
         ));
     }
     // validate Xs add to zero
-    let blame = decommitments
-        .iter_indexed()
-        .filter(|(_, _, d)| d.x.iter().sum::<Point<E>>() != Point::zero())
-        .map(|t| t.0)
-        .collect::<Vec<_>>();
+    let blame = collect_simple_blame(&decommitments, |d| {
+        d.x.iter().sum::<Point<E>>() != Point::zero()
+    });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
     }
@@ -379,7 +369,7 @@ where
     // pi_i
     let sch_proof_y = {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-            .map_err(|e| Bug::HashToScalarError(e))?;
+            .map_err(Bug::HashToScalarError)?;
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         schnorr_pok::prove(&sch_secret_b, &challenge, &y)
     };
@@ -394,7 +384,7 @@ where
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
     };
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-        .map_err(|e| Bug::HashToScalarError(e))?;
+        .map_err(Bug::HashToScalarError)?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     let π_fac_aux = π_fac::Aux {
         s: s.clone(),
@@ -470,11 +460,11 @@ where
     let blame = shares
         .iter()
         .zip(decommitments.iter_indexed())
-        .filter_map(|(share, (j, _, decommitment))| {
+        .filter_map(|(share, (j, msg_id, decommitment))| {
             let i = usize::from(i);
             let X = Point::generator() * share;
             if X != decommitment.x[i] {
-                Some(j)
+                Some(AbortBlame::new(j, msg_id, msg_id))
             } else {
                 None
             }
@@ -489,12 +479,13 @@ where
     // don't implement it now
 
     // verify sch proofs for y and x
-    let blame = utils::collect_blame::<_, _, _, Bug>(
-        decommitments.iter_indexed().zip(shares_msg_b.iter()),
-        |((j, _, decommitment), proof_msg)| {
+    let blame = utils::try_collect_blame(
+        &decommitments,
+        &shares_msg_b,
+        |j, decommitment, proof_msg| {
             let challenge =
                 Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
-                    .map_err(|e| Bug::HashToScalarError(e))?;
+                    .map_err(Bug::HashToScalarError)?;
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // proof for y, i.e. pi_j
@@ -503,12 +494,12 @@ where
                 .verify(&decommitment.sch_commit_b, &challenge, &decommitment.Y)
                 .is_err()
             {
-                return Ok(Some(j));
+                return Ok(true);
             }
 
             // x length is verified above
             if proof_msg.sch_proofs_x.len() != decommitment.x.len() {
-                return Ok(Some(j));
+                return Ok(true);
             }
             // proof for x, i.e. psi_j^k for every k
             for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
@@ -516,10 +507,11 @@ where
                     .verify(mine_from(i, j, &decommitment.sch_commits_a), &challenge, x)
                     .is_err()
                 {
-                    return Ok(Some(j));
+                    return Ok(true);
                 }
             }
-            Ok(None)
+            // explicit type ascription because it can't get inferred
+            Ok::<_, Bug>(false)
         },
     )?;
     if !blame.is_empty() {
@@ -529,23 +521,18 @@ where
     }
 
     // verify mod proofs
-    let blame = decommitments
-        .iter_indexed()
-        .zip(shares_msg_b.iter())
-        .filter_map(|((j, _, decommitment), proof_msg)| {
+    let blame = collect_blame(
+        &decommitments,
+        &shares_msg_b,
+        |_, decommitment, proof_msg| {
             let data = π_mod::Data {
                 n: decommitment.N.clone(),
             };
             let (ref comm, ref proof) = proof_msg.mod_proof;
-            if π_mod::non_interactive::verify(parties_shared_state.clone(), &data, comm, proof)
+            π_mod::non_interactive::verify(parties_shared_state.clone(), &data, comm, proof)
                 .is_err()
-            {
-                Some(j)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+        },
+    );
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             ProtocolAborted::invalid_mod_proof(blame),
@@ -553,11 +540,11 @@ where
     }
 
     // verify fac proofs
-    let blame = decommitments
-        .iter_indexed()
-        .zip(shares_msg_b.iter())
-        .filter_map(|((j, _, decommitment), proof_msg)| {
-            let verdict = π_fac::verify(
+    let blame = collect_blame(
+        &decommitments,
+        &shares_msg_b,
+        |_, decommitment, proof_msg| {
+            π_fac::verify(
                 parties_shared_state.clone(),
                 &π_fac::Aux {
                     s: decommitment.s.clone(),
@@ -570,14 +557,10 @@ where
                 },
                 &π_fac_security,
                 &proof_msg.fac_proof,
-            );
-            if verdict.is_err() {
-                Some(j)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+            )
+            .is_err()
+        },
+    );
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             ProtocolAborted::invalid_fac_proof(blame),
@@ -677,7 +660,7 @@ pub enum Bug {
 #[error("Protocol aborted; malicious parties: {parties:?}; reason: {reason}")]
 pub struct ProtocolAborted {
     pub reason: ProtocolAbortReason,
-    pub parties: Vec<u16>,
+    pub parties: Vec<AbortBlame>,
 }
 
 /// Reason for protocol abort: which exact check has failed
@@ -703,7 +686,7 @@ pub enum ProtocolAbortReason {
 
 macro_rules! make_factory {
     ($function:ident, $reason:ident) => {
-        fn $function(parties: Vec<u16>) -> Self {
+        fn $function(parties: Vec<AbortBlame>) -> Self {
             Self {
                 reason: ProtocolAbortReason::$reason,
                 parties,

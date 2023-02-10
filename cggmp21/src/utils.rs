@@ -6,6 +6,8 @@ use paillier_zk::{
     paillier_affine_operation_in_range as π_aff, paillier_encryption_in_range as π_enc,
 };
 use rand_core::RngCore;
+use round_based::rounds_router::simple_store::RoundMsgs;
+use round_based::{MsgId, PartyIndex};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -103,15 +105,75 @@ where
     a
 }
 
-pub fn collect_blame<I, T, F, E>(iter: I, mut f: F) -> Result<Vec<u16>, E>
+#[derive(Debug)]
+pub struct AbortBlame {
+    pub faulty_party: PartyIndex,
+    pub data_message: MsgId,
+    pub proof_message: MsgId,
+}
+
+impl AbortBlame {
+    pub fn new(faulty_party: PartyIndex, data_message: MsgId, proof_message: MsgId) -> Self {
+        Self {
+            faulty_party,
+            data_message,
+            proof_message,
+        }
+    }
+}
+
+pub fn collect_blame<D, P, F>(
+    data_messages: &RoundMsgs<D>,
+    proof_messages: &RoundMsgs<P>,
+    mut filter: F,
+) -> Vec<AbortBlame>
 where
-    I: Iterator<Item = T>,
-    F: FnMut(T) -> Result<Option<u16>, E>,
+    F: FnMut(PartyIndex, &D, &P) -> bool,
+{
+    data_messages
+        .iter_indexed()
+        .zip(proof_messages.iter_indexed())
+        .filter_map(|((j, data_msg_id, data), (_, proof_msg_id, proof))| {
+            if filter(j, data, proof) {
+                Some(AbortBlame::new(j, data_msg_id, proof_msg_id))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn collect_simple_blame<D, F>(messages: &RoundMsgs<D>, mut filter: F) -> Vec<AbortBlame>
+where
+    F: FnMut(&D) -> bool,
+{
+    messages
+        .iter_indexed()
+        .filter_map(|(j, msg_id, data)| {
+            if filter(data) {
+                Some(AbortBlame::new(j, msg_id, msg_id))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn try_collect_blame<E, D, P, F>(
+    data_messages: &RoundMsgs<D>,
+    proof_messages: &RoundMsgs<P>,
+    mut filter: F,
+) -> Result<Vec<AbortBlame>, E>
+where
+    F: FnMut(PartyIndex, &D, &P) -> Result<bool, E>,
 {
     let mut r = Vec::new();
-    for x in iter {
-        if let Some(i) = f(x)? {
-            r.push(i);
+    for ((j, data_msg_id, data), (_, proof_msg_id, proof)) in data_messages
+        .iter_indexed()
+        .zip(proof_messages.iter_indexed())
+    {
+        if filter(j, data, proof)? {
+            r.push(AbortBlame::new(j, data_msg_id, proof_msg_id));
         }
     }
     Ok(r)
