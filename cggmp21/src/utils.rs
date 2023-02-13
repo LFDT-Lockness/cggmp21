@@ -105,10 +105,19 @@ where
     a
 }
 
+/// For some messages it is possible to precisely identify where the fault
+/// happened and which party is to blame. Use this struct to collect present the
+/// blame.
+///
+/// In the future we might want to replace the data_message and proof_message
+/// with a generic vec of messages.
 #[derive(Debug)]
 pub struct AbortBlame {
+    /// Party which can be blamed for breaking the protocol
     pub faulty_party: PartyIndex,
+    /// Message with initial data
     pub data_message: MsgId,
+    /// Message with some kind of proof related to the data
     pub proof_message: MsgId,
 }
 
@@ -122,6 +131,7 @@ impl AbortBlame {
     }
 }
 
+/// Filter returns `true` for every __faulty__ message pair
 pub fn collect_blame<D, P, F>(
     data_messages: &RoundMsgs<D>,
     proof_messages: &RoundMsgs<P>,
@@ -143,6 +153,8 @@ where
         .collect()
 }
 
+/// Filter returns `true` for every __faulty__ message. Data and proof are set
+/// to the same message.
 pub fn collect_simple_blame<D, F>(messages: &RoundMsgs<D>, mut filter: F) -> Vec<AbortBlame>
 where
     F: FnMut(&D) -> bool,
@@ -159,6 +171,9 @@ where
         .collect()
 }
 
+/// Same as [`collect_blame`], but filter can fail, in which case whole blame
+/// collection will fail. So to not lose security the error type should be some
+/// kind of unrecoverable internal assertion failure.
 pub fn try_collect_blame<E, D, P, F>(
     data_messages: &RoundMsgs<D>,
     proof_messages: &RoundMsgs<P>,
