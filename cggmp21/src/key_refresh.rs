@@ -88,6 +88,23 @@ pub struct MsgRound3<E: Curve> {
     sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
 }
 
+/// To speed up computations, it's possible to supply data to the algorithm
+/// generated ahead of time
+pub struct PregeneratedPrimes {
+    p: BigNumber,
+    q: BigNumber,
+}
+
+impl PregeneratedPrimes {
+    /// Generate the structure. Takes some time.
+    pub fn generate<L: SecurityLevel, R: RngCore>(rng: &mut R) -> Self {
+        Self {
+            p: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
+            q: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
+        }
+    }
+}
+
 pub struct KeyRefreshBuilder<'a, E, L, D>
 where
     E: Curve,
@@ -96,6 +113,7 @@ where
 {
     core_share: &'a IncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
+    pregenerated: Option<PregeneratedPrimes>,
 }
 
 impl<'a, E, L, D> KeyRefreshBuilder<'a, E, L, D>
@@ -109,6 +127,7 @@ where
         Self {
             core_share,
             execution_id: Default::default(),
+            pregenerated: None,
         }
     }
 
@@ -117,6 +136,7 @@ where
         Self {
             core_share: &key_share.core,
             execution_id: Default::default(),
+            pregenerated: None,
         }
     }
 
@@ -128,12 +148,20 @@ where
         KeyRefreshBuilder {
             core_share: self.core_share,
             execution_id: Default::default(),
+            pregenerated: None,
         }
     }
 
     pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
         Self {
             execution_id,
+            ..self
+        }
+    }
+
+    pub fn set_pregenerated_data(self, pregenerated: PregeneratedPrimes) -> Self {
+        Self {
+            pregenerated: Some(pregenerated),
             ..self
         }
     }
@@ -152,7 +180,14 @@ where
         L: SecurityLevel,
         D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
     {
-        run_refresh(rng, party, self.execution_id, self.core_share).await
+        run_refresh(
+            rng,
+            party,
+            self.execution_id,
+            self.pregenerated,
+            self.core_share,
+        )
+        .await
     }
 }
 
@@ -160,6 +195,7 @@ async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
     execution_id: ExecutionId<E, L, D>,
+    pregenerated: Option<PregeneratedPrimes>,
     core_share: &IncompleteKeyShare<E, L>,
 ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
 where
@@ -190,8 +226,8 @@ where
 
     // Round 1
 
-    let p = BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng);
-    let q = BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng);
+    let PregeneratedPrimes { p, q } =
+        pregenerated.unwrap_or_else(|| PregeneratedPrimes::generate::<L, _>(rng));
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
     let dec =
