@@ -209,7 +209,7 @@ where
     let i = core_share.i;
     let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
-    let MpcParty { delivery, .. } = party.into_party();
+    let MpcParty { delivery, blocking, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     // Setup networking
@@ -226,8 +226,14 @@ where
 
     // Round 1
 
-    let PregeneratedPrimes { p, q } =
-        pregenerated.unwrap_or_else(|| PregeneratedPrimes::generate::<L, _>(rng));
+    let PregeneratedPrimes { p, q } = match pregenerated {
+        Some(x) => x,
+        None => blocking.spawn(|| {
+            // can't use rng from context as this worker can outlive it
+            let mut rng = rand_core::OsRng::default();
+            PregeneratedPrimes::generate::<L, _>(&mut rng)
+        }).await.map_err(|_| KeyRefreshError::SpawnError)?
+    };
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
     let dec =
@@ -668,6 +674,8 @@ pub enum KeyRefreshError<IErr, OErr> {
     /// Sending message error
     #[error("send message")]
     SendError(#[source] OErr),
+    #[error("could not spawn worker thread")]
+    SpawnError,
     #[error("internal error")]
     InternalError(#[from] Bug),
     #[error("couldn't decrypt a message")]
