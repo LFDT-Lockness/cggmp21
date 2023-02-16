@@ -90,17 +90,19 @@ pub struct MsgRound3<E: Curve> {
 
 /// To speed up computations, it's possible to supply data to the algorithm
 /// generated ahead of time
-pub struct PregeneratedPrimes {
+pub struct PregeneratedPrimes<L> {
     p: BigNumber,
     q: BigNumber,
+    _phantom: std::marker::PhantomData<L>,
 }
 
-impl PregeneratedPrimes {
+impl<L: SecurityLevel> PregeneratedPrimes<L> {
     /// Generate the structure. Takes some time.
-    pub fn generate<L: SecurityLevel, R: RngCore>(rng: &mut R) -> Self {
+    pub fn generate<R: RngCore>(rng: &mut R) -> Self {
         Self {
             p: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
             q: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
+            _phantom: std::marker::PhantomData,
         }
     }
 }
@@ -113,7 +115,7 @@ where
 {
     core_share: &'a IncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
-    pregenerated: Option<PregeneratedPrimes>,
+    pregenerated: Option<PregeneratedPrimes<L>>,
 }
 
 impl<'a, E, L, D> KeyRefreshBuilder<'a, E, L, D>
@@ -159,7 +161,7 @@ where
         }
     }
 
-    pub fn set_pregenerated_data(self, pregenerated: PregeneratedPrimes) -> Self {
+    pub fn set_pregenerated_data(self, pregenerated: PregeneratedPrimes<L>) -> Self {
         Self {
             pregenerated: Some(pregenerated),
             ..self
@@ -195,7 +197,7 @@ async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
     execution_id: ExecutionId<E, L, D>,
-    pregenerated: Option<PregeneratedPrimes>,
+    pregenerated: Option<PregeneratedPrimes<L>>,
     core_share: &IncompleteKeyShare<E, L>,
 ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
 where
@@ -209,7 +211,9 @@ where
     let i = core_share.i;
     let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
-    let MpcParty { delivery, blocking, .. } = party.into_party();
+    let MpcParty {
+        delivery, blocking, ..
+    } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     // Setup networking
@@ -226,13 +230,16 @@ where
 
     // Round 1
 
-    let PregeneratedPrimes { p, q } = match pregenerated {
+    let PregeneratedPrimes { p, q, .. } = match pregenerated {
         Some(x) => x,
-        None => blocking.spawn(|| {
-            // can't use rng from context as this worker can outlive it
-            let mut rng = rand_core::OsRng::default();
-            PregeneratedPrimes::generate::<L, _>(&mut rng)
-        }).await.map_err(|_| KeyRefreshError::SpawnError)?
+        None => blocking
+            .spawn(|| {
+                // can't use rng from context as this worker can outlive it
+                let mut rng = rand_core::OsRng::default();
+                PregeneratedPrimes::generate(&mut rng)
+            })
+            .await
+            .map_err(|_| KeyRefreshError::SpawnError)?,
     };
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
