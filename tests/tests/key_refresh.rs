@@ -36,9 +36,12 @@ mod generic {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let pregenerated_data =
+                cggmp21::key_refresh::PregeneratedPrimes::generate(&mut party_rng);
             async move {
                 cggmp21::key_refresh(&share)
                     .set_execution_id(refresh_execution_id)
+                    .set_pregenerated_data(pregenerated_data)
                     .start(&mut party_rng, party)
                     .await
             }

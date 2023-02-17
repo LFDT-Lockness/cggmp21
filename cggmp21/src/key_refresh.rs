@@ -161,6 +161,9 @@ where
         }
     }
 
+    /// Set pregenerated data, which you can obtain with
+    /// [`PregeneratedPrimes::generate`]. If not set, will be generated during
+    /// protocol with OsRng
     pub fn set_pregenerated_data(self, pregenerated: PregeneratedPrimes<L>) -> Self {
         Self {
             pregenerated: Some(pregenerated),
