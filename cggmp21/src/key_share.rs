@@ -26,7 +26,7 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
     pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
-    /// Public key corresponding to shared secret key
+    /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[serde_as(as = "Compact")]
     pub shared_public_key: Point<E>,
     /// Randomness derived at key generation
@@ -34,7 +34,8 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
     pub rid: L::Rid,
     /// Public shares of all parties sharing the key
     ///
-    /// `public_shares[i]` corresponds to public share of $\ith$ party
+    /// `public_shares[i]` corresponds to public share of $\ith$ party.
+    /// Corresponds to **X** = $(X_i)_i$ in paper
     #[serde_as(as = "Vec<Compact>")]
     pub public_shares: Vec<Point<E>>,
     /// Secret share $x_i$
@@ -171,6 +172,20 @@ impl<E: Curve, L: SecurityLevel> TryFrom<KeyShare<E, L>> for Valid<KeyShare<E, L
     fn try_from(key_share: KeyShare<E, L>) -> Result<Self, Self::Error> {
         key_share.validate()?;
         Ok(Self(key_share))
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> From<Valid<IncompleteKeyShare<E, L>>>
+    for IncompleteKeyShare<E, L>
+{
+    fn from(x: Valid<IncompleteKeyShare<E, L>>) -> Self {
+        x.0
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> From<Valid<KeyShare<E, L>>> for KeyShare<E, L> {
+    fn from(x: Valid<KeyShare<E, L>>) -> Self {
+        x.0
     }
 }
 

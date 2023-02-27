@@ -19,6 +19,7 @@ use thiserror::Error;
 use crate::execution_id::ProtocolChoice;
 use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
 use crate::security_level::SecurityLevel;
+use crate::utils::xor_array;
 use crate::utils::{hash_message, HashMessageError};
 use crate::ExecutionId;
 
@@ -298,18 +299,6 @@ where
         .try_into()
         .map_err(Bug::InvalidKeyShare)?)
     }
-}
-
-fn xor_array<A, B>(mut a: A, b: B) -> A
-where
-    A: AsMut<[u8]>,
-    B: AsRef<[u8]>,
-{
-    a.as_mut()
-        .iter_mut()
-        .zip(b.as_ref())
-        .for_each(|(a_i, b_i)| *a_i ^= *b_i);
-    a
 }
 
 /// Keygen failed
