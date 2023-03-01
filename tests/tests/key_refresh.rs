@@ -1,5 +1,3 @@
-mod precomputed_shares;
-
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
     use generic_ec::{hash_to_curve::FromHash, Point};
@@ -9,8 +7,6 @@ mod generic {
     use sha2::Sha256;
 
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
-
-    use super::precomputed_shares::CACHED_SHARES;
 
     #[test_case::case(5; "n3")]
     #[test_case::case(10; "n10")]
@@ -22,9 +18,10 @@ mod generic {
     {
         let mut rng = rand_dev::DevRng::new();
 
-        let shares = CACHED_SHARES
+        let shares = cggmp21_tests::CACHED_SHARES
             .get_shares::<E>(n)
             .expect("retrieve cached shares");
+        let mut primes = cggmp21_tests::CACHED_PRIMES.clone().into_iterator();
 
         // Perform refresh
 
@@ -36,8 +33,7 @@ mod generic {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
-            let pregenerated_data =
-                cggmp21::key_refresh::PregeneratedPrimes::generate(&mut party_rng);
+            let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
                 cggmp21::key_refresh(&share)
                     .set_execution_id(refresh_execution_id)

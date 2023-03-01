@@ -2,9 +2,22 @@ use anyhow::{bail, Context, Result};
 use cggmp21::{
     key_share::{KeyShare, Valid},
     security_level::ReasonablySecure,
+    unknown_order::BigNumber,
 };
 use generic_ec::Curve;
+use rand::RngCore;
 use serde_json::{Map, Value};
+
+lazy_static::lazy_static! {
+    pub static ref CACHED_SHARES: PrecomputedKeyShares =
+        PrecomputedKeyShares::from_serialized(
+            include_str!("../../test-data/precomputed_shares.json")
+        ).unwrap();
+    pub static ref CACHED_PRIMES: PregeneratedPrimes =
+        PregeneratedPrimes::from_serialized(
+            include_str!("../../test-data/pregenerated_primes.json")
+        ).unwrap();
+}
 
 pub struct PrecomputedKeyShares {
     shares: Map<String, Value>,
@@ -17,12 +30,12 @@ impl PrecomputedKeyShares {
         }
     }
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(shares: &str) -> Result<Self> {
+    pub fn from_serialized(shares: &str) -> Result<Self> {
         let shares = serde_json::from_str(shares).context("parse shares")?;
         Ok(Self { shares })
     }
 
-    pub fn to_string(&self) -> Result<String> {
+    pub fn to_serialized(&self) -> Result<String> {
         serde_json::to_string_pretty(&self.shares).context("serialize shares")
     }
 
@@ -49,5 +62,74 @@ impl PrecomputedKeyShares {
         self.shares
             .insert(format!("n={n},curve={}", E::CURVE_NAME), key_shares);
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PregeneratedPrimes {
+    primes: Vec<BigNumber>,
+    bitsize: usize,
+}
+
+impl PregeneratedPrimes {
+    pub fn from_serialized(repr: &str) -> Result<Self> {
+        serde_json::from_str(repr).context("parse primes")
+    }
+
+    pub fn to_serialized(&self) -> Result<String> {
+        serde_json::to_string(self).context("serialize primes")
+    }
+
+    /// Same as IntoIter::into_iter would be, but easier to write
+    pub fn into_iterator<L>(self) -> PrimesIterator<L>
+    where
+        L: cggmp21::security_level::SecurityLevel,
+    {
+        if self.bitsize != 4 * L::SECURITY_BITS {
+            panic!("Attempting to use generated primes while expecting wrong bit size");
+        }
+        PrimesIterator {
+            inner: self.primes.into_iter(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Generate `amount * 2` numbers (exactly `amount` of pregenerated pairs
+    /// for key refresh) at given security level
+    pub fn generate<R, L>(amount: usize, rng: &mut R) -> Self
+    where
+        L: cggmp21::security_level::SecurityLevel,
+        R: RngCore,
+    {
+        let primes = (0..amount)
+            .map(|_| {
+                let (p, q) = cggmp21::key_refresh::PregeneratedPrimes::<L>::generate(rng).split();
+                [p, q]
+            })
+            .flatten()
+            .collect();
+        let bitsize = 4 * L::SECURITY_BITS;
+
+        Self { primes, bitsize }
+    }
+}
+
+/// It's easier to adapt bignumber iterator than fight with serializing
+/// PregeneratedPrimes, especially as a quick solution for tests
+pub struct PrimesIterator<L> {
+    inner: std::vec::IntoIter<BigNumber>,
+    _phantom: std::marker::PhantomData<L>,
+}
+
+impl<L> Iterator for PrimesIterator<L>
+where
+    L: cggmp21::security_level::SecurityLevel,
+{
+    type Item = cggmp21::key_refresh::PregeneratedPrimes<L>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let p = self.inner.next()?;
+        let q = self.inner.next()?;
+        Some(cggmp21::key_refresh::PregeneratedPrimes::new(p, q))
     }
 }

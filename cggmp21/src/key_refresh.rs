@@ -91,6 +91,7 @@ pub struct MsgRound3<E: Curve> {
 
 /// To speed up computations, it's possible to supply data to the algorithm
 /// generated ahead of time
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PregeneratedPrimes<L> {
     p: BigNumber,
     q: BigNumber,
@@ -98,6 +99,17 @@ pub struct PregeneratedPrimes<L> {
 }
 
 impl<L: SecurityLevel> PregeneratedPrimes<L> {
+    pub fn new(p: BigNumber, q: BigNumber) -> Self {
+        Self {
+            p, q,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn split(self) -> (BigNumber, BigNumber) {
+        (self.p, self.q)
+    }
+
     /// Generate the structure. Takes some time.
     pub fn generate<R: RngCore>(rng: &mut R) -> Self {
         Self {

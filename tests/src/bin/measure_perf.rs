@@ -4,7 +4,6 @@ use cggmp21::{
     signing::Message,
     ExecutionId,
 };
-use cggmp21_tests::PrecomputedKeyShares;
 use clap::Parser;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -15,11 +14,6 @@ use sha2::Sha256;
 type E = generic_ec::curves::Secp256r1;
 type L = cggmp21::security_level::ReasonablySecure;
 type D = sha2::Sha256;
-
-lazy_static::lazy_static! {
-    static ref CACHED_SHARES: PrecomputedKeyShares =
-        PrecomputedKeyShares::from_str(include_str!("../../../test-data/precomputed_shares.json")).unwrap();
-}
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -39,7 +33,7 @@ async fn main() {
 
     for n in args.n {
         println!("n = {n}");
-        let shares = CACHED_SHARES
+        let shares = cggmp21_tests::CACHED_SHARES
             .get_shares::<E>(n)
             .expect("retrieve key shares from cache");
 
@@ -51,10 +45,13 @@ async fn main() {
             use cggmp21::key_refresh::Msg;
             let mut simulation = Simulation::<Msg<E, D>>::new();
 
+            let mut primes = cggmp21_tests::CACHED_PRIMES.clone().into_iterator();
+
             let outputs = shares.iter().map(|share| {
                 let party = simulation.add_party();
                 let refresh_execution_id = refresh_execution_id.clone();
                 let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+                let pregen = primes.next().expect("Can't get pregenerated prime");
 
                 let mut profiler = PerfProfiler::new();
 
@@ -62,6 +59,7 @@ async fn main() {
                     let _new_share = cggmp21::key_refresh(share)
                         .set_execution_id(refresh_execution_id)
                         .set_progress_tracer(&mut profiler)
+                        .set_pregenerated_data(pregen)
                         .start(&mut party_rng, party)
                         .await
                         .context("refresh failed")?;
