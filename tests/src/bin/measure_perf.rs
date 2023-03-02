@@ -13,7 +13,7 @@ type D = sha2::Sha256;
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(short, default_value = "3")]
+    #[clap(short, value_delimiter = ',', default_value = "3,5,7,10")]
     n: Vec<u16>,
     #[clap(long, default_value = "true")]
     bench_refresh: bool,
