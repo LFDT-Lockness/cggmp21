@@ -91,9 +91,7 @@ impl PregeneratedPrimes {
     }
 
     /// Iterate over numbers, producing pregenerated pairs for key refresh
-    pub fn iter<'a, L>(
-        &'a self,
-    ) -> impl Iterator<Item = cggmp21::key_refresh::PregeneratedPrimes<L>> + 'a
+    pub fn iter<L>(&self) -> impl Iterator<Item = cggmp21::key_refresh::PregeneratedPrimes<L>> + '_
     where
         L: cggmp21::security_level::SecurityLevel,
     {
