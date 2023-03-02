@@ -8,24 +8,16 @@ use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};
 
-// You can't disable clippy warnings inside a macro, so we isolate macro calls
-// into a module and disable warnings this way
-mod cached {
-    #![allow(clippy::unwrap_used)]
-    use crate::{PrecomputedKeyShares, PregeneratedPrimes};
-
-    lazy_static::lazy_static! {
-        pub static ref CACHED_SHARES: PrecomputedKeyShares =
-            PrecomputedKeyShares::from_serialized(
-                include_str!("../../test-data/precomputed_shares.json")
-            ).unwrap();
-        pub static ref CACHED_PRIMES: PregeneratedPrimes =
-            PregeneratedPrimes::from_serialized(
-                include_str!("../../test-data/pregenerated_primes.json")
-            ).unwrap();
-    }
+lazy_static::lazy_static! {
+    pub static ref CACHED_SHARES: PrecomputedKeyShares =
+        PrecomputedKeyShares::from_serialized(
+            include_str!("../../test-data/precomputed_shares.json")
+        ).unwrap();
+    pub static ref CACHED_PRIMES: PregeneratedPrimes =
+        PregeneratedPrimes::from_serialized(
+            include_str!("../../test-data/pregenerated_primes.json")
+        ).unwrap();
 }
-pub use cached::*;
 
 pub struct PrecomputedKeyShares {
     shares: Map<String, Value>,
