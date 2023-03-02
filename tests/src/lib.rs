@@ -79,7 +79,7 @@ impl PregeneratedPrimes {
     }
 
     pub fn to_serialized(&self) -> Result<String> {
-        serde_json::to_string(self).context("serialize primes")
+        serde_json::to_string_pretty(self).context("serialize primes")
     }
 
     /// Iterate over numbers, producing pregenerated pairs for key refresh
