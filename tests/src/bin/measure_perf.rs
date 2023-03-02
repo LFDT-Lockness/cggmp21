@@ -15,9 +15,9 @@ type D = sha2::Sha256;
 struct Args {
     #[clap(short, default_value = "3")]
     n: Vec<u16>,
-    #[clap(long)]
+    #[clap(long, default_value = "true")]
     bench_refresh: bool,
-    #[clap(long)]
+    #[clap(long, default_value = "true")]
     bench_signing: bool,
 }
 
