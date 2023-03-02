@@ -1,9 +1,5 @@
 use anyhow::Context;
-use cggmp21::{
-    progress::PerfProfiler,
-    signing::Message,
-    ExecutionId,
-};
+use cggmp21::{progress::PerfProfiler, signing::Message, ExecutionId};
 use clap::Parser;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -39,8 +35,7 @@ async fn main() {
 
         if args.bench_refresh {
             let refresh_execution_id: [u8; 32] = rng.gen();
-            let refresh_execution_id =
-                ExecutionId::<E, L>::from_bytes(&refresh_execution_id);
+            let refresh_execution_id = ExecutionId::<E, L>::from_bytes(&refresh_execution_id);
 
             use cggmp21::key_refresh::Msg;
             let mut simulation = Simulation::<Msg<E, D>>::new();

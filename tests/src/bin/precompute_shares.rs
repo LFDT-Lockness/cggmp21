@@ -11,7 +11,9 @@ fn main() -> Result<()> {
     match args.next() {
         Some(cmd) if cmd == "shares" => precompute_shares()?,
         Some(cmd) if cmd == "primes" => precompute_primes()?,
-        _ => eprintln!("Usage: {exec} [shares,primes]\n\tPregenerate test data and print it to stdout")
+        _ => eprintln!(
+            "Usage: {exec} [shares,primes]\n\tPregenerate test data and print it to stdout"
+        ),
     }
     Ok(())
 }

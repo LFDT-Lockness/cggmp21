@@ -22,6 +22,7 @@ use thiserror::Error;
 use crate::{
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
+    progress::Tracer,
     security_level::SecurityLevel,
     utils,
     utils::{
@@ -29,7 +30,7 @@ use crate::{
         xor_array, AbortBlame,
     },
     zk::ring_pedersen_parameters as π_prm,
-    ExecutionId, progress::Tracer,
+    ExecutionId,
 };
 
 /// Message of key refresh protocol
@@ -101,7 +102,8 @@ pub struct PregeneratedPrimes<L> {
 impl<L: SecurityLevel> PregeneratedPrimes<L> {
     pub fn new(p: BigNumber, q: BigNumber) -> Self {
         Self {
-            p, q,
+            p,
+            q,
             _phantom: std::marker::PhantomData,
         }
     }

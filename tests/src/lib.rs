@@ -8,16 +8,24 @@ use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};
 
-lazy_static::lazy_static! {
-    pub static ref CACHED_SHARES: PrecomputedKeyShares =
-        PrecomputedKeyShares::from_serialized(
-            include_str!("../../test-data/precomputed_shares.json")
-        ).unwrap();
-    pub static ref CACHED_PRIMES: PregeneratedPrimes =
-        PregeneratedPrimes::from_serialized(
-            include_str!("../../test-data/pregenerated_primes.json")
-        ).unwrap();
+// You can't disable clippy warnings inside a macro, so we isolate macro calls
+// into a module and disable warnings this way
+mod cached {
+    #![allow(clippy::unwrap_used)]
+    use crate::{PrecomputedKeyShares, PregeneratedPrimes};
+
+    lazy_static::lazy_static! {
+        pub static ref CACHED_SHARES: PrecomputedKeyShares =
+            PrecomputedKeyShares::from_serialized(
+                include_str!("../../test-data/precomputed_shares.json")
+            ).unwrap();
+        pub static ref CACHED_PRIMES: PregeneratedPrimes =
+            PregeneratedPrimes::from_serialized(
+                include_str!("../../test-data/pregenerated_primes.json")
+            ).unwrap();
+    }
 }
+pub use cached::*;
 
 pub struct PrecomputedKeyShares {
     shares: Map<String, Value>,
@@ -81,7 +89,7 @@ impl PregeneratedPrimes {
     }
 
     /// Iterate over numbers, producing pregenerated pairs for key refresh
-    pub fn iter<'a, L>(&'a self) -> PrimesIterator<'a, L>
+    pub fn iter<L>(&self) -> PrimesIterator<L>
     where
         L: cggmp21::security_level::SecurityLevel,
     {
@@ -102,11 +110,10 @@ impl PregeneratedPrimes {
         R: RngCore,
     {
         let primes = (0..amount)
-            .map(|_| {
+            .flat_map(|_| {
                 let (p, q) = cggmp21::key_refresh::PregeneratedPrimes::<L>::generate(rng).split();
                 [p, q]
             })
-            .flatten()
             .collect();
         let bitsize = 4 * L::SECURITY_BITS;
 
