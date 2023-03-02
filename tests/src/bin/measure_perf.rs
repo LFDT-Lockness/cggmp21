@@ -65,6 +65,8 @@ async fn main() {
             let perf_reports = futures::future::try_join_all(outputs)
                 .await
                 .expect("signing failed");
+
+            println!("Key refresh protocol");
             println!("{}", perf_reports[0].clone().display_io(false));
         }
 
@@ -101,6 +103,7 @@ async fn main() {
                 .await
                 .expect("signing failed");
 
+            println!("Signing protocol");
             println!("{}", perf_reports[0].clone().display_io(false));
         }
     }

@@ -75,6 +75,8 @@ impl PrecomputedKeyShares {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PregeneratedPrimes {
+    // It would be better to use key_refresh::PregeneratedPrimes here, but
+    // adding serialization to that is an enormous pain in the ass
     primes: Vec<BigNumber>,
     bitsize: usize,
 }
@@ -89,21 +91,23 @@ impl PregeneratedPrimes {
     }
 
     /// Iterate over numbers, producing pregenerated pairs for key refresh
-    pub fn iter<L>(&self) -> PrimesIterator<L>
+    pub fn iter<'a, L>(
+        &'a self,
+    ) -> impl Iterator<Item = cggmp21::key_refresh::PregeneratedPrimes<L>> + 'a
     where
         L: cggmp21::security_level::SecurityLevel,
     {
         if self.bitsize != 4 * L::SECURITY_BITS {
             panic!("Attempting to use generated primes while expecting wrong bit size");
         }
-        PrimesIterator {
-            inner: self.primes.iter(),
-            _phantom: std::marker::PhantomData,
-        }
+        self.primes.chunks(2).map(|s| {
+            let p = &s[0];
+            let q = &s[1];
+            cggmp21::key_refresh::PregeneratedPrimes::new(p.clone(), q.clone())
+        })
     }
 
-    /// Generate `amount * 2` numbers (exactly `amount` of pregenerated pairs
-    /// for key refresh) at given security level
+    /// Generate enough primes so that you can do `amount` of key refreshes
     pub fn generate<R, L>(amount: usize, rng: &mut R) -> Self
     where
         L: cggmp21::security_level::SecurityLevel,
@@ -118,25 +122,5 @@ impl PregeneratedPrimes {
         let bitsize = 4 * L::SECURITY_BITS;
 
         Self { primes, bitsize }
-    }
-}
-
-/// It's easier to adapt bignumber iterator than fight with serializing
-/// PregeneratedPrimes, especially as a quick solution for tests
-pub struct PrimesIterator<'a, L> {
-    inner: std::slice::Iter<'a, BigNumber>,
-    _phantom: std::marker::PhantomData<L>,
-}
-
-impl<'a, L> Iterator for PrimesIterator<'a, L>
-where
-    L: cggmp21::security_level::SecurityLevel,
-{
-    type Item = cggmp21::key_refresh::PregeneratedPrimes<L>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let p = self.inner.next()?.clone();
-        let q = self.inner.next()?.clone();
-        Some(cggmp21::key_refresh::PregeneratedPrimes::new(p, q))
     }
 }
