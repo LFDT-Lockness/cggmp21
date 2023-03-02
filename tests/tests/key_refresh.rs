@@ -21,7 +21,7 @@ mod generic {
         let shares = cggmp21_tests::CACHED_SHARES
             .get_shares::<E>(n)
             .expect("retrieve cached shares");
-        let mut primes = cggmp21_tests::CACHED_PRIMES.clone().into_iterator();
+        let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
         // Perform refresh
 

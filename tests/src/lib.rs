@@ -80,8 +80,8 @@ impl PregeneratedPrimes {
         serde_json::to_string(self).context("serialize primes")
     }
 
-    /// Same as IntoIter::into_iter would be, but easier to write
-    pub fn into_iterator<L>(self) -> PrimesIterator<L>
+    /// Iterate over numbers, producing pregenerated pairs for key refresh
+    pub fn iter<'a, L>(&'a self) -> PrimesIterator<'a, L>
     where
         L: cggmp21::security_level::SecurityLevel,
     {
@@ -89,7 +89,7 @@ impl PregeneratedPrimes {
             panic!("Attempting to use generated primes while expecting wrong bit size");
         }
         PrimesIterator {
-            inner: self.primes.into_iter(),
+            inner: self.primes.iter(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -116,20 +116,20 @@ impl PregeneratedPrimes {
 
 /// It's easier to adapt bignumber iterator than fight with serializing
 /// PregeneratedPrimes, especially as a quick solution for tests
-pub struct PrimesIterator<L> {
-    inner: std::vec::IntoIter<BigNumber>,
+pub struct PrimesIterator<'a, L> {
+    inner: std::slice::Iter<'a, BigNumber>,
     _phantom: std::marker::PhantomData<L>,
 }
 
-impl<L> Iterator for PrimesIterator<L>
+impl<'a, L> Iterator for PrimesIterator<'a, L>
 where
     L: cggmp21::security_level::SecurityLevel,
 {
     type Item = cggmp21::key_refresh::PregeneratedPrimes<L>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let p = self.inner.next()?;
-        let q = self.inner.next()?;
+        let p = self.inner.next()?.clone();
+        let q = self.inner.next()?.clone();
         Some(cggmp21::key_refresh::PregeneratedPrimes::new(p, q))
     }
 }

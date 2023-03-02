@@ -17,7 +17,7 @@ type D = sha2::Sha256;
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(short, default_value = "3,5,7,10")]
+    #[clap(short, default_value = "3")]
     n: Vec<u16>,
     #[clap(long)]
     bench_refresh: bool,
@@ -45,7 +45,7 @@ async fn main() {
             use cggmp21::key_refresh::Msg;
             let mut simulation = Simulation::<Msg<E, D>>::new();
 
-            let mut primes = cggmp21_tests::CACHED_PRIMES.clone().into_iterator();
+            let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
             let outputs = shares.iter().map(|share| {
                 let party = simulation.add_party();
