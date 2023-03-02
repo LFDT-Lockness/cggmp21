@@ -438,6 +438,7 @@ where
             q: q.clone(),
         };
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
+            .map_err(Bug::PiMod)?
     };
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(Bug::HashToScalarError)?;
@@ -479,7 +480,8 @@ where
             π_fac::PrivateData { p: &p, q: &q },
             &π_fac_security,
             &mut rng,
-        );
+        )
+        .map_err(Bug::PiFac)?;
 
         let msg = MsgRound3 {
             mod_proof: mod_proof.clone(),
@@ -709,6 +711,10 @@ pub enum Bug {
     TooManyParties,
     #[error("Invalid key share geenrated")]
     InvalidShareGenerated(#[source] crate::key_share::InvalidKeyShare),
+    #[error("couldn't prove a pi mod statement")]
+    PiMod(#[source] paillier_zk::Error),
+    #[error("couldn't prove a pi fac statement")]
+    PiFac(#[source] paillier_zk::Error),
 }
 
 /// Error indicating that protocol was aborted by malicious party

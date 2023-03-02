@@ -1,4 +1,5 @@
 #![allow(non_snake_case, mixed_script_confusables, uncommon_codepoints)]
+#![forbid(clippy::disallowed_methods)]
 
 pub use {
     paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order, round_based,

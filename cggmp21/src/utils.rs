@@ -2,8 +2,8 @@ use digest::Digest;
 use generic_ec::{Curve, Scalar};
 use paillier_zk::libpaillier::{unknown_order::BigNumber, EncryptionKey};
 use paillier_zk::{
-    group_element_vs_paillier_encryption_in_range as π_log,
-    paillier_affine_operation_in_range as π_aff, paillier_encryption_in_range as π_enc,
+    group_element_vs_paillier_encryption_in_range as pi_log,
+    paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
 };
 use rand_core::RngCore;
 use round_based::rounds_router::simple_store::RoundMsgs;
@@ -41,26 +41,24 @@ pub fn scalar_to_bignumber<E: Curve>(scalar: impl AsRef<Scalar<E>>) -> BigNumber
 }
 
 pub struct SecurityParams {
-    pub π_aff: π_aff::SecurityParams,
-    pub π_log: π_log::SecurityParams,
-    pub π_enc: π_enc::SecurityParams,
+    pub pi_aff: pi_aff::SecurityParams,
+    pub pi_log: pi_log::SecurityParams,
+    pub pi_enc: pi_enc::SecurityParams,
 }
 
 impl SecurityParams {
     pub fn new<L: SecurityLevel>() -> Self {
         Self {
-            π_aff: π_aff::SecurityParams {
+            pi_aff: pi_aff::SecurityParams {
                 l_x: L::ELL,
                 l_y: L::ELL_PRIME,
                 epsilon: L::EPSILON,
-                q: L::q(),
             },
-            π_log: π_log::SecurityParams {
+            pi_log: pi_log::SecurityParams {
                 l: L::ELL,
                 epsilon: L::EPSILON,
-                q: L::q(),
             },
-            π_enc: π_enc::SecurityParams {
+            pi_enc: pi_enc::SecurityParams {
                 l: L::ELL,
                 epsilon: L::EPSILON,
                 q: L::q(),
