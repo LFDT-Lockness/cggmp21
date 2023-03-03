@@ -1,6 +1,7 @@
 use std::iter;
 
 use paillier_zk::libpaillier::unknown_order::BigNumber;
+use paillier_zk::BigNumberExt;
 use rand_core::{CryptoRng, RngCore};
 use thiserror::Error;
 
@@ -41,7 +42,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
 
     let primes_setups = iter::repeat_with(|| generate_primes_setup::<L, _>(rng))
         .take(n.into())
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let y = iter::repeat_with(|| SecretScalar::<E>::random(rng))
         .take(n.into())
@@ -62,7 +63,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
         })
         .collect::<Vec<_>>();
 
-    core_shares
+    let key_shares = core_shares
         .zip(primes_setups)
         .zip(y)
         .map(|((core_share, primes_setup), y_i)| {
@@ -76,7 +77,8 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
             .try_into()
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(TrustedDealerError)
+        .map_err(Reason::InvalidKeyShare)?;
+    Ok(key_shares)
 }
 
 struct PartyPrimesSetup {
@@ -89,7 +91,7 @@ struct PartyPrimesSetup {
 
 fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
-) -> PartyPrimesSetup {
+) -> Result<PartyPrimesSetup, TrustedDealerError> {
     let p = BigNumber::safe_prime_from_rng(L::SECURITY_BITS * 4, rng);
     let q = BigNumber::safe_prime_from_rng(L::SECURITY_BITS * 4, rng);
     let N = &p * &q;
@@ -99,11 +101,19 @@ fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
     let λ = BigNumber::from_rng(&φ_N, rng);
 
     let t = BigNumber::modmul(&r, &r, &N);
-    let s = BigNumber::modpow(&t, &λ, &N);
+    let s = BigNumber::powmod(&t, &λ, &N).map_err(|_| Reason::PowMod)?;
 
-    PartyPrimesSetup { p, q, N, s, t }
+    Ok(PartyPrimesSetup { p, q, N, s, t })
 }
 
 #[derive(Debug, Error)]
-#[error("trusted dealer failed to generate shares due to internal error")]
-pub struct TrustedDealerError(InvalidKeyShare);
+#[error(transparent)]
+pub struct TrustedDealerError(#[from] Reason);
+
+#[derive(Debug, Error)]
+enum Reason {
+    #[error("trusted dealer failed to generate shares due to internal error")]
+    InvalidKeyShare(#[source] InvalidKeyShare),
+    #[error("pow mod undefined")]
+    PowMod,
+}

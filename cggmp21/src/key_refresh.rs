@@ -10,7 +10,7 @@ use generic_ec_zkp::{
 };
 use paillier_zk::{
     libpaillier, no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
-    unknown_order::BigNumber,
+    unknown_order::BigNumber, BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
@@ -25,7 +25,8 @@ use crate::{
     security_level::SecurityLevel,
     utils,
     utils::{
-        but_nth, collect_blame, collect_simple_blame, iter_peers, mine_from, xor_array, AbortBlame,
+        but_nth, collect_blame, collect_simple_blame, iter_peers, mine_from, scalar_to_bignumber,
+        xor_array, AbortBlame,
     },
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
@@ -275,14 +276,15 @@ where
     let r = utils::sample_bigint_in_mult_group(rng, &N);
     let λ = BigNumber::from_rng(&φ_N, rng);
     let t = r.modmul(&r, &N);
-    let s = t.modpow(&λ, &N);
+    let s = t.powmod(&λ, &N).map_err(|_| Bug::PowMod)?;
 
     let proof_data = π_prm::Data {
         N: &N,
         s: &s,
         t: &t,
     };
-    let params_proof = π_prm::prove(parties_shared_state.clone(), &mut rng, proof_data, &φ_N, &λ);
+    let params_proof = π_prm::prove(parties_shared_state.clone(), &mut rng, proof_data, &φ_N, &λ)
+        .map_err(Bug::PiPrm)?;
 
     // tau_j and A_i^j in paper
     let (sch_secrets_a, sch_commits_a) = iter_peers(i, n)
@@ -467,9 +469,8 @@ where
             .collect();
         let nonce = BigNumber::from_rng(enc.n(), &mut rng);
         let C = enc
-            .encrypt(x.as_ref().to_be_bytes(), Some(nonce))
-            .ok_or(Bug::PaillierEnc)?
-            .0;
+            .encrypt_with(&scalar_to_bignumber(x), &nonce)
+            .map_err(|_| Bug::PaillierEnc)?;
         let fac_proof = π_fac::prove(
             parties_shared_state.clone(),
             &π_fac_aux,
@@ -509,8 +510,10 @@ where
     let shares = shares_msg_b
         .iter()
         .map(|m| {
-            let bytes = dec.decrypt(&m.C).ok_or(KeyRefreshError::PaillierDec)?;
-            Scalar::from_be_bytes(bytes).map_err(KeyRefreshError::InvalidScalar)
+            let bytes = dec
+                .decrypt_to_bigint(&m.C)
+                .map_err(|_| KeyRefreshError::PaillierDec)?;
+            Ok::<_, KeyRefreshError<_, _>>(bytes.to_scalar())
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -715,6 +718,10 @@ pub enum Bug {
     PiMod(#[source] paillier_zk::Error),
     #[error("couldn't prove a pi fac statement")]
     PiFac(#[source] paillier_zk::Error),
+    #[error("powmod not defined")]
+    PowMod,
+    #[error("couldn't prove prm statement")]
+    PiPrm(#[source] crate::zk::ring_pedersen_parameters::ZkError),
 }
 
 /// Error indicating that protocol was aborted by malicious party

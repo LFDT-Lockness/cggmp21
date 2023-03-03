@@ -1,8 +1,9 @@
 //! Пprm or Rprm in the paper. Proof that s ⋮ t modulo N. Non-interactive
 //! version only.
 use digest::{typenum::U32, Digest};
-use paillier_zk::unknown_order::BigNumber;
+use paillier_zk::{unknown_order::BigNumber, BigNumberExt};
 use rand_core::{RngCore, SeedableRng};
+use thiserror::Error;
 
 /// A reasonable security level for proof
 pub const SECURITY: usize = 64;
@@ -67,7 +68,7 @@ pub fn prove<const M: usize, R, D>(
     data: Data,
     phi: &BigNumber,
     lambda: &BigNumber,
-) -> Proof<M>
+) -> Result<Proof<M>, ZkError>
 where
     D: Digest<OutputSize = U32>,
     R: RngCore,
@@ -75,7 +76,16 @@ where
     let private_commitment = [(); M].map(|()| BigNumber::from_rng(phi, &mut rng));
     let commitment = private_commitment
         .clone()
-        .map(|a| data.t.modpow(&a, data.N));
+        .map(|a| data.t.powmod(&a, data.N));
+    // TODO: since array::try_map is not stable yet, we have to be hacky here
+    let commitment = if commitment.iter().any(Result::is_err) {
+        return Err(Reason::PowMod.into());
+    } else {
+        // We made sure that every item in the array is `Ok(_)`
+        #[allow(clippy::unwrap_used)]
+        commitment.map(Result::unwrap)
+    };
+
     let challenge: Challenge<M> = derive_challenge(shared_state, data);
 
     let mut zs = private_commitment;
@@ -84,7 +94,7 @@ where
             *z_ref = z_ref.modadd(lambda, phi);
         }
     }
-    Proof { commitment, zs }
+    Ok(Proof { commitment, zs })
 }
 
 /// Verify the proof. Derives determenistic challenge based on `shared_state`
@@ -99,7 +109,7 @@ where
 {
     let challenge: Challenge<M> = derive_challenge(shared_state, data);
     for ((z, a), e) in proof.zs.iter().zip(&proof.commitment).zip(&challenge.es) {
-        let lhs = data.t.modpow(z, data.N);
+        let lhs = data.t.powmod(z, data.N).map_err(|_| InvalidProof)?;
         if *e {
             let rhs = data.s.modmul(a, data.N);
             if lhs != rhs {
@@ -112,6 +122,16 @@ where
     Ok(())
 }
 
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct ZkError(#[from] Reason);
+
+#[derive(Debug, Error)]
+enum Reason {
+    #[error("pow mod undefined")]
+    PowMod,
+}
+
 /// Witness that proof is invalid
 #[derive(Debug)]
 pub struct InvalidProof;
@@ -119,7 +139,7 @@ pub struct InvalidProof;
 // running with M=64 completed in 1.22 on my machine in debug build
 #[cfg(test)]
 mod test {
-    use paillier_zk::unknown_order::BigNumber;
+    use paillier_zk::{unknown_order::BigNumber, BigNumberExt};
 
     #[test]
     fn passing() {
@@ -134,7 +154,7 @@ mod test {
         let r = crate::utils::sample_bigint_in_mult_group(&mut rng, &n);
         let lambda = BigNumber::from_rng(&phi, &mut rng);
         let t = r.modmul(&r, &n);
-        let s = t.modpow(&lambda, &n);
+        let s = t.powmod(&lambda, &n).unwrap();
 
         let data = super::Data {
             N: &n,
@@ -148,7 +168,8 @@ mod test {
             data,
             &phi,
             &lambda,
-        );
+        )
+        .unwrap();
         super::verify(shared_state, data, &proof).expect("proof should pass");
     }
 
@@ -165,7 +186,7 @@ mod test {
         let r = crate::utils::sample_bigint_in_mult_group(&mut rng, &n);
         let lambda = BigNumber::from_rng(&phi, &mut rng);
         let t = r.modmul(&r, &n);
-        let correct_s = t.modpow(&lambda, &n);
+        let correct_s = t.powmod(&lambda, &n).unwrap();
         let s = correct_s.modadd(&BigNumber::one(), &n);
 
         let data = super::Data {
@@ -180,7 +201,8 @@ mod test {
             data,
             &phi,
             &lambda,
-        );
+        )
+        .unwrap();
         if super::verify(shared_state, data, &proof).is_ok() {
             panic!("proof should fail");
         }
