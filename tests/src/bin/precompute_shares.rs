@@ -6,16 +6,28 @@ use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 
 fn main() -> Result<()> {
-    let mut args = std::env::args();
-    let exec = args.next().unwrap();
-    match args.next() {
-        Some(cmd) if cmd == "shares" => precompute_shares()?,
-        Some(cmd) if cmd == "primes" => precompute_primes()?,
-        _ => eprintln!(
-            "Usage: {exec} [shares,primes]\n\tPregenerate test data and print it to stdout"
-        ),
+    match args() {
+        Operation::GenShares => precompute_shares(),
+        Operation::GenPrimes => precompute_primes(),
     }
-    Ok(())
+}
+
+#[derive(Clone, Debug)]
+enum Operation {
+    GenShares,
+    GenPrimes,
+}
+
+fn args() -> Operation {
+    use bpaf::Parser;
+    let shares = bpaf::command("shares", bpaf::pure(Operation::GenShares).to_options())
+        .help("Pregenerate key shares");
+    let primes = bpaf::command("primes", bpaf::pure(Operation::GenPrimes).to_options())
+        .help("Pregenerate primes for key refresh");
+    bpaf::construct!([shares, primes])
+        .to_options()
+        .descr("Pregenerate test data and print it to stdout")
+        .run()
 }
 
 fn precompute_shares() -> Result<()> {

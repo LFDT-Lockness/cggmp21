@@ -1,6 +1,5 @@
 use anyhow::Context;
 use cggmp21::{progress::PerfProfiler, signing::Message, ExecutionId};
-use clap::Parser;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rand_dev::DevRng;
@@ -11,20 +10,39 @@ type E = generic_ec::curves::Secp256r1;
 type L = cggmp21::security_level::ReasonablySecure;
 type D = sha2::Sha256;
 
-#[derive(Debug, Parser)]
 struct Args {
-    #[clap(short, value_delimiter = ',', default_value = "3,5,7,10")]
     n: Vec<u16>,
-    #[clap(long, default_value = "true")]
     bench_refresh: bool,
-    #[clap(long, default_value = "true")]
     bench_signing: bool,
+}
+
+fn args() -> Args {
+    use bpaf::Parser;
+    let n = bpaf::short('n')
+        .help("Amount of parties")
+        .argument::<u16>("N")
+        .many()
+        .map(|ns| if ns.is_empty() { vec![3, 5, 7, 10] } else { ns });
+    let bench_refresh = bpaf::long("bench-refresh")
+        .argument::<bool>("true|false")
+        .fallback(true);
+    let bench_signing = bpaf::long("bench-signing")
+        .argument::<bool>("true|false")
+        .fallback(true);
+
+    bpaf::construct!(Args {
+        n,
+        bench_refresh,
+        bench_signing
+    })
+    .to_options()
+    .run()
 }
 
 #[ignore = "performance tests are ignored by default"]
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let args = Args::parse();
+    let args = args();
     let mut rng = DevRng::new();
 
     for n in args.n {
