@@ -920,7 +920,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#2681c217d5a9739a3e85e8ece9e2b88466030d1e"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#72f8eda33ead93938ebee3622bb34880dd2cf78a"
 dependencies = [
  "generic-ec",
  "generic-ec-core",
@@ -930,6 +930,7 @@ dependencies = [
  "serde",
  "sha2",
  "subtle",
+ "thiserror",
  "zeroize",
 ]
 
@@ -1062,9 +1063,9 @@ dependencies = [
 
 [[package]]
 name = "rand_dev"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5c0cba528828fd18b862d32335d9e1ad592f10555f87a97a5046ff0f3a88fd2"
+checksum = "cbee97c27dada05f03db49ffe6516872f6c926e0fd525f9ce0cb3c051adf145c"
 dependencies = [
  "hex",
  "rand_chacha",
