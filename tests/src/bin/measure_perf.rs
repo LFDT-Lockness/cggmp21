@@ -19,16 +19,12 @@ struct Args {
 fn args() -> Args {
     use bpaf::Parser;
     let n = bpaf::short('n')
-        .help("Amount of parties")
-        .argument::<u16>("N")
-        .many()
-        .map(|ns| if ns.is_empty() { vec![3, 5, 7, 10] } else { ns });
-    let bench_refresh = bpaf::long("bench-refresh")
-        .argument::<bool>("true|false")
-        .fallback(true);
-    let bench_signing = bpaf::long("bench-signing")
-        .argument::<bool>("true|false")
-        .fallback(true);
+        .help("Amount of parties, comma-separated")
+        .argument::<String>("N")
+        .parse(|s| s.split(',').map(std::str::FromStr::from_str).collect())
+        .fallback(vec![3, 5, 7, 10]);
+    let bench_refresh = bpaf::long("no-bench-refresh").switch().map(|b| !b);
+    let bench_signing = bpaf::long("no-bench-signing").switch().map(|b| !b);
 
     bpaf::construct!(Args {
         n,
