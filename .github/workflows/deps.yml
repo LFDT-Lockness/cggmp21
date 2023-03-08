@@ -36,6 +36,7 @@ jobs:
         cargo tree -p cggmp21 -e no-build -e no-dev --prefix none | tail -n +2 | sort > ../all-deps-pr
         cargo tree -p cggmp21 -e no-build -e no-dev > ../cargo-tree-pr
     - name: Diff
+      shell: bash {0}
       run: |
         diff -U 0 direct-deps-base direct-deps-pr > direct-deps-diff
         if (( $? == 0 )); then echo "No changes" > direct-deps-diff; fi
