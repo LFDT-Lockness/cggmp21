@@ -22,6 +22,7 @@ use thiserror::Error;
 use crate::{
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
+    progress::Tracer,
     security_level::SecurityLevel,
     utils,
     utils::{
@@ -91,6 +92,7 @@ pub struct MsgRound3<E: Curve> {
 
 /// To speed up computations, it's possible to supply data to the algorithm
 /// generated ahead of time
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PregeneratedPrimes<L> {
     p: BigNumber,
     q: BigNumber,
@@ -98,6 +100,18 @@ pub struct PregeneratedPrimes<L> {
 }
 
 impl<L: SecurityLevel> PregeneratedPrimes<L> {
+    pub fn new(p: BigNumber, q: BigNumber) -> Self {
+        Self {
+            p,
+            q,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn split(self) -> (BigNumber, BigNumber) {
+        (self.p, self.q)
+    }
+
     /// Generate the structure. Takes some time.
     pub fn generate<R: RngCore>(rng: &mut R) -> Self {
         Self {
@@ -117,6 +131,7 @@ where
     core_share: &'a IncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
     pregenerated: Option<PregeneratedPrimes<L>>,
+    tracer: Option<&'a mut dyn Tracer>,
 }
 
 impl<'a, E, L, D> KeyRefreshBuilder<'a, E, L, D>
@@ -131,6 +146,7 @@ where
             core_share,
             execution_id: Default::default(),
             pregenerated: None,
+            tracer: None,
         }
     }
 
@@ -140,6 +156,7 @@ where
             core_share: &key_share.core,
             execution_id: Default::default(),
             pregenerated: None,
+            tracer: None,
         }
     }
 
@@ -152,6 +169,7 @@ where
             core_share: self.core_share,
             execution_id: Default::default(),
             pregenerated: None,
+            tracer: None,
         }
     }
 
@@ -170,6 +188,11 @@ where
             pregenerated: Some(pregenerated),
             ..self
         }
+    }
+
+    pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
+        self.tracer = Some(tracer);
+        self
     }
 
     /// Carry out the refresh procedure. Takes a lot of time
@@ -191,6 +214,7 @@ where
             party,
             self.execution_id,
             self.pregenerated,
+            self.tracer,
             self.core_share,
         )
         .await
@@ -202,6 +226,7 @@ async fn run_refresh<R, M, E, L, D>(
     party: M,
     execution_id: ExecutionId<E, L, D>,
     pregenerated: Option<PregeneratedPrimes<L>>,
+    mut tracer: Option<&mut dyn Tracer>,
     core_share: &IncompleteKeyShare<E, L>,
 ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
 where
@@ -212,28 +237,34 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
+    tracer.protocol_begins();
+
+    tracer.stage("Retrieve auxiliary data");
     let i = core_share.i;
     let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
+    tracer.stage("Setup networking");
     let MpcParty {
         delivery, blocking, ..
     } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
-    // Setup networking
     let mut rounds = RoundsRouter::<Msg<E, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round2 = rounds.add_round(RoundInput::<MsgRound2<E, D>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
 
+    tracer.stage("Precompute execution id and shared state");
     let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(execution_id);
 
     // Round 1
+    tracer.round_begins();
 
+    tracer.stage("Retrieve or compute primes (p and q)");
     let PregeneratedPrimes { p, q, .. } = match pregenerated {
         Some(x) => x,
         None => blocking
@@ -245,17 +276,21 @@ where
             .await
             .map_err(|_| KeyRefreshError::SpawnError)?,
     };
+    tracer.stage("Compute paillier decryption key (N)");
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);
     let dec =
         libpaillier::DecryptionKey::with_primes_unchecked(&p, &q).ok_or(Bug::PaillierKeyError)?;
 
+    tracer.stage("Generate secret y and public Y");
     let y = SecretScalar::<E>::random(rng);
     let Y = Point::generator() * &y;
+    tracer.stage("Compute schnorr commitment τ_i");
     // tau and B_i in paper
     let (sch_secret_b, sch_commit_b) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
     // *x_i* in paper
+    tracer.stage("Generate secret x_i and public X_i");
     // generate n-1 values first..
     let mut xs = (0..n - 1)
         .map(|_| SecretScalar::<E>::random(rng))
@@ -273,11 +308,13 @@ where
         .map(|x| Point::generator() * x)
         .collect::<Vec<_>>();
 
+    tracer.stage("Generate auxiliary params r, λ, t, s");
     let r = utils::sample_bigint_in_mult_group(rng, &N);
     let λ = BigNumber::from_rng(&φ_N, rng);
     let t = r.modmul(&r, &N);
     let s = t.powmod(&λ, &N).map_err(|_| Bug::PowMod)?;
 
+    tracer.stage("Prove Πprm (ψ_i)");
     let proof_data = π_prm::Data {
         N: &N,
         s: &s,
@@ -286,16 +323,19 @@ where
     let params_proof = π_prm::prove(parties_shared_state.clone(), &mut rng, proof_data, &φ_N, &λ)
         .map_err(Bug::PiPrm)?;
 
+    tracer.stage("Compute schnorr commitment τ_j");
     // tau_j and A_i^j in paper
     let (sch_secrets_a, sch_commits_a) = iter_peers(i, n)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip::<_, _, Vec<_>, Vec<_>>();
 
+    tracer.stage("Sample random bytes");
     // rho_i in paper, this signer's share of bytes
     let mut rho_bytes = Vec::new();
     rho_bytes.resize(L::SECURITY_BYTES, 0);
     rng.fill_bytes(&mut rho_bytes);
 
+    tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
@@ -311,6 +351,7 @@ where
         .mix_bytes(&rho_bytes)
         .commit(rng);
 
+    tracer.send_msg();
     let commitment = MsgRound1 {
         commitment: hash_commit,
     };
@@ -318,12 +359,18 @@ where
         .send(Outgoing::broadcast(Msg::Round1(commitment.clone())))
         .await
         .map_err(KeyRefreshError::SendError)?;
+    tracer.msg_sent();
 
     // Round 2
+    tracer.round_begins();
+
+    tracer.receive_msgs();
     let commitments = rounds
         .complete(round1)
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?;
+    tracer.msgs_received();
+    tracer.send_msg();
     let decommitment = MsgRound2 {
         x: Xs.clone(),
         sch_commits_a: sch_commits_a.clone(),
@@ -340,15 +387,20 @@ where
         .send(Outgoing::broadcast(Msg::Round2(decommitment.clone())))
         .await
         .map_err(KeyRefreshError::SendError)?;
+    tracer.msg_sent();
 
     // Round 3
+    tracer.round_begins();
 
+    tracer.receive_msgs();
     let decommitments = rounds
         .complete(round2)
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?;
+    tracer.msgs_received();
 
     // validate decommitments
+    tracer.stage("Validate round 1 decommitments");
     let blame = collect_blame(
         &decommitments,
         &commitments,
@@ -375,6 +427,7 @@ where
         ));
     }
     // Validate parties didn't skip any data
+    tracer.stage("Validate data sizes");
     let blame = collect_simple_blame(&decommitments, |decommitment| {
         let n = usize::from(n);
         decommitment.x.len() != n
@@ -387,6 +440,7 @@ where
         ));
     }
     // validate parameters and param_proofs
+    tracer.stage("Validate П_prm (ψ_i)");
     let blame = collect_simple_blame(&decommitments, |d| {
         if d.N.bit_length() < L::SECURITY_BYTES {
             true
@@ -405,6 +459,7 @@ where
         ));
     }
     // validate Xs add to zero
+    tracer.stage("Validate X_i");
     let blame = collect_simple_blame(&decommitments, |d| {
         d.x.iter().sum::<Point<E>>() != Point::zero()
     });
@@ -412,18 +467,21 @@ where
         return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
     }
 
+    tracer.stage("Compute paillier encryption keys");
     // encryption keys for each party
     let encs = decommitments
         .iter()
         .map(|d| utils::encryption_key_from_n(&d.N))
         .collect::<Vec<_>>();
 
+    tracer.stage("Add together shared random bytes");
     // rho in paper, collective random bytes
     let rho_bytes = decommitments
         .iter()
         .map(|d| &d.rho_bytes)
         .fold(rho_bytes, xor_array);
 
+    tracer.stage("Compute schnorr proof п_i");
     // pi_i
     let sch_proof_y = {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
@@ -432,6 +490,7 @@ where
         schnorr_pok::prove(&sch_secret_b, &challenge, &y)
     };
 
+    tracer.stage("Compute П_mod (ψ_i)");
     // common data for messages
     let mod_proof = {
         let data = π_mod::Data { n: N.clone() };
@@ -442,9 +501,11 @@ where
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
             .map_err(Bug::PiMod)?
     };
+    tracer.stage("Sample challenge for schnorr_pok");
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(Bug::HashToScalarError)?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
+    tracer.stage("Prepare auxiliary params and security level for proofs");
     let π_fac_aux = π_fac::Aux {
         s: s.clone(),
         t: t.clone(),
@@ -463,14 +524,17 @@ where
         .zip(&sch_secrets_a)
         .zip(iter_peers(i, n));
     for (((x, enc), secret), j) in iterator {
+        tracer.stage("Compute schnorr proof ψ_i^j");
         let sch_proofs_x = xs
             .iter()
             .map(|x_j| schnorr_pok::prove(secret, &challenge, x_j))
             .collect();
+        tracer.stage("Paillier encryption of x_i^j");
         let nonce = BigNumber::from_rng(enc.n(), &mut rng);
         let C = enc
             .encrypt_with(&scalar_to_bignumber(x), &nonce)
             .map_err(|_| Bug::PaillierEnc)?;
+        tracer.stage("Compute П_fac (ф_i)");
         let fac_proof = π_fac::prove(
             parties_shared_state.clone(),
             &π_fac_aux,
@@ -484,6 +548,7 @@ where
         )
         .map_err(Bug::PiFac)?;
 
+        tracer.send_msg();
         let msg = MsgRound3 {
             mod_proof: mod_proof.clone(),
             fac_proof,
@@ -495,15 +560,20 @@ where
             .send(Outgoing::p2p(j, Msg::Round3(msg)))
             .await
             .map_err(KeyRefreshError::SendError)?;
+        tracer.msg_sent();
     }
 
     // Output
+    tracer.round_begins();
 
+    tracer.receive_msgs();
     let shares_msg_b = rounds
         .complete(round3)
         .await
         .map_err(KeyRefreshError::ReceiveMessage)?;
+    tracer.msgs_received();
 
+    tracer.stage("Paillier decrypt x_j^i from C_j^i");
     // x_j^i in paper. x_i^i is a share from self to self, so it was never sent,
     // so it's handled separately
     let my_share = &xs[usize::from(i)];
@@ -517,6 +587,7 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    tracer.stage("Validate shares");
     // verify shares are well-formed
     let blame = shares
         .iter()
@@ -539,6 +610,7 @@ where
     // It is possible at this point to report a bad party to others, but we
     // don't implement it now
 
+    tracer.stage("Validate schnorr proofs п_j and ψ_j^k");
     // verify sch proofs for y and x
     let blame = utils::try_collect_blame(
         &decommitments,
@@ -581,6 +653,7 @@ where
         ));
     }
 
+    tracer.stage("Validate ψ_j (П_mod)");
     // verify mod proofs
     let blame = collect_blame(
         &decommitments,
@@ -600,6 +673,7 @@ where
         ));
     }
 
+    tracer.stage("Validate ф_j (П_fac)");
     // verify fac proofs
     let blame = collect_blame(
         &decommitments,
@@ -631,8 +705,10 @@ where
     // verifications passed, compute final key shares
 
     let old_core_share = core_share.clone();
+    tracer.stage("Calculate new x_i");
     let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x) + my_share;
     let mut x_star = old_core_share.x + x_sum;
+    tracer.stage("Calculate new X_i");
     let X_prods = (0..n).map(|k| {
         let k = usize::from(k);
         decommitments
@@ -647,11 +723,13 @@ where
         .map(|(x, p)| x + p)
         .collect();
 
+    tracer.stage("Assemble new core share");
     let new_core_share = IncompleteKeyShare {
         public_shares: X_stars,
         x: SecretScalar::new(&mut x_star),
         ..old_core_share
     };
+    tracer.stage("Assemble auxiliary info");
     let party_auxes = decommitments
         .iter_including_me(&decommitment)
         .map(|d| PartyAux {
@@ -669,6 +747,7 @@ where
         parties: party_auxes,
     };
 
+    tracer.protocol_ends();
     Ok(key_share.try_into().map_err(Bug::InvalidShareGenerated)?)
 }
 

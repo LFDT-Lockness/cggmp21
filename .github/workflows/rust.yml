@@ -34,9 +34,9 @@ jobs:
     - name: Check formatting
       run: cargo fmt --all -- --check
     - name: Run clippy
-      run: cargo clippy --all --lib -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
+      run: cargo clippy --all --lib --exclude cggmp21-tests -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
     - name: Run clippy tests
-      run: cargo clippy --tests -- -D clippy::all
+      run: cargo clippy --tests --lib -- -D clippy::all
   bench:
     runs-on: ubuntu-latest
     needs: build

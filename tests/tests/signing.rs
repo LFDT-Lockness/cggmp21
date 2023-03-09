@@ -1,5 +1,3 @@
-mod precomputed_shares;
-
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
     use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
@@ -12,8 +10,6 @@ mod generic {
     use cggmp21::signing::{Message, Msg};
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
-    use super::precomputed_shares::CACHED_SHARES;
-
     #[test_case::case(2; "n2")]
     #[test_case::case(3; "n3")]
     #[tokio::test]
@@ -24,7 +20,7 @@ mod generic {
     {
         let mut rng = DevRng::new();
 
-        let shares = CACHED_SHARES
+        let shares = cggmp21_tests::CACHED_SHARES
             .get_shares::<E>(n)
             .expect("retrieve cached shares");
 
