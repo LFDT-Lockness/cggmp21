@@ -31,6 +31,7 @@ hex = { version = "0.4", default-features = false, features = ["serde"] }
 [dev-dependencies]
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive", "dev"] }
 
+rand = "0.8"
 rand_dev = "0.1"
 rand_chacha = "0.3"
 

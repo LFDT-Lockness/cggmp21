@@ -132,6 +132,7 @@ dependencies = [
  "generic-ec-zkp",
  "hex",
  "paillier-zk",
+ "rand",
  "rand_chacha",
  "rand_core",
  "rand_dev",
