@@ -22,15 +22,11 @@ rand_chacha = { version = "0.3", default-features = false }
 futures = "0.3"
 
 thiserror = "1"
-phantom-type = "0.4"
 
 serde = { version = "1", features = ["derive"] }
 serde_with = "2"
 serde_json = "1"
 hex = { version = "0.4", default-features = false, features = ["serde"] }
-
-# We don't depend on this crates directly, but need this crate to have `serde` feature enabled
-generic-array = { version = "0.14", features = ["serde"] }
 
 [dev-dependencies]
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive", "dev"] }
@@ -38,11 +34,6 @@ round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch 
 rand = "0.8"
 rand_dev = "0.1"
 rand_chacha = "0.3"
-
-tokio = { version = "1", features = ["macros"] }
-
-generic-tests = "0.1"
-test-case = "2.2"
 
 [features]
 default = ["paillier-zk/gmp"]

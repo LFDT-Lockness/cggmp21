@@ -1,0 +1,59 @@
+name: Deps tracker
+
+on:
+  pull_request:
+    branches: [ "*" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  track_deps:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: |
+          ${{ secrets.GENERIC_EC_KEY }}
+          ${{ secrets.PAILLIER_ZK_KEY }}
+    - uses: actions/checkout@v3
+      with:
+        path: base_branch
+        ref: ${{ github.base_ref }}
+    - uses: actions/checkout@v3
+      with:
+        path: pr_branch
+    - name: Retrieve base branch deps
+      run: |
+        cd base_branch
+        cargo tree -p cggmp21 -e no-build -e no-dev --depth 1 --prefix none | sed 's/ (\*)$//' | sort -u > ../direct-deps-base
+        cargo tree -p cggmp21 -e no-build -e no-dev --prefix none | tail -n +2 | sed 's/ (\*)$//' | sort -u > ../all-deps-base
+    - name: Retrieve PR brach deps
+      run: |
+        cd pr_branch
+        cargo tree -p cggmp21 -e no-build -e no-dev --depth 1 --prefix none | tail -n +2 | sed 's/ (\*)$//' | sort -u > ../direct-deps-pr
+        cargo tree -p cggmp21 -e no-build -e no-dev --prefix none | tail -n +2 | sed 's/ (\*)$//' | sort -u > ../all-deps-pr
+        cargo tree -p cggmp21 -e no-build -e no-dev > ../cargo-tree-pr
+    - name: Diff
+      shell: bash {0}
+      run: |
+        diff -U 0 direct-deps-base direct-deps-pr > direct-deps-diff
+        if (( $? == 0 )); then echo "No changes" > direct-deps-diff; fi
+        diff -U 0 all-deps-base all-deps-pr > all-deps-diff
+        if (( $? == 0 )); then echo "No changes" > all-deps-diff; fi
+    - name: Generate PR comment
+      run: |
+        cat pr_branch/.github/diff-pr-comment.tpl \
+          | sed -e '/DIRECT_DEPS_DIFF/{r direct-deps-diff' -e 'd}' \
+          | sed -e '/DIRECT_DEPS/{r direct-deps-pr' -e 'd}' \
+          | sed -e '/CARGO_TREE/{r cargo-tree-pr' -e 'd}' \
+          | sed -e '/ALL_DEPS_DIFF/{r all-deps-diff' -e 'd}' \
+          > pr-comment
+    - name: Publish PR comment
+      continue-on-error: true
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: deps-diff
+        path: pr-comment
+  

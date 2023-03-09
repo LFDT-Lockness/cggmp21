@@ -128,13 +128,10 @@ version = "0.0.0"
 dependencies = [
  "digest 0.10.6",
  "futures",
- "generic-array",
  "generic-ec",
  "generic-ec-zkp",
- "generic-tests",
  "hex",
  "paillier-zk",
- "phantom-type 0.4.2",
  "rand",
  "rand_chacha",
  "rand_core",
@@ -144,9 +141,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha2",
- "test-case",
  "thiserror",
- "tokio",
 ]
 
 [[package]]
