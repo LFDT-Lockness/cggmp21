@@ -78,6 +78,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcoin_hashes"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90064b8dee6815a6470d60bad07bbbaee885c0e12d04177138fa3291a01b7bc4"
+
+[[package]]
 name = "block-buffer"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -158,6 +164,7 @@ dependencies = [
  "rand_chacha",
  "rand_dev",
  "round-based",
+ "secp256k1",
  "serde",
  "serde_json",
  "sha2",
@@ -517,7 +524,7 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.0.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#39070cded813ef002078faedc3abeb4d6014f8ae"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
 dependencies = [
  "generic-array",
  "generic-ec-core",
@@ -534,7 +541,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#39070cded813ef002078faedc3abeb4d6014f8ae"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -546,7 +553,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#39070cded813ef002078faedc3abeb4d6014f8ae"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
 dependencies = [
  "elliptic-curve",
  "generic-ec-core",
@@ -561,7 +568,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#39070cded813ef002078faedc3abeb4d6014f8ae"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
 dependencies = [
  "digest 0.10.6",
  "generic-array",
@@ -1051,6 +1058,25 @@ dependencies = [
  "pkcs8",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4124a35fe33ae14259c490fd70fa199a32b9ce9502f2ee6bc4f81ec06fa65894"
+dependencies = [
+ "bitcoin_hashes",
+ "secp256k1-sys",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "642a62736682fdd8c71da0eb273e453c8ac74e33b9fb310e22ba5b03ec7651ff"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

@@ -8,6 +8,8 @@ use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};
 
+pub mod external_verifier;
+
 lazy_static::lazy_static! {
     pub static ref CACHED_SHARES: PrecomputedKeyShares =
         PrecomputedKeyShares::from_serialized(

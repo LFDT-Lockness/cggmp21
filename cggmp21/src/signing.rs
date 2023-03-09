@@ -835,7 +835,7 @@ where
             let s = NonZero::from_scalar(
                 partial_sig.sigma + partial_sigs.iter().map(|m| m.sigma).sum::<Scalar<E>>(),
             );
-            Option::zip(r, s).map(|(r, s)| Signature { r, s })
+            Option::zip(r, s).map(|(r, s)| Signature { r, s }.normalize_s())
         };
         let sig_invalid = match &sig {
             Some(sig) => sig
@@ -876,7 +876,7 @@ impl<E: Curve> PartialSignature<E> {
         } else {
             let r = NonZero::from_scalar(partial_signatures[0].r)?;
             let s = NonZero::from_scalar(partial_signatures.iter().map(|s| s.sigma).sum())?;
-            Some(Signature { r, s })
+            Some(Signature { r, s }.normalize_s())
         }
     }
 }
@@ -896,6 +896,42 @@ where
         } else {
             Err(InvalidSignature)
         }
+    }
+}
+
+impl<E: Curve> Signature<E> {
+    /// Normilizes the signature
+    ///
+    /// Given that $(r, s)$ is valid signature, $(r, -s)$ is also a valid signature. Some applications (like Bitcoin)
+    /// remove this ambiguity by restricting $s$ to be in lower half. This method normailizes the signature by picking
+    /// $s$ that is in lower half.
+    ///
+    /// Note that signing protocol implemented within this crate ouputs normalized signature by default.
+    pub fn normalize_s(self) -> Self {
+        let neg_s = -self.s;
+        if neg_s < self.s {
+            Signature { s: neg_s, ..self }
+        } else {
+            self
+        }
+    }
+
+    /// Writes serialized signature to the bytes buffer
+    ///
+    /// Bytes buffer size must be at least [`Signature::serialized_len()`], otherwise content
+    /// of output buffer is unspecified.
+    pub fn write_to_slice(&self, out: &mut [u8]) {
+        if out.len() < Self::serialized_len() {
+            return;
+        }
+        let scalar_size = Scalar::<E>::serialized_len();
+        out[0..scalar_size].copy_from_slice(&self.r.to_be_bytes());
+        out[scalar_size..2 * scalar_size].copy_from_slice(&self.s.to_be_bytes());
+    }
+
+    /// Returns size of bytes buffer that can fit serialized signature
+    pub fn serialized_len() -> usize {
+        2 * Scalar::<E>::serialized_len()
     }
 }
 
