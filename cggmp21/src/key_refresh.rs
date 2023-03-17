@@ -501,6 +501,31 @@ where
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
             .map_err(Bug::PiMod)?
     };
+    tracer.stage("Compute П_fac (ф_i)");
+    let π_fac_security = π_fac::SecurityParams {
+        l: L::ELL,
+        epsilon: L::EPSILON,
+        q: L::q(),
+    };
+    let fac_proof = {
+        let π_fac_aux = π_fac::Aux {
+            s: s.clone(),
+            t: t.clone(),
+            rsa_modulo: N.clone(),
+        };
+        π_fac::prove(
+            parties_shared_state.clone(),
+            &π_fac_aux,
+            π_fac::Data {
+                n: &N,
+                n_root: &utils::sqrt(&N),
+            },
+            π_fac::PrivateData { p: &p, q: &q },
+            &π_fac_security,
+            &mut rng,
+        )
+        .map_err(Bug::PiFac)?
+    };
     tracer.stage("Compute schnorr proof ψ_i^j");
     let sch_proofs_x = xs
         .iter()
@@ -508,16 +533,6 @@ where
         .map(|(x_j, secret_j)| schnorr_pok::prove(secret_j, &challenge, x_j))
         .collect::<Vec<_>>();
     tracer.stage("Prepare auxiliary params and security level for proofs");
-    let π_fac_aux = π_fac::Aux {
-        s: s.clone(),
-        t: t.clone(),
-        rsa_modulo: N.clone(),
-    };
-    let π_fac_security = π_fac::SecurityParams {
-        l: L::ELL,
-        epsilon: L::EPSILON,
-        q: L::q(),
-    };
     // message to each party
     let iterator =
         // use every share except ours
@@ -530,24 +545,11 @@ where
         let C = enc
             .encrypt_with(&scalar_to_bignumber(x), &nonce)
             .map_err(|_| Bug::PaillierEnc)?;
-        tracer.stage("Compute П_fac (ф_i)");
-        let fac_proof = π_fac::prove(
-            parties_shared_state.clone(),
-            &π_fac_aux,
-            π_fac::Data {
-                n: &N,
-                n_root: &utils::sqrt(&N),
-            },
-            π_fac::PrivateData { p: &p, q: &q },
-            &π_fac_security,
-            &mut rng,
-        )
-        .map_err(Bug::PiFac)?;
 
         tracer.send_msg();
         let msg = MsgRound3 {
             mod_proof: mod_proof.clone(),
-            fac_proof,
+            fac_proof: fac_proof.clone(),
             sch_proof_y: sch_proof_y.clone(),
             sch_proofs_x: sch_proofs_x.clone(),
             C,
