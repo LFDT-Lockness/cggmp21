@@ -26,8 +26,8 @@ use crate::{
     security_level::SecurityLevel,
     utils,
     utils::{
-        but_nth, collect_blame, collect_simple_blame, iter_peers, mine_from, scalar_to_bignumber,
-        xor_array, AbortBlame,
+        but_nth, collect_blame, collect_simple_blame, iter_peers, scalar_to_bignumber, xor_array,
+        AbortBlame,
     },
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
@@ -325,7 +325,7 @@ where
 
     tracer.stage("Compute schnorr commitment τ_j");
     // tau_j and A_i^j in paper
-    let (sch_secrets_a, sch_commits_a) = iter_peers(i, n)
+    let (sch_secrets_a, sch_commits_a) = (0..n)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip::<_, _, Vec<_>, Vec<_>>();
 
@@ -337,6 +337,7 @@ where
 
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
+    // TODO: decommitment should be kappa bits
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
         .mix(n)
@@ -431,7 +432,7 @@ where
     let blame = collect_simple_blame(&decommitments, |decommitment| {
         let n = usize::from(n);
         decommitment.x.len() != n
-            || decommitment.sch_commits_a.len() != n - 1
+            || decommitment.sch_commits_a.len() != n
             || decommitment.rho_bytes.len() != L::SECURITY_BYTES
     });
     if !blame.is_empty() {
@@ -481,14 +482,13 @@ where
         .map(|d| &d.rho_bytes)
         .fold(rho_bytes, xor_array);
 
+    tracer.stage("Sample challenge for schnorr_pok");
+    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
+        .map_err(Bug::HashToScalarError)?;
+    let challenge = schnorr_pok::Challenge { nonce: challenge };
     tracer.stage("Compute schnorr proof п_i");
     // pi_i
-    let sch_proof_y = {
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-            .map_err(Bug::HashToScalarError)?;
-        let challenge = schnorr_pok::Challenge { nonce: challenge };
-        schnorr_pok::prove(&sch_secret_b, &challenge, &y)
-    };
+    let sch_proof_y = schnorr_pok::prove(&sch_secret_b, &challenge, &y);
 
     tracer.stage("Compute П_mod (ψ_i)");
     // common data for messages
@@ -501,10 +501,12 @@ where
         π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
             .map_err(Bug::PiMod)?
     };
-    tracer.stage("Sample challenge for schnorr_pok");
-    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-        .map_err(Bug::HashToScalarError)?;
-    let challenge = schnorr_pok::Challenge { nonce: challenge };
+    tracer.stage("Compute schnorr proof ψ_i^j");
+    let sch_proofs_x = xs
+        .iter()
+        .zip(sch_secrets_a.iter())
+        .map(|(x_j, secret_j)| schnorr_pok::prove(secret_j, &challenge, x_j))
+        .collect::<Vec<_>>();
     tracer.stage("Prepare auxiliary params and security level for proofs");
     let π_fac_aux = π_fac::Aux {
         s: s.clone(),
@@ -521,14 +523,8 @@ where
         // use every share except ours
         but_nth(i, xs.iter())
         .zip(&encs)
-        .zip(&sch_secrets_a)
         .zip(iter_peers(i, n));
-    for (((x, enc), secret), j) in iterator {
-        tracer.stage("Compute schnorr proof ψ_i^j");
-        let sch_proofs_x = xs
-            .iter()
-            .map(|x_j| schnorr_pok::prove(secret, &challenge, x_j))
-            .collect();
+    for ((x, enc), j) in iterator {
         tracer.stage("Paillier encryption of x_i^j");
         let nonce = BigNumber::from_rng(enc.n(), &mut rng);
         let C = enc
@@ -553,7 +549,7 @@ where
             mod_proof: mod_proof.clone(),
             fac_proof,
             sch_proof_y: sch_proof_y.clone(),
-            sch_proofs_x,
+            sch_proofs_x: sch_proofs_x.clone(),
             C,
         };
         outgoings
@@ -635,11 +631,13 @@ where
                 return Ok(true);
             }
             // proof for x, i.e. psi_j^k for every k
-            for (sch_proof, x) in proof_msg.sch_proofs_x.iter().zip(&decommitment.x) {
-                if sch_proof
-                    .verify(mine_from(i, j, &decommitment.sch_commits_a), &challenge, x)
-                    .is_err()
-                {
+            let iterator = proof_msg
+                .sch_proofs_x
+                .iter()
+                .zip(&decommitment.x)
+                .zip(&decommitment.sch_commits_a);
+            for ((sch_proof, x), commit) in iterator {
+                if sch_proof.verify(commit, &challenge, x).is_err() {
                     return Ok(true);
                 }
             }
