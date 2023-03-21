@@ -244,9 +244,7 @@ where
     let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
     tracer.stage("Setup networking");
-    let MpcParty {
-        delivery, ..
-    } = party.into_party();
+    let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     let mut rounds = RoundsRouter::<Msg<E, D, L>>::builder();
@@ -288,10 +286,7 @@ where
     // then create a last element such that the sum is zero
     let mut x_last = -xs.iter().sum::<Scalar<E>>();
     xs.push(SecretScalar::new(&mut x_last));
-    debug_assert_eq!(
-        xs.iter().sum::<Scalar<E>>(),
-        Scalar::zero()
-    );
+    debug_assert_eq!(xs.iter().sum::<Scalar<E>>(), Scalar::zero());
     // *X_i* in paper
     let Xs = xs
         .iter()
@@ -420,8 +415,7 @@ where
     tracer.stage("Validate data sizes");
     let blame = collect_simple_blame(&decommitments, |decommitment| {
         let n = usize::from(n);
-        decommitment.x.len() != n
-            || decommitment.sch_commits_a.len() != n
+        decommitment.x.len() != n || decommitment.sch_commits_a.len() != n
     });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
@@ -478,42 +472,40 @@ where
     // pi_i
     let sch_proof_y = schnorr_pok::prove(&sch_secret_b, &challenge, &y);
 
-    tracer.stage("Compute П_mod (ψ_i)");
     // common data for messages
-    let mod_proof = {
-        let data = π_mod::Data { n: N.clone() };
-        let pdata = π_mod::PrivateData {
+    tracer.stage("Compute П_mod (ψ_i)");
+    let mod_proof = π_mod::non_interactive::prove(
+        parties_shared_state.clone(),
+        &π_mod::Data { n: N.clone() },
+        &π_mod::PrivateData {
             p: p.clone(),
             q: q.clone(),
-        };
-        π_mod::non_interactive::prove(parties_shared_state.clone(), &data, &pdata, &mut rng)
-            .map_err(Bug::PiMod)?
-    };
+        },
+        &mut rng,
+    )
+    .map_err(Bug::PiMod)?;
     tracer.stage("Compute П_fac (ф_i)");
     let π_fac_security = π_fac::SecurityParams {
         l: L::ELL,
         epsilon: L::EPSILON,
         q: L::q(),
     };
-    let fac_proof = {
-        let π_fac_aux = π_fac::Aux {
+    let fac_proof = π_fac::prove(
+        parties_shared_state.clone(),
+        &π_fac::Aux {
             s: s.clone(),
             t: t.clone(),
             rsa_modulo: N.clone(),
-        };
-        π_fac::prove(
-            parties_shared_state.clone(),
-            &π_fac_aux,
-            π_fac::Data {
-                n: &N,
-                n_root: &utils::sqrt(&N),
-            },
-            π_fac::PrivateData { p: &p, q: &q },
-            &π_fac_security,
-            &mut rng,
-        )
-        .map_err(Bug::PiFac)?
-    };
+        },
+        π_fac::Data {
+            n: &N,
+            n_root: &utils::sqrt(&N),
+        },
+        π_fac::PrivateData { p: &p, q: &q },
+        &π_fac_security,
+        &mut rng,
+    )
+    .map_err(Bug::PiFac)?;
     tracer.stage("Compute schnorr proof ψ_i^j");
     let sch_proofs_x = xs
         .iter()
