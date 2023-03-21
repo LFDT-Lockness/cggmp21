@@ -46,25 +46,31 @@ where
 
 /// Protocol for finalizing the keygen by generating aux info and performing
 /// initial key refresh.
+///
+/// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 pub fn aux_info_gen<E, L>(
     core_share: &Valid<IncompleteKeyShare<E, L>>,
+    pregenerated: key_refresh::PregeneratedPrimes<L>,
 ) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
 where
     E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::KeyRefreshBuilder::new(core_share)
+    key_refresh::KeyRefreshBuilder::new(core_share, pregenerated)
 }
 
 /// Protocol for performing key refresh
+///
+/// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 pub fn key_refresh<E, L>(
     key_share: &Valid<KeyShare<E, L>>,
+    pregenerated: key_refresh::PregeneratedPrimes<L>,
 ) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
 where
     E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::KeyRefreshBuilder::new_refresh(key_share)
+    key_refresh::KeyRefreshBuilder::new_refresh(key_share, pregenerated)
 }
 
 pub fn signing<E, L>(key_share: &Valid<KeyShare<E, L>>) -> SigningBuilder<E, L, Sha256>

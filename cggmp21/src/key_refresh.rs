@@ -130,7 +130,7 @@ where
 {
     core_share: &'a IncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
-    pregenerated: Option<PregeneratedPrimes<L>>,
+    pregenerated: PregeneratedPrimes<L>,
     tracer: Option<&'a mut dyn Tracer>,
 }
 
@@ -140,22 +140,32 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    /// Build aux info generating operation. Start it with [`start`]
-    pub fn new(core_share: &'a Valid<IncompleteKeyShare<E, L>>) -> Self {
+    /// Build aux info generating operation. Start it with [`start`].
+    ///
+    /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
+    pub fn new(
+        core_share: &'a Valid<IncompleteKeyShare<E, L>>,
+        pregenerated: PregeneratedPrimes<L>,
+    ) -> Self {
         Self {
             core_share,
             execution_id: Default::default(),
-            pregenerated: None,
+            pregenerated,
             tracer: None,
         }
     }
 
     /// Build key refresh operation. Start it with [`start`]
-    pub fn new_refresh(key_share: &'a Valid<KeyShare<E, L>>) -> Self {
+    ///
+    /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
+    pub fn new_refresh(
+        key_share: &'a Valid<KeyShare<E, L>>,
+        pregenerated: PregeneratedPrimes<L>,
+    ) -> Self {
         Self {
             core_share: &key_share.core,
             execution_id: Default::default(),
-            pregenerated: None,
+            pregenerated,
             tracer: None,
         }
     }
@@ -168,7 +178,7 @@ where
         KeyRefreshBuilder {
             core_share: self.core_share,
             execution_id: Default::default(),
-            pregenerated: None,
+            pregenerated: self.pregenerated,
             tracer: None,
         }
     }
@@ -176,16 +186,6 @@ where
     pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
         Self {
             execution_id,
-            ..self
-        }
-    }
-
-    /// Set pregenerated data, which you can obtain with
-    /// [`PregeneratedPrimes::generate`]. If not set, will be generated during
-    /// protocol with OsRng
-    pub fn set_pregenerated_data(self, pregenerated: PregeneratedPrimes<L>) -> Self {
-        Self {
-            pregenerated: Some(pregenerated),
             ..self
         }
     }
@@ -225,7 +225,7 @@ async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
     execution_id: ExecutionId<E, L, D>,
-    pregenerated: Option<PregeneratedPrimes<L>>,
+    pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     core_share: &IncompleteKeyShare<E, L>,
 ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
@@ -245,7 +245,7 @@ where
 
     tracer.stage("Setup networking");
     let MpcParty {
-        delivery, blocking, ..
+        delivery, ..
     } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
@@ -265,17 +265,7 @@ where
     tracer.round_begins();
 
     tracer.stage("Retrieve or compute primes (p and q)");
-    let PregeneratedPrimes { p, q, .. } = match pregenerated {
-        Some(x) => x,
-        None => blocking
-            .spawn(|| {
-                // can't use rng from context as this worker can outlive it
-                let mut rng = rand_core::OsRng::default();
-                PregeneratedPrimes::generate(&mut rng)
-            })
-            .await
-            .map_err(|_| KeyRefreshError::SpawnError)?,
-    };
+    let PregeneratedPrimes { p, q, .. } = pregenerated;
     tracer.stage("Compute paillier decryption key (N)");
     let N = &p * &q;
     let φ_N = (&p - 1) * (&q - 1);

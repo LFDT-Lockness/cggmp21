@@ -35,9 +35,8 @@ mod generic {
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
-                cggmp21::key_refresh(&share)
+                cggmp21::key_refresh(&share, pregenerated_data)
                     .set_execution_id(refresh_execution_id)
-                    .set_pregenerated_data(pregenerated_data)
                     .start(&mut party_rng, party)
                     .await
             }

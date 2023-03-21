@@ -65,10 +65,9 @@ async fn main() {
                 let mut profiler = PerfProfiler::new();
 
                 async move {
-                    let _new_share = cggmp21::key_refresh(share)
+                    let _new_share = cggmp21::key_refresh(share, pregen)
                         .set_execution_id(refresh_execution_id)
                         .set_progress_tracer(&mut profiler)
-                        .set_pregenerated_data(pregen)
                         .start(&mut party_rng, party)
                         .await
                         .context("refresh failed")?;
