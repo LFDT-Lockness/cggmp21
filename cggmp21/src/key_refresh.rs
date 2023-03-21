@@ -641,7 +641,7 @@ where
             let data = π_mod::Data {
                 n: decommitment.N.clone(),
             };
-            let (ref comm, ref proof) = proof_msg.mod_proof;
+            let (comm, proof) = &proof_msg.mod_proof;
             π_mod::non_interactive::verify(parties_shared_state.clone(), &data, comm, proof)
                 .is_err()
         },
