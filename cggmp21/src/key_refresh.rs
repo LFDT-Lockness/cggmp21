@@ -554,15 +554,19 @@ where
     // x_j^i in paper. x_i^i is a share from self to self, so it was never sent,
     // so it's handled separately
     let my_share = &xs[usize::from(i)];
-    let shares = shares_msg_b
-        .iter()
-        .map(|m| {
-            let bytes = dec
+    // If the share couldn't be decrypted, abort with a faulty party
+    let (shares, blame) = utils::partition_results(shares_msg_b
+        .iter_indexed()
+        .map(|(j, mid, m)| {
+            let bigint = dec
                 .decrypt_to_bigint(&m.C)
-                .map_err(|_| KeyRefreshError::PaillierDec)?;
-            Ok::<_, KeyRefreshError<_, _>>(bytes.to_scalar())
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+                .map_err(|_| AbortBlame::new(j, mid, mid))?;
+            Ok::<_, AbortBlame>(bigint.to_scalar())
+        }));
+    if !blame.is_empty() {
+        return Err(KeyRefreshError::Aborted(ProtocolAborted::paillier_dec(blame)));
+    }
+    debug_assert_eq!(shares.len(), usize::from(n) - 1);
 
     tracer.stage("Validate shares");
     // verify shares are well-formed
@@ -811,6 +815,8 @@ pub enum ProtocolAbortReason {
     InvalidXShare,
     #[error("party sent a message with missing data")]
     InvalidDataSize,
+    #[error("party message could not be decrypted")]
+    PaillierDec,
 }
 
 macro_rules! make_factory {
@@ -835,4 +841,5 @@ impl ProtocolAborted {
     make_factory!(invalid_x, InvalidX);
     make_factory!(invalid_x_share, InvalidXShare);
     make_factory!(invalid_data_size, InvalidDataSize);
+    make_factory!(paillier_dec, PaillierDec);
 }

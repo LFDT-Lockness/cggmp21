@@ -225,6 +225,22 @@ pub fn sqrt(x: &BigNumber) -> BigNumber {
     low
 }
 
+/// Partition into vector of errors and vector of values
+pub fn partition_results<I, A, B>(iter: I) -> (Vec<A>, Vec<B>)
+where
+    I: Iterator<Item = Result<A, B>>
+{
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+    for i in iter {
+        match i {
+            Ok(ok) => oks.push(ok),
+            Err(err) => errs.push(err),
+        }
+    }
+    (oks, errs)
+}
+
 #[cfg(test)]
 mod test {
     #[test]
