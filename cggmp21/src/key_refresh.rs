@@ -286,10 +286,10 @@ where
         .map(|_| SecretScalar::<E>::random(rng))
         .collect::<Vec<_>>();
     // then create a last element such that the sum is zero
-    let mut x_last = -xs.iter().fold(Scalar::<E>::zero(), |s, x| s + x.as_ref());
+    let mut x_last = -xs.iter().sum::<Scalar<E>>();
     xs.push(SecretScalar::new(&mut x_last));
     debug_assert_eq!(
-        xs.iter().fold(Scalar::<E>::zero(), |s, x| s + x.as_ref()),
+        xs.iter().sum::<Scalar<E>>(),
         Scalar::zero()
     );
     // *X_i* in paper
