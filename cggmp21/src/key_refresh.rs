@@ -329,10 +329,12 @@ where
         .mix_many(&Xs)
         .mix_many(sch_commits_a.iter().map(|a| a.0))
         .mix(Y)
+        .mix(sch_commit_b.0)
         .mix_bytes(&N.to_bytes())
         .mix_bytes(&s.to_bytes())
         .mix_bytes(&t.to_bytes())
-        // mix param proof
+        .mix_many_bytes(params_proof.commitment.iter().map(|x| x.to_bytes()))
+        .mix_many_bytes(params_proof.zs.iter().map(|x| x.to_bytes()))
         .mix_bytes(&rho_bytes)
         .commit(rng);
 
@@ -386,26 +388,24 @@ where
 
     // validate decommitments
     tracer.stage("Validate round 1 decommitments");
-    let blame = collect_blame(
-        &decommitments,
-        &commitments,
-        |j, decommitment, commitment| {
-            HashCommit::<D>::builder()
-                .mix_bytes(sid)
-                .mix(n)
-                .mix(j)
-                .mix_many(&decommitment.x)
-                .mix_many(decommitment.sch_commits_a.iter().map(|a| a.0))
-                .mix(decommitment.Y)
-                .mix_bytes(decommitment.N.to_bytes())
-                .mix_bytes(decommitment.s.to_bytes())
-                .mix_bytes(decommitment.t.to_bytes())
-                // mix param proof
-                .mix_bytes(&decommitment.rho_bytes)
-                .verify(&commitment.commitment, &decommitment.decommit)
-                .is_err()
-        },
-    );
+    let blame = collect_blame(&decommitments, &commitments, |j, decomm, comm| {
+        HashCommit::<D>::builder()
+            .mix_bytes(sid)
+            .mix(n)
+            .mix(j)
+            .mix_many(&decomm.x)
+            .mix_many(decomm.sch_commits_a.iter().map(|a| a.0))
+            .mix(decomm.Y)
+            .mix(decomm.sch_commit_b.0)
+            .mix_bytes(decomm.N.to_bytes())
+            .mix_bytes(decomm.s.to_bytes())
+            .mix_bytes(decomm.t.to_bytes())
+            .mix_many_bytes(decomm.params_proof.commitment.iter().map(|x| x.to_bytes()))
+            .mix_many_bytes(decomm.params_proof.zs.iter().map(|x| x.to_bytes()))
+            .mix_bytes(&decomm.rho_bytes)
+            .verify(&comm.commitment, &decomm.decommit)
+            .is_err()
+    });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
             ProtocolAborted::invalid_decommitment(blame),
