@@ -533,16 +533,17 @@ where
     // so it's handled separately
     let my_share = &xs[usize::from(i)];
     // If the share couldn't be decrypted, abort with a faulty party
-    let (shares, blame) = utils::partition_results(shares_msg_b
-        .iter_indexed()
-        .map(|(j, mid, m)| {
+    let (shares, blame) =
+        utils::partition_results(shares_msg_b.iter_indexed().map(|(j, mid, m)| {
             let bigint = dec
                 .decrypt_to_bigint(&m.C)
                 .map_err(|_| AbortBlame::new(j, mid, mid))?;
             Ok::<_, AbortBlame>(bigint.to_scalar())
         }));
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::paillier_dec(blame)));
+        return Err(KeyRefreshError::Aborted(ProtocolAborted::paillier_dec(
+            blame,
+        )));
     }
     debug_assert_eq!(shares.len(), usize::from(n) - 1);
 
