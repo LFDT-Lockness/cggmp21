@@ -55,9 +55,6 @@ pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     x: Vec<Point<E>>,
     /// **A_i** in paper
     sch_commits_a: Vec<schnorr_pok::Commit<E>>,
-    Y: Point<E>,
-    /// B_i in paper
-    sch_commit_b: schnorr_pok::Commit<E>,
     N: BigNumber,
     s: BigNumber,
     t: BigNumber,
@@ -78,8 +75,6 @@ pub struct MsgRound3<E: Curve> {
     mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
     /// phi_i^j in paper
     fac_proof: π_fac::Proof,
-    /// pi_i in paper
-    sch_proof_y: schnorr_pok::Proof<E>,
     /// C_i^j in paper
     C: BigNumber,
     /// psi_i_j in paper
@@ -270,13 +265,6 @@ where
     let dec =
         libpaillier::DecryptionKey::with_primes_unchecked(&p, &q).ok_or(Bug::PaillierKeyError)?;
 
-    tracer.stage("Generate secret y and public Y");
-    let y = SecretScalar::<E>::random(rng);
-    let Y = Point::generator() * &y;
-    tracer.stage("Compute schnorr commitment τ_i");
-    // tau and B_i in paper
-    let (sch_secret_b, sch_commit_b) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
-
     // *x_i* in paper
     tracer.stage("Generate secret x_i and public X_i");
     // generate n-1 values first..
@@ -328,8 +316,6 @@ where
         .mix(i)
         .mix_many(&Xs)
         .mix_many(sch_commits_a.iter().map(|a| a.0))
-        .mix(Y)
-        .mix(sch_commit_b.0)
         .mix_bytes(&N.to_bytes())
         .mix_bytes(&s.to_bytes())
         .mix_bytes(&t.to_bytes())
@@ -361,8 +347,6 @@ where
     let decommitment = MsgRound2 {
         x: Xs.clone(),
         sch_commits_a: sch_commits_a.clone(),
-        Y,
-        sch_commit_b: sch_commit_b.clone(),
         N: N.clone(),
         s: s.clone(),
         t: t.clone(),
@@ -395,8 +379,6 @@ where
             .mix(j)
             .mix_many(&decomm.x)
             .mix_many(decomm.sch_commits_a.iter().map(|a| a.0))
-            .mix(decomm.Y)
-            .mix(decomm.sch_commit_b.0)
             .mix_bytes(decomm.N.to_bytes())
             .mix_bytes(decomm.s.to_bytes())
             .mix_bytes(decomm.t.to_bytes())
@@ -468,9 +450,6 @@ where
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(Bug::HashToScalarError)?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
-    tracer.stage("Compute schnorr proof п_i");
-    // pi_i
-    let sch_proof_y = schnorr_pok::prove(&sch_secret_b, &challenge, &y);
 
     // common data for messages
     tracer.stage("Compute П_mod (ψ_i)");
@@ -529,7 +508,6 @@ where
         let msg = MsgRound3 {
             mod_proof: mod_proof.clone(),
             fac_proof: fac_proof.clone(),
-            sch_proof_y: sch_proof_y.clone(),
             sch_proofs_x: sch_proofs_x.clone(),
             C,
         };
@@ -592,7 +570,7 @@ where
     // don't implement it now
 
     tracer.stage("Validate schnorr proofs п_j and ψ_j^k");
-    // verify sch proofs for y and x
+    // verify sch proofs for x
     let blame = utils::try_collect_blame(
         &decommitments,
         &shares_msg_b,
@@ -601,15 +579,6 @@ where
                 Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
                     .map_err(Bug::HashToScalarError)?;
             let challenge = schnorr_pok::Challenge { nonce: challenge };
-
-            // proof for y, i.e. pi_j
-            let sch_proof = &proof_msg.sch_proof_y;
-            if sch_proof
-                .verify(&decommitment.sch_commit_b, &challenge, &decommitment.Y)
-                .is_err()
-            {
-                return Ok(true);
-            }
 
             // x length is verified above
             if proof_msg.sch_proofs_x.len() != decommitment.x.len() {
@@ -719,14 +688,12 @@ where
             N: d.N.clone(),
             s: d.s.clone(),
             t: d.t.clone(),
-            Y: d.Y,
         })
         .collect();
     let key_share = KeyShare {
         core: new_core_share,
         p,
         q,
-        y,
         parties: party_auxes,
     };
 

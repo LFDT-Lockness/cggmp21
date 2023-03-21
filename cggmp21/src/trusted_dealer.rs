@@ -44,33 +44,21 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
         .take(n.into())
         .collect::<Result<Vec<_>, _>>()?;
 
-    let y = iter::repeat_with(|| SecretScalar::<E>::random(rng))
-        .take(n.into())
-        .collect::<Vec<_>>();
-    let Y = y
-        .iter()
-        .map(|y_i| Point::generator() * y_i)
-        .collect::<Vec<_>>();
-
     let parties_aux = primes_setups
         .iter()
-        .zip(Y)
-        .map(|(primes_setup, Y_i)| PartyAux {
+        .map(|primes_setup| PartyAux {
             N: primes_setup.N.clone(),
             s: primes_setup.s.clone(),
             t: primes_setup.t.clone(),
-            Y: Y_i,
         })
         .collect::<Vec<_>>();
 
     let key_shares = core_shares
         .zip(primes_setups)
-        .zip(y)
-        .map(|((core_share, primes_setup), y_i)| {
+        .map(|(core_share, primes_setup)| {
             KeyShare {
                 p: primes_setup.p,
                 q: primes_setup.q,
-                y: y_i,
                 parties: parties_aux.clone(),
                 core: core_share,
             }
