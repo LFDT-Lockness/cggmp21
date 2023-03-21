@@ -37,9 +37,9 @@ use crate::{
 #[derive(ProtocolMessage, Clone)]
 // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
 #[allow(clippy::large_enum_variant)]
-pub enum Msg<E: Curve, D: Digest> {
+pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
     Round1(MsgRound1<D>),
-    Round2(MsgRound2<E, D>),
+    Round2(MsgRound2<E, D, L>),
     Round3(MsgRound3<E>),
 }
 
@@ -50,7 +50,7 @@ pub struct MsgRound1<D: Digest> {
 }
 /// Message from round 2
 #[derive(Clone)]
-pub struct MsgRound2<E: Curve, D: Digest> {
+pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     /// **X_i** in paper
     x: Vec<Point<E>>,
     /// **A_i** in paper
@@ -66,7 +66,7 @@ pub struct MsgRound2<E: Curve, D: Digest> {
     params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
     /// rho_i in paper
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
-    rho_bytes: Vec<u8>,
+    rho_bytes: L::Rid,
     /// u_i in paper
     decommit: hash_commitment::DecommitNonce<D>,
 }
@@ -203,7 +203,7 @@ where
     ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = Msg<E, D>>,
+        M: Mpc<ProtocolMessage = Msg<E, D, L>>,
         E: Curve,
         Scalar<E>: FromHash,
         L: SecurityLevel,
@@ -231,7 +231,7 @@ async fn run_refresh<R, M, E, L, D>(
 ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
 where
     R: RngCore + CryptoRng,
-    M: Mpc<ProtocolMessage = Msg<E, D>>,
+    M: Mpc<ProtocolMessage = Msg<E, D, L>>,
     E: Curve,
     Scalar<E>: FromHash,
     L: SecurityLevel,
@@ -249,9 +249,9 @@ where
     } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
-    let mut rounds = RoundsRouter::<Msg<E, D>>::builder();
+    let mut rounds = RoundsRouter::<Msg<E, D, L>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
-    let round2 = rounds.add_round(RoundInput::<MsgRound2<E, D>>::broadcast(i, n));
+    let round2 = rounds.add_round(RoundInput::<MsgRound2<E, D, L>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
 
@@ -321,9 +321,8 @@ where
 
     tracer.stage("Sample random bytes");
     // rho_i in paper, this signer's share of bytes
-    let mut rho_bytes = Vec::new();
-    rho_bytes.resize(L::SECURITY_BYTES, 0);
-    rng.fill_bytes(&mut rho_bytes);
+    let mut rho_bytes = L::Rid::default();
+    rng.fill_bytes(rho_bytes.as_mut());
 
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
@@ -423,7 +422,6 @@ where
         let n = usize::from(n);
         decommitment.x.len() != n
             || decommitment.sch_commits_a.len() != n
-            || decommitment.rho_bytes.len() != L::SECURITY_BYTES
     });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(

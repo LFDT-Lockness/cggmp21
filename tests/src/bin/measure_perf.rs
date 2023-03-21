@@ -52,7 +52,7 @@ async fn main() {
             let refresh_execution_id = ExecutionId::<E, L>::from_bytes(&refresh_execution_id);
 
             use cggmp21::key_refresh::Msg;
-            let mut simulation = Simulation::<Msg<E, D>>::new();
+            let mut simulation = Simulation::<Msg<E, D, L>>::new();
 
             let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
