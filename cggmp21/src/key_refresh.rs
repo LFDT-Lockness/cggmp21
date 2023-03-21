@@ -521,9 +521,8 @@ where
         .zip(iter_peers(i, n));
     for ((x, enc), j) in iterator {
         tracer.stage("Paillier encryption of x_i^j");
-        let nonce = BigNumber::from_rng(enc.n(), &mut rng);
-        let C = enc
-            .encrypt_with(&scalar_to_bignumber(x), &nonce)
+        let (C, _) = enc
+            .encrypt_with_random(&scalar_to_bignumber(x), &mut rng)
             .map_err(|_| Bug::PaillierEnc)?;
 
         tracer.send_msg();
