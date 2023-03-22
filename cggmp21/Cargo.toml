@@ -35,6 +35,8 @@ rand = "0.8"
 rand_dev = "0.1"
 rand_chacha = "0.3"
 
+generic-tests = "0.1"
+
 [features]
 default = ["paillier-zk/gmp"]
 all-curves = ["curve-secp256k1", "curve-secp256r1"]

@@ -8,6 +8,7 @@ pub use {
 
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
 use key_share::{IncompleteKeyShare, KeyShare, Valid};
+use round_based::PartyIndex;
 use security_level::SecurityLevel;
 use sha2::Sha256;
 use signing::SigningBuilder;
@@ -67,12 +68,16 @@ where
     key_refresh::KeyRefreshBuilder::new_refresh(key_share)
 }
 
-pub fn signing<E, L>(key_share: &Valid<KeyShare<E, L>>) -> SigningBuilder<E, L, Sha256>
+pub fn signing<'r, E, L>(
+    i: PartyIndex,
+    parties_indexes_at_keygen: &'r [PartyIndex],
+    key_share: &'r Valid<KeyShare<E, L>>,
+) -> SigningBuilder<'r, E, L, Sha256>
 where
     E: Curve,
     L: SecurityLevel,
     Point<E>: HasAffineX<E>,
     Scalar<E>: FromHash,
 {
-    SigningBuilder::new(key_share)
+    SigningBuilder::new(i, parties_indexes_at_keygen, key_share)
 }

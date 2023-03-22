@@ -130,6 +130,7 @@ dependencies = [
  "futures",
  "generic-ec",
  "generic-ec-zkp",
+ "generic-tests",
  "hex",
  "paillier-zk",
  "rand",
@@ -519,9 +520,8 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.0.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
 dependencies = [
- "generic-array",
  "generic-ec-core",
  "generic-ec-curves",
  "hex",
@@ -536,7 +536,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -548,7 +548,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
 dependencies = [
  "elliptic-curve",
  "generic-ec-core",
@@ -563,7 +563,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#e264391797f7e2c025e1f633fb996a3aa9178f43"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
 dependencies = [
  "digest 0.10.6",
  "generic-array",

@@ -19,7 +19,7 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E>(n)
+            .get_shares::<E>(None, n)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 

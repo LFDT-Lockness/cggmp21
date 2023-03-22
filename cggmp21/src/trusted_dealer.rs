@@ -5,26 +5,64 @@ use paillier_zk::BigNumberExt;
 use rand_core::{CryptoRng, RngCore};
 use thiserror::Error;
 
-use generic_ec::{Curve, Point, SecretScalar};
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{
-    key_share::{IncompleteKeyShare, InvalidKeyShare, KeyShare, PartyAux, Valid},
+    key_share::{IncompleteKeyShare, InvalidKeyShare, KeyShare, PartyAux, Valid, VssSetup},
     security_level::SecurityLevel,
-    utils::sample_bigint_in_mult_group,
+    utils::{lagrange_coefficient, sample_bigint_in_mult_group},
 };
 
 pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
+    t: Option<u16>,
     n: u16,
 ) -> Result<Vec<Valid<KeyShare<E, L>>>, TrustedDealerError> {
-    let secret_shares = iter::repeat_with(|| SecretScalar::<E>::random(rng))
-        .take(n.into())
-        .collect::<Vec<_>>();
+    let key_shares_indexes = (1..=n)
+        .map(|i| NonZero::from_scalar(Scalar::from(i)))
+        .collect::<Option<Vec<_>>>()
+        .ok_or(Reason::DeriveKeyShareIndex)?;
+    let secret_shares = if let Some(t) = t {
+        let polynomial_coef = iter::repeat_with(|| SecretScalar::<E>::random(rng))
+            .take(t.into())
+            .collect::<Vec<_>>();
+        let f = |x: &NonZero<Scalar<E>>| {
+            polynomial_coef
+                .iter()
+                .rev()
+                .fold(Scalar::zero(), |acc, coef_i| acc * x + coef_i)
+        };
+        key_shares_indexes
+            .iter()
+            .map(|I_i| f(&I_i))
+            .map(|mut x_i| SecretScalar::new(&mut x_i))
+            .collect::<Vec<_>>()
+    } else {
+        iter::repeat_with(|| SecretScalar::<E>::random(rng))
+            .take(n.into())
+            .collect::<Vec<_>>()
+    };
     let public_shares = secret_shares
         .iter()
         .map(|s_i| Point::generator() * s_i)
         .collect::<Vec<_>>();
-    let shared_public_key = public_shares.iter().sum();
+    let shared_public_key = if let Some(t) = t {
+        let I = &key_shares_indexes[0..usize::from(t)];
+        let lagrange_coefs = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, I));
+        lagrange_coefs
+            .zip(&public_shares)
+            .try_fold(Point::zero(), |acc, (lambda_j, X_j)| {
+                Some(acc + lambda_j? * X_j)
+            })
+            .ok_or(Reason::DerivePublicKey)?
+    } else {
+        public_shares.iter().sum()
+    };
+
+    let vss_setup = t.map(|t| VssSetup {
+        min_signers: t,
+        I: key_shares_indexes,
+    });
 
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
@@ -34,10 +72,12 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
         .map(|(i, x_i)| IncompleteKeyShare::<E, L> {
             curve: Default::default(),
             i,
+            n,
             shared_public_key,
             rid: rid.clone(),
             public_shares: public_shares.clone(),
             x: x_i,
+            vss_setup: vss_setup.clone(),
         });
 
     let primes_setups = iter::repeat_with(|| generate_primes_setup::<L, _>(rng))
@@ -116,4 +156,8 @@ enum Reason {
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("pow mod undefined")]
     PowMod,
+    #[error("deriving key share index failed")]
+    DeriveKeyShareIndex,
+    #[error("deriving public key failed")]
+    DerivePublicKey,
 }

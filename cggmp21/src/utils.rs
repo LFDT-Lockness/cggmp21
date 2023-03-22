@@ -1,5 +1,5 @@
 use digest::Digest;
-use generic_ec::{Curve, Scalar};
+use generic_ec::{Curve, NonZero, Scalar};
 use paillier_zk::libpaillier::{unknown_order::BigNumber, EncryptionKey};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as pi_log,
@@ -210,8 +210,9 @@ where
 }
 
 /// Drop n-th item from iteration
-pub fn but_nth<T, I: Iterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
-    iter.enumerate()
+pub fn but_nth<T, I: IntoIterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
+    iter.into_iter()
+        .enumerate()
         .filter(move |(i, _)| *i != usize::from(n))
         .map(|(_, x)| x)
 }
@@ -235,6 +236,51 @@ pub fn sqrt(x: &BigNumber) -> BigNumber {
         }
     }
     low
+}
+
+/// Calculates lagrange coefficient $\lambda_j$ to interpolate polynomial $f$ at point $x$
+///
+/// Lagrange coefficient can be used to turn polynomial key shares into additive
+/// key shares.
+///
+/// ## Example
+/// E.g. we have a polynomial $f(x)$ with $deg(f) = 1$, and we have key shares
+/// $(I_0, x_0 = f(I_0)), (I_1, x_1 = f(I_1)), (I_2, x_2 = f(I_2))$ (where $I_i$
+/// are distinct non-zero publicly known field elements) which all together share
+/// a secret $\sk = f(0)$ in 2-out-of-3 scheme. We can take any of two key shares
+/// and reconstruct a secret `sk`:
+///
+/// $$\sk = f(0) = \lambda_0 \cdot x_0 + \lambda_1 \cdot x_2$$
+///
+/// where `lambda_0 = lagrange_coefficient(Scalar::zero(), 0, &[I_0, I_2])`,
+/// `lambda_1 = lagrange_coefficient(Scalar::zero(), 1, &[I_0, I_2])`.
+///
+/// ## Returns
+/// Returns `None` if `j >= xs.len()` or if there's `m` such that `xs[j] == xs[m]` or
+/// `x == xs[m]`. Note that, generally, lagrange interpolation is only defined when
+/// elements in `xs` are pairwise distinct.
+pub fn lagrange_coefficient<E: Curve>(
+    x: Scalar<E>,
+    j: u16,
+    xs: &[NonZero<Scalar<E>>],
+) -> Option<NonZero<Scalar<E>>> {
+    let nom = but_nth(j, xs).map(|x_m| x - x_m).product::<Scalar<E>>();
+
+    let x_j = xs.get(usize::from(j))?;
+    let denom = but_nth(j, xs).map(|x_m| x_j - x_m).product::<Scalar<E>>();
+    let denom_inv = denom.invert()?;
+
+    NonZero::from_scalar(nom * denom_inv)
+}
+
+/// Returns `[list[indexes[0]], list[indexes[1]], ..., list[indexes[n-1]]]`
+///
+/// Result is `None` if any of `indexes[i]` is out of range of `list`
+pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Option<Vec<T>> {
+    indexes
+        .iter()
+        .map(|&i| list.get(i.into()).map(T::clone))
+        .collect()
 }
 
 #[cfg(test)]
@@ -267,4 +313,62 @@ mod test {
             assert!(&root * &root > x);
         }
     }
+}
+
+#[cfg(test)]
+#[generic_tests::define]
+mod generic_test {
+    use generic_ec::{Curve, NonZero, Scalar};
+    use rand_dev::DevRng;
+
+    use super::lagrange_coefficient;
+
+    #[test]
+    fn lagrange_coefficient_reconstructs_secret<E: Curve>() {
+        let mut rng = DevRng::new();
+
+        // Polynomial of degree 1, f(x) = coef[0] + coef[1] * x
+        let polynomial_coefs = [Scalar::random(&mut rng), Scalar::random(&mut rng)];
+        let f = |x: &Scalar<E>| {
+            polynomial_coefs
+                .iter()
+                .rev()
+                .fold(Scalar::zero(), |acc, coef_i| acc * x + coef_i)
+        };
+
+        // I_j represents share index of j-th party. Each party should have a
+        // distinct non-zero index
+        let I = |i: u16| NonZero::from_scalar(Scalar::<E>::from(i + 1)).unwrap();
+        let I_0 = I(0);
+        let I_1 = I(1);
+        let I_2 = I(2);
+
+        // x_j represents a secret key share of j-th party
+        let x_0 = f(&I_0);
+        let x_1 = f(&I_1);
+        let x_2 = f(&I_2);
+
+        // key shares above share a secret key `sk` in 2-out-of-3 scheme
+        let sk = f(&Scalar::zero());
+        assert_eq!(sk, polynomial_coefs[0]);
+
+        // We take x_0 and x_2 to reconstruct sk
+        let lambda_0 = lagrange_coefficient(Scalar::zero(), 0, &[I_0, I_2]).unwrap();
+        let lambda_2 = lagrange_coefficient(Scalar::zero(), 1, &[I_0, I_2]).unwrap();
+
+        let reconstructed_sk = x_0 * lambda_0 + x_2 * lambda_2;
+        assert_eq!(sk, reconstructed_sk);
+
+        // We can also reconstruct x_1
+        let lambda_0 = lagrange_coefficient(I_1.into(), 0, &[I_0, I_2]).unwrap();
+        let lambda_2 = lagrange_coefficient(I_1.into(), 1, &[I_0, I_2]).unwrap();
+
+        let reconstructed_x_1 = x_0 * lambda_0 + x_2 * lambda_2;
+        assert_eq!(x_1, reconstructed_x_1);
+    }
+
+    #[instantiate_tests(<generic_ec::curves::Secp256k1>)]
+    mod secp256k1 {}
+    #[instantiate_tests(<generic_ec::curves::Secp256r1>)]
+    mod secp256r1 {}
 }

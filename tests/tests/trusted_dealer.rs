@@ -1,7 +1,8 @@
 #[generic_tests::define]
 mod test {
-    use cggmp21::define_security_level;
-    use generic_ec::{Curve, Point, Scalar};
+    use cggmp21::{define_security_level, key_share::IncompleteKeyShare};
+    use generic_ec::{Curve, Point};
+    use rand::seq::SliceRandom;
     use rand_dev::DevRng;
 
     use cggmp21::trusted_dealer::mock_keygen;
@@ -21,18 +22,25 @@ mod test {
     #[test]
     fn trusted_dealer_generates_correct_shares<E: Curve>() {
         let mut rng = DevRng::new();
+        let thresholds = [None, Some(2), Some(3), Some(5), Some(7), Some(10)];
 
         for n in [2, 3, 7, 10] {
-            let shares = mock_keygen::<E, DummyLevel, _>(&mut rng, n).unwrap();
-            let reconstructed_private_key: Scalar<E> = shares.iter().map(|s_i| &s_i.core.x).sum();
-            shares.iter().enumerate().for_each(|(i, s_i)| {
-                s_i.validate()
-                    .unwrap_or_else(|e| panic!("{i} share not valid: {e}"))
-            });
-            assert_eq!(
-                shares[0].core.shared_public_key,
-                Point::generator() * reconstructed_private_key
-            );
+            for &t in thresholds
+                .iter()
+                .filter(|t| t.map(|t| t <= n).unwrap_or(true))
+            {
+                let shares = mock_keygen::<E, DummyLevel, _>(&mut rng, t, n).unwrap();
+
+                // Choose `t` random key shares and reconstruct a secret key
+                let t = t.unwrap_or(n);
+                let t_shares = shares
+                    .choose_multiple(&mut rng, t.into())
+                    .map(|s| s.core.clone())
+                    .collect::<Vec<_>>();
+
+                let sk = IncompleteKeyShare::reconstruct_secret_key(&t_shares).unwrap();
+                assert_eq!(Point::generator() * sk, shares[0].core.shared_public_key);
+            }
         }
     }
 

@@ -13,15 +13,16 @@
 //! # type E = cggmp21::supported_curves::Secp256r1;
 //! # type L = cggmp21::security_level::ReasonablySecure;
 //! # fn load_key_share() -> Result<Valid<KeyShare<E, L>>, std::convert::Infallible> { unimplemented!() }
-//! # async fn connect_to_network<M>() -> Result<round_based::MpcParty<M, round_based::simulation::MockedDelivery<M>>, std::convert::Infallible> { unimplemented!() }
+//! # async fn connect_to_network<M>() -> Result<(u16, round_based::MpcParty<M, round_based::simulation::MockedDelivery<M>>), std::convert::Infallible> { unimplemented!() }
 //! # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+//! # let participants = &[1, 2, 3];
 //! use cggmp21::progress::PerfProfiler;
 //!
 //! let mut tracer = PerfProfiler::new();
 //!
-//! let party = connect_to_network().await?;
+//! let (i, party) = connect_to_network().await?;
 //! let key_share = load_key_share()?;
-//! cggmp21::signing(&key_share)
+//! cggmp21::signing(i, participants, &key_share)
 //!     .set_progress_tracer(&mut tracer)
 //!     .generate_presignature(&mut rand::rngs::OsRng, party)
 //!     .await?;
