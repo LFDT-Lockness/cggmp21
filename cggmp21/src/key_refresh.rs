@@ -257,7 +257,7 @@ where
     // Round 1
     tracer.round_begins();
 
-    tracer.stage("Retrieve or compute primes (p and q)");
+    tracer.stage("Retrieve primes (p and q)");
     let PregeneratedPrimes { p, q, .. } = pregenerated;
     tracer.stage("Compute paillier decryption key (N)");
     let N = &p * &q;
@@ -446,11 +446,6 @@ where
         .map(|d| &d.rho_bytes)
         .fold(rho_bytes, xor_array);
 
-    tracer.stage("Sample challenge for schnorr_pok");
-    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-        .map_err(Bug::HashToScalarError)?;
-    let challenge = schnorr_pok::Challenge { nonce: challenge };
-
     // common data for messages
     tracer.stage("Compute П_mod (ψ_i)");
     let mod_proof = π_mod::non_interactive::prove(
@@ -486,6 +481,9 @@ where
     )
     .map_err(Bug::PiFac)?;
     tracer.stage("Compute schnorr proof ψ_i^j");
+    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
+        .map_err(Bug::HashToScalarError)?;
+    let challenge = schnorr_pok::Challenge { nonce: challenge };
     let sch_proofs_x = xs
         .iter()
         .zip(sch_secrets_a.iter())
@@ -659,7 +657,7 @@ where
 
     let old_core_share = core_share.clone();
     tracer.stage("Calculate new x_i");
-    let x_sum = shares.iter().fold(Scalar::zero(), |s, x| s + x) + my_share;
+    let x_sum = shares.iter().sum::<Scalar<E>>() + my_share;
     let mut x_star = old_core_share.x + x_sum;
     tracer.stage("Calculate new X_i");
     let X_prods = (0..n).map(|k| {
