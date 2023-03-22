@@ -30,7 +30,7 @@ mod generic {
             ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
         let mut simulation =
             Simulation::<cggmp21::key_refresh::Msg<E, Sha256, ReasonablySecure>>::new();
-        let outputs = shares.into_iter().map(|share| {
+        let outputs = shares.iter().map(|share| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
@@ -70,6 +70,38 @@ mod generic {
             key_shares[0].core.shared_public_key,
             key_shares[0].core.public_shares.iter().sum::<Point<E>>()
         );
+        for key_share in &key_shares {
+            assert_eq!(
+                key_share.core.shared_public_key,
+                shares[0].core.shared_public_key
+            );
+        }
+
+        // attempt to sign with new shares and verify the signature
+
+        let signing_execution_id = ExecutionId::<E, ReasonablySecure>::from_bytes(&[228; 32]);
+        let mut simulation = Simulation::<cggmp21::signing::Msg<E, Sha256>>::new();
+        let message_to_sign = cggmp21::signing::Message::new::<Sha256>(&[42; 100]);
+        let outputs = key_shares.iter().map(|share| {
+            let party = simulation.add_party();
+            let signing_execution_id = signing_execution_id.clone();
+            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            async move {
+                cggmp21::signing(share)
+                    .set_execution_id(signing_execution_id)
+                    .sign(&mut party_rng, party, message_to_sign)
+                    .await
+            }
+        });
+        let signatures = futures::future::try_join_all(outputs)
+            .await
+            .expect("signing failed");
+
+        for signature in &signatures {
+            signature
+                .verify(&key_shares[0].core.shared_public_key, &message_to_sign)
+                .expect("signature is not valid");
+        }
     }
 
     #[instantiate_tests(<cggmp21::supported_curves::Secp256r1>)]
