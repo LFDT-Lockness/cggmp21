@@ -8,8 +8,8 @@ mod generic {
 
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
-    #[test_case::case(5; "n3")]
-    #[test_case::case(10; "n10")]
+    #[test_case::case(3; "n3")]
+    #[test_case::case(5; "n5")]
     #[tokio::test]
     async fn key_refresh_works<E: generic_ec::Curve>(n: u16)
     where
@@ -36,7 +36,7 @@ mod generic {
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
-                cggmp21::key_refresh(&share, pregenerated_data)
+                cggmp21::key_refresh(share, pregenerated_data)
                     .set_execution_id(refresh_execution_id)
                     .start(&mut party_rng, party)
                     .await
