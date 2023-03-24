@@ -52,7 +52,7 @@ pub struct MsgRound1<D: Digest> {
 #[derive(Clone)]
 pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     /// **X_i** in paper
-    x: Vec<Point<E>>,
+    Xs: Vec<Point<E>>,
     /// **A_i** in paper
     sch_commits_a: Vec<schnorr_pok::Commit<E>>,
     N: BigNumber,
@@ -261,7 +261,7 @@ where
     let PregeneratedPrimes { p, q, .. } = pregenerated;
     tracer.stage("Compute paillier decryption key (N)");
     let N = &p * &q;
-    let φ_N = (&p - 1) * (&q - 1);
+    let phi_N = (&p - 1) * (&q - 1);
     let dec =
         libpaillier::DecryptionKey::with_primes_unchecked(&p, &q).ok_or(Bug::PaillierKeyError)?;
 
@@ -283,22 +283,27 @@ where
 
     tracer.stage("Generate auxiliary params r, λ, t, s");
     let r = utils::sample_bigint_in_mult_group(rng, &N);
-    let λ = BigNumber::from_rng(&φ_N, rng);
+    let lambda = BigNumber::from_rng(&phi_N, rng);
     let t = r.modmul(&r, &N);
-    let s = t.powmod(&λ, &N).map_err(|_| Bug::PowMod)?;
+    let s = t.powmod(&lambda, &N).map_err(|_| Bug::PowMod)?;
 
-    tracer.stage("Prove Πprm (ψ_i)");
-    let proof_data = π_prm::Data {
-        N: &N,
-        s: &s,
-        t: &t,
-    };
-    let params_proof = π_prm::prove(parties_shared_state.clone(), &mut rng, proof_data, &φ_N, &λ)
-        .map_err(Bug::PiPrm)?;
+    tracer.stage("Prove Πprm (ψˆ_i)");
+    let hat_psi = π_prm::prove(
+        parties_shared_state.clone(),
+        &mut rng,
+        π_prm::Data {
+            N: &N,
+            s: &s,
+            t: &t,
+        },
+        &phi_N,
+        &lambda,
+    )
+    .map_err(Bug::PiPrm)?;
 
     tracer.stage("Compute schnorr commitment τ_j");
     // tau_j and A_i^j in paper
-    let (sch_secrets_a, sch_commits_a) = (0..n)
+    let (taus, As) = (0..n)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip::<_, _, Vec<_>, Vec<_>>();
 
@@ -315,12 +320,12 @@ where
         .mix(n)
         .mix(i)
         .mix_many(&Xs)
-        .mix_many(sch_commits_a.iter().map(|a| a.0))
+        .mix_many(As.iter().map(|a| a.0))
         .mix_bytes(&N.to_bytes())
         .mix_bytes(&s.to_bytes())
         .mix_bytes(&t.to_bytes())
-        .mix_many_bytes(params_proof.commitment.iter().map(|x| x.to_bytes()))
-        .mix_many_bytes(params_proof.zs.iter().map(|x| x.to_bytes()))
+        .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_bytes()))
+        .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_bytes()))
         .mix_bytes(&rho_bytes)
         .commit(rng);
 
@@ -345,12 +350,12 @@ where
     tracer.msgs_received();
     tracer.send_msg();
     let decommitment = MsgRound2 {
-        x: Xs.clone(),
-        sch_commits_a: sch_commits_a.clone(),
+        Xs: Xs.clone(),
+        sch_commits_a: As.clone(),
         N: N.clone(),
         s: s.clone(),
         t: t.clone(),
-        params_proof,
+        params_proof: hat_psi,
         rho_bytes: rho_bytes.clone(),
         decommit,
     };
@@ -377,7 +382,7 @@ where
             .mix_bytes(sid)
             .mix(n)
             .mix(j)
-            .mix_many(&decomm.x)
+            .mix_many(&decomm.Xs)
             .mix_many(decomm.sch_commits_a.iter().map(|a| a.0))
             .mix_bytes(decomm.N.to_bytes())
             .mix_bytes(decomm.s.to_bytes())
@@ -397,7 +402,7 @@ where
     tracer.stage("Validate data sizes");
     let blame = collect_simple_blame(&decommitments, |decommitment| {
         let n = usize::from(n);
-        decommitment.x.len() != n || decommitment.sch_commits_a.len() != n
+        decommitment.Xs.len() != n || decommitment.sch_commits_a.len() != n
     });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(
@@ -426,7 +431,7 @@ where
     // validate Xs add to zero
     tracer.stage("Validate X_i");
     let blame = collect_simple_blame(&decommitments, |d| {
-        d.x.iter().sum::<Point<E>>() != Point::zero()
+        d.Xs.iter().sum::<Point<E>>() != Point::zero()
     });
     if !blame.is_empty() {
         return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
@@ -448,7 +453,7 @@ where
 
     // common data for messages
     tracer.stage("Compute П_mod (ψ_i)");
-    let mod_proof = π_mod::non_interactive::prove(
+    let psi = π_mod::non_interactive::prove(
         parties_shared_state.clone(),
         &π_mod::Data { n: N.clone() },
         &π_mod::PrivateData {
@@ -464,7 +469,7 @@ where
         epsilon: L::EPSILON,
         q: L::q(),
     };
-    let fac_proof = π_fac::prove(
+    let phi = π_fac::prove(
         parties_shared_state.clone(),
         &π_fac::Aux {
             s: s.clone(),
@@ -484,9 +489,9 @@ where
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(Bug::HashToScalarError)?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
-    let sch_proofs_x = xs
+    let psis = xs
         .iter()
-        .zip(sch_secrets_a.iter())
+        .zip(taus.iter())
         .map(|(x_j, secret_j)| schnorr_pok::prove(secret_j, &challenge, x_j))
         .collect::<Vec<_>>();
     tracer.stage("Prepare auxiliary params and security level for proofs");
@@ -504,9 +509,9 @@ where
 
         tracer.send_msg();
         let msg = MsgRound3 {
-            mod_proof: mod_proof.clone(),
-            fac_proof: fac_proof.clone(),
-            sch_proofs_x: sch_proofs_x.clone(),
+            mod_proof: psi.clone(),
+            fac_proof: phi.clone(),
+            sch_proofs_x: psis.clone(),
             C,
         };
         outgoings
@@ -553,7 +558,7 @@ where
         .filter_map(|(share, (j, msg_id, decommitment))| {
             let i = usize::from(i);
             let X = Point::generator() * share;
-            if X != decommitment.x[i] {
+            if X != decommitment.Xs[i] {
                 Some(AbortBlame::new(j, msg_id, msg_id))
             } else {
                 None
@@ -580,14 +585,14 @@ where
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // x length is verified above
-            if proof_msg.sch_proofs_x.len() != decommitment.x.len() {
+            if proof_msg.sch_proofs_x.len() != decommitment.Xs.len() {
                 return Ok(true);
             }
             // proof for x, i.e. psi_j^k for every k
             let iterator = proof_msg
                 .sch_proofs_x
                 .iter()
-                .zip(&decommitment.x)
+                .zip(&decommitment.Xs)
                 .zip(&decommitment.sch_commits_a);
             for ((sch_proof, x), commit) in iterator {
                 if sch_proof.verify(commit, &challenge, x).is_err() {
@@ -664,7 +669,7 @@ where
         let k = usize::from(k);
         decommitments
             .iter_including_me(&decommitment)
-            .map(|d| d.x[k])
+            .map(|d| d.Xs[k])
             .sum::<Point<E>>()
     });
     let X_stars = old_core_share
