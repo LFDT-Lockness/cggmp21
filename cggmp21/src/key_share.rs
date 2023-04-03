@@ -48,6 +48,9 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
 /// Key share is obtained as output of [key refresh protocol](crate::refresh).
 /// It contains a [core share](IncompleteKeyShare) and auxiliary data required to
 /// carry out signing.
+///
+/// Compared to the paper, we removed the El-Gamal private key as it's not used
+/// for 3-round presigning, which is the only one we provide
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
@@ -58,29 +61,23 @@ pub struct KeyShare<E: Curve, L: SecurityLevel> {
     pub p: BigNumber,
     /// Secret prime $q$
     pub q: BigNumber,
-    /// El-Gamal private key
-    #[serde_as(as = "Compact")]
-    pub y: SecretScalar<E>,
     /// Public auxiliary data of all parties sharing the key
     ///
     /// `parties[i]` corresponds to public auxiliary data of $\ith$ party
-    pub parties: Vec<PartyAux<E>>,
+    pub parties: Vec<PartyAux>,
 }
 
 /// Party public auxiliary data
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct PartyAux<E: Curve> {
+pub struct PartyAux {
     /// $N_i = p_i \cdot q_i$
     pub N: BigNumber,
     /// Ring-Perdesten parameter $s_i$
     pub s: BigNumber,
     /// Ring-Perdesten parameter $t_i$
     pub t: BigNumber,
-    /// El-Gamal public key
-    #[serde_as(as = "Compact")]
-    pub Y: Point<E>,
 }
 
 impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
@@ -120,11 +117,6 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
             return Err(ErrorReason::AuxWrongLength.into());
         }
 
-        let el_gamal_public = self.parties[usize::from(self.core.i)].Y;
-        if el_gamal_public != Point::generator() * &self.y {
-            return Err(ErrorReason::ElGamalKey.into());
-        }
-
         let N_i = &self.parties[usize::from(self.core.i)].N;
         if *N_i != &self.p * &self.q {
             return Err(ErrorReason::PrimesMul.into());
@@ -142,8 +134,8 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     }
 }
 
-impl<E: Curve> From<&PartyAux<E>> for π_enc::Aux {
-    fn from(aux: &PartyAux<E>) -> Self {
+impl From<&PartyAux> for π_enc::Aux {
+    fn from(aux: &PartyAux) -> Self {
         Self {
             s: aux.s.clone(),
             t: aux.t.clone(),
@@ -228,8 +220,6 @@ enum ErrorReason {
     SharesDontMatchPublicKey,
     #[error("size of parties auxiliary data list doesn't match `n`: n != parties.len()")]
     AuxWrongLength,
-    #[error("party El-Gamal secret key doesn't match public key: y_i G != Y_i")]
-    ElGamalKey,
     #[error("N_i != p q")]
     PrimesMul,
     #[error("gcd(s_j, N_j) != 1 or gcd(t_j, N_j) != 1")]
