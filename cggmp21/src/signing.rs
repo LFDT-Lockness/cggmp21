@@ -299,7 +299,7 @@ where
 
     // Assemble x_i and \vec X
     let (x_i, X) = if let Some(VssSetup { I, .. }) = &key_share.core.vss_setup {
-        let I = subset(S, &I).ok_or(Bug::Subset)?;
+        let I = subset(S, I).ok_or(Bug::Subset)?;
         let X = subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
 
         let lambda_i = lagrange_coefficient(Scalar::zero(), i, &I).ok_or(Bug::LagrangeCoef)?;
@@ -333,8 +333,8 @@ where
         &x_i,
         &X,
         key_share.core.shared_public_key,
-        &p_i,
-        &q_i,
+        p_i,
+        q_i,
         &R,
         message_to_sign,
     )
@@ -372,7 +372,7 @@ where
     let R_i = &R[usize::from(i)];
     let N_i = &R_i.N;
     let enc_i = encryption_key_from_n(N_i);
-    let dec_i = DecryptionKey::with_primes(&p_i, &q_i).ok_or(Bug::InvalidOwnPaillierKey)?;
+    let dec_i = DecryptionKey::with_primes(p_i, q_i).ok_or(Bug::InvalidOwnPaillierKey)?;
 
     tracer.stage("Precompute execution id and security params");
     let sid = sid.evaluate(ProtocolChoice::Presigning3);

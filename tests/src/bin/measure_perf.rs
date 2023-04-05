@@ -105,7 +105,7 @@ async fn main() {
                 let mut profiler = PerfProfiler::new();
 
                 outputs.push(async move {
-                    let _signature = cggmp21::signing(i, &signers_indexes_at_keygen, share)
+                    let _signature = cggmp21::signing(i, signers_indexes_at_keygen, share)
                         .set_execution_id(signing_execution_id)
                         .set_progress_tracer(&mut profiler)
                         .sign(&mut party_rng, party, message_to_sign)

@@ -228,7 +228,7 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
 
         if let Some(VssSetup { I, .. }) = vss {
             let S = key_shares.iter().map(|s| s.i).collect::<Vec<_>>();
-            let I = subset(&S, &I).ok_or(ReconstructError::Subset)?;
+            let I = subset(&S, I).ok_or(ReconstructError::Subset)?;
             let lagrange_coefficients = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
             let mut sk = lagrange_coefficients
                 .zip(key_shares)

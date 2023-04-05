@@ -88,7 +88,7 @@ mod generic {
             let signing_execution_id = signing_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
             async move {
-                cggmp21::signing(share.core.i, &participants, share)
+                cggmp21::signing(share.core.i, participants, share)
                     .set_execution_id(signing_execution_id)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await

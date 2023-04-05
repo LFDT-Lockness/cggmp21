@@ -1,4 +1,10 @@
-#![allow(non_snake_case, mixed_script_confusables, uncommon_codepoints)]
+#![allow(
+    non_snake_case,
+    mixed_script_confusables,
+    uncommon_codepoints,
+    clippy::too_many_arguments,
+    clippy::nonminimal_bool
+)]
 #![forbid(clippy::disallowed_methods)]
 #![cfg_attr(not(test), forbid(unused_crate_dependencies))]
 

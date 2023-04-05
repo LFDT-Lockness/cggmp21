@@ -34,7 +34,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
         };
         key_shares_indexes
             .iter()
-            .map(|I_i| f(&I_i))
+            .map(|I_i| f(I_i))
             .map(|mut x_i| SecretScalar::new(&mut x_i))
             .collect::<Vec<_>>()
     } else {
