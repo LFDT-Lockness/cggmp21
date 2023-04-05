@@ -197,18 +197,6 @@ pub fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
     (0..n).filter(move |x| *x != i)
 }
 
-/// Get i-th message from j-th party in vector
-pub fn mine_from<V, O>(i: u16, j: u16, v: &V) -> &O
-where
-    V: std::ops::Index<usize, Output = O>,
-{
-    if i < j {
-        v.index(usize::from(i))
-    } else {
-        v.index(usize::from(i) - 1)
-    }
-}
-
 /// Drop n-th item from iteration
 pub fn but_nth<T, I: IntoIterator<Item = T>>(n: u16, iter: I) -> impl Iterator<Item = T> {
     iter.into_iter()
@@ -236,6 +224,22 @@ pub fn sqrt(x: &BigNumber) -> BigNumber {
         }
     }
     low
+}
+
+/// Partition into vector of errors and vector of values
+pub fn partition_results<I, A, B>(iter: I) -> (Vec<A>, Vec<B>)
+where
+    I: Iterator<Item = Result<A, B>>,
+{
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+    for i in iter {
+        match i {
+            Ok(ok) => oks.push(ok),
+            Err(err) => errs.push(err),
+        }
+    }
+    (oks, errs)
 }
 
 /// Calculates lagrange coefficient $\lambda_j$ to interpolate polynomial $f$ at point $x$
