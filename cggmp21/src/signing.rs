@@ -353,7 +353,7 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     pk: Point<E>,
     p_i: &BigNumber,
     q_i: &BigNumber,
-    R: &[PartyAux<E>],
+    R: &[PartyAux],
     message_to_sign: Option<Message>,
 ) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
 where
