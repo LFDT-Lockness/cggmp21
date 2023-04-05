@@ -29,7 +29,7 @@ pub mod signing;
 pub mod supported_curves;
 pub mod trusted_dealer;
 mod utils;
-pub mod zk;
+mod zk;
 
 pub use self::execution_id::ExecutionId;
 
