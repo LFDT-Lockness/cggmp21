@@ -11,15 +11,13 @@ use paillier_zk::{
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    rounds_router::{
-        simple_store::{RoundInput, RoundInputError},
-        CompleteRoundError, RoundsRouter,
-    },
+    rounds_router::{simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex, ProtocolMessage,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::errors::IoError;
 use crate::key_share::{PartyAux, VssSetup};
 use crate::progress::Tracer;
 use crate::utils::{hash_message, iter_peers, lagrange_coefficient, subset, HashMessageError};
@@ -220,7 +218,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Presignature<E>, SigningError<M::ReceiveError, M::SendError>>
+    ) -> Result<Presignature<E>, SigningError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -248,7 +246,7 @@ where
         rng: &mut R,
         party: M,
         message_to_sign: Message,
-    ) -> Result<Signature<E>, SigningError<M::ReceiveError, M::SendError>>
+    ) -> Result<Signature<E>, SigningError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -288,7 +286,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     S: &[PartyIndex],
     message_to_sign: Option<Message>,
     enforce_reliable_broadcast: bool,
-) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
+) -> Result<ProtocolOutput<E>, SigningError>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
     E: Curve,
@@ -392,7 +390,7 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     R: &[PartyAux],
     message_to_sign: Option<Message>,
     enforce_reliable_broadcast: bool,
-) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
+) -> Result<ProtocolOutput<E>, SigningError>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
     E: Curve,
@@ -450,7 +448,7 @@ where
             G: G_i.clone(),
         })))
         .await
-        .map_err(SigningError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     let parties_shared_state = D::new_with_prefix(sid);
@@ -478,7 +476,7 @@ where
         outgoings
             .send(Outgoing::p2p(j, Msg::Round1b(MsgRound1b { psi0 })))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -490,11 +488,11 @@ where
     let ciphertexts = rounds
         .complete(round1a)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     let psi0 = rounds
         .complete(round1b)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     // Reliability check (if enabled)
@@ -515,7 +513,7 @@ where
                 MsgReliabilityCheck(h_i),
             )))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
 
         tracer.round_begins();
@@ -524,7 +522,7 @@ where
         let round1a_hashes = rounds
             .complete(round1a_sync)
             .await
-            .map_err(SigningError::ReceiveMessage)?;
+            .map_err(IoError::receive_message)?;
         tracer.msgs_received();
         tracer.stage("Assert other parties hashed messages (reliability check)");
         let parties_have_different_hashes = round1a_hashes
@@ -710,7 +708,7 @@ where
                 }),
             ))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -722,7 +720,7 @@ where
     let round2_msgs = rounds
         .complete(round2)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     let mut faulty_parties = vec![];
@@ -862,7 +860,7 @@ where
                 }),
             ))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -874,7 +872,7 @@ where
     let round3_msgs = rounds
         .complete(round3)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     tracer.stage("Validate psi_prime_prime");
@@ -949,7 +947,7 @@ where
             sigma: partial_sig.sigma,
         })))
         .await
-        .map_err(SigningError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Output
@@ -959,7 +957,7 @@ where
     let partial_sigs = rounds
         .complete(round4)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
     let sig = {
         let r = NonZero::from_scalar(partial_sig.r);
@@ -1091,9 +1089,24 @@ enum ProtocolOutput<E: Curve> {
 #[error("message to sign is not valid")]
 pub struct InvalidMessage;
 
+#[derive(Debug, Error)]
+#[error("signing protocol failed")]
+pub struct SigningError(#[source] Reason);
+
+crate::errors::impl_from! {
+    impl From for SigningError {
+        err: InvalidArgs => SigningError(Reason::InvalidArgs(err)),
+        err: InvalidKeyShare => SigningError(Reason::InvalidKeyShare(err)),
+        err: InvalidSecurityLevel => SigningError(Reason::InvalidSecurityLevel(err)),
+        err: SigningAborted => SigningError(Reason::Aborted(err)),
+        err: IoError => SigningError(Reason::IoError(err)),
+        err: Bug => SigningError(Reason::Bug(err)),
+    }
+}
+
 /// Error indicating that signing failed
 #[derive(Debug, Error)]
-pub enum SigningError<IErr, OErr> {
+enum Reason {
     #[error("invalid arguments")]
     InvalidArgs(
         #[from]
@@ -1113,21 +1126,17 @@ pub enum SigningError<IErr, OErr> {
         InvalidSecurityLevel,
     ),
     /// Signing protocol was maliciously aborted by another party
-    #[error("signing protocol was maliciously aborted by another party")]
+    #[error("protocol was maliciously aborted by another party")]
     Aborted(
         #[source]
         #[from]
         SigningAborted,
     ),
-    /// Receiving message error
-    #[error("receive message")]
-    ReceiveMessage(#[source] CompleteRoundError<RoundInputError, IErr>),
-    /// Sending message error
-    #[error("send message")]
-    SendError(#[source] OErr),
+    #[error("i/o error")]
+    IoError(#[source] IoError),
     /// Bug occurred
     #[error("bug occurred")]
-    Bug(InternalError),
+    Bug(Bug),
 }
 
 /// Error indicating that protocol was aborted by malicious party
@@ -1135,7 +1144,7 @@ pub enum SigningError<IErr, OErr> {
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[allow(clippy::type_complexity)]
 #[derive(Debug, Error)]
-pub enum SigningAborted {
+enum SigningAborted {
     #[error("pi_enc::verify(K) failed")]
     EncProofOfK(Vec<(PartyIndex, MsgId, MsgId)>),
     #[error("ψ, ψˆ, or ψ' proofs are invalid")]
@@ -1162,7 +1171,7 @@ pub enum SigningAborted {
 }
 
 #[derive(Debug, Error)]
-pub enum InvalidSecurityLevel {
+enum InvalidSecurityLevel {
     #[error("specified security level is too small to carry out protocol")]
     SecurityLevelTooSmall,
     #[error("epsilon is too small to carry out protocol")]
@@ -1170,7 +1179,7 @@ pub enum InvalidSecurityLevel {
 }
 
 #[derive(Debug, Error)]
-pub enum InvalidArgs {
+enum InvalidArgs {
     #[error("exactly `threshold` amount of parties should take part in signing")]
     MismatchedAmountOfParties,
     #[error("signer index `i` is out of bounds (must be < n)")]
@@ -1178,13 +1187,6 @@ pub enum InvalidArgs {
     #[error("party index in S is out of bounds (must be < n)")]
     InvalidS,
 }
-
-/// Error indicating that internal bug was detected
-///
-/// Please, report this issue if you encounter it
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct InternalError(Bug);
 
 #[derive(Debug, Error)]
 enum Bug {
@@ -1243,9 +1245,3 @@ enum BugSource {
 #[derive(Debug, Error)]
 #[error("signature is not valid")]
 pub struct InvalidSignature;
-
-impl<IErr, OErr> From<Bug> for SigningError<IErr, OErr> {
-    fn from(e: Bug) -> Self {
-        SigningError::Bug(InternalError(e))
-    }
-}

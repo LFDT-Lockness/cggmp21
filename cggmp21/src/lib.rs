@@ -19,6 +19,7 @@ use security_level::SecurityLevel;
 use sha2::Sha256;
 use signing::SigningBuilder;
 
+mod errors;
 mod execution_id;
 pub mod key_refresh;
 pub mod key_share;
