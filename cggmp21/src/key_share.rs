@@ -191,10 +191,10 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
             .unwrap_or(self.n)
     }
 
-    /// Reconstructs a secret key from set of `t` key shares
+    /// Reconstructs a secret key from set of at least [`min_signers`](Self::min_signers) key shares
     ///
-    /// Requires exactly `t` distinct key shares from the same generation (key refresh
-    /// produces key shares of the next generation). Returns error if input is invalid.
+    /// Requires at least [`min_signers`](Self::min_signers) distinct key shares from the same generation
+    /// (key refresh produces key shares of the next generation). Returns error if input is invalid.
     ///
     /// Note that, normally, secret key is not supposed to be reconstructed, and key
     /// shares should never be at one place. This basically defeats purpose of MPC and
@@ -218,8 +218,8 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
             return Err(ReconstructError::DifferentKeyShares.into());
         }
 
-        if key_shares.len() != usize::from(t) {
-            return Err(ReconstructError::KeySharesLen {
+        if key_shares.len() < usize::from(t) {
+            return Err(ReconstructError::TooFewKeyShares {
                 len: key_shares.len(),
                 t,
             }
@@ -395,8 +395,8 @@ enum ReconstructError {
         "provided key shares doesn't seem to share the same key or belong to the same generation"
     )]
     DifferentKeyShares,
-    #[error("expected exactly `t={t}` key shares, but {len} key shares were provided")]
-    KeySharesLen { len: usize, t: u16 },
+    #[error("expected at least `t={t}` key shares, but {len} key shares were provided")]
+    TooFewKeyShares { len: usize, t: u16 },
     #[error("subset function returned error (seems like a bug)")]
     Subset,
     #[error("interpolation failed (seems like a bug)")]
