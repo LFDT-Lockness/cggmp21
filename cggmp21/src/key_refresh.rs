@@ -20,6 +20,7 @@ use round_based::{
 use thiserror::Error;
 
 use crate::{
+    errors::IoError,
     execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
     progress::Tracer,
@@ -195,7 +196,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
+    ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -223,7 +224,7 @@ async fn run_refresh<R, M, E, L, D>(
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     core_share: &IncompleteKeyShare<E, L>,
-) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
+) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -336,7 +337,7 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(commitment.clone())))
         .await
-        .map_err(KeyRefreshError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Round 2
@@ -346,7 +347,7 @@ where
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
     tracer.send_msg();
     let decommitment = MsgRound2 {
@@ -362,7 +363,7 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round2(decommitment.clone())))
         .await
-        .map_err(KeyRefreshError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Round 3
@@ -372,7 +373,7 @@ where
     let decommitments = rounds
         .complete(round2)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     // validate decommitments
@@ -394,9 +395,7 @@ where
             .is_err()
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_decommitment(blame),
-        ));
+        return Err(ProtocolAborted::invalid_decommitment(blame).into());
     }
     // Validate parties didn't skip any data
     tracer.stage("Validate data sizes");
@@ -405,9 +404,7 @@ where
         decommitment.Xs.len() != n || decommitment.sch_commits_a.len() != n
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_data_size(blame),
-        ));
+        return Err(ProtocolAborted::invalid_data_size(blame).into());
     }
     // validate parameters and param_proofs
     tracer.stage("Validate П_prm (ψ_i)");
@@ -424,9 +421,7 @@ where
         }
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_ring_pedersen_parameters(blame),
-        ));
+        return Err(ProtocolAborted::invalid_ring_pedersen_parameters(blame).into());
     }
     // validate Xs add to zero
     tracer.stage("Validate X_i");
@@ -434,7 +429,7 @@ where
         d.Xs.iter().sum::<Point<E>>() != Point::zero()
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
+        return Err(ProtocolAborted::invalid_x(blame).into());
     }
 
     tracer.stage("Compute paillier encryption keys");
@@ -520,7 +515,7 @@ where
         outgoings
             .send(Outgoing::p2p(j, Msg::Round3(msg)))
             .await
-            .map_err(KeyRefreshError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -531,7 +526,7 @@ where
     let shares_msg_b = rounds
         .complete(round3)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     tracer.stage("Paillier decrypt x_j^i from C_j^i");
@@ -547,9 +542,7 @@ where
             Ok::<_, AbortBlame>(bigint.to_scalar())
         }));
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::paillier_dec(
-            blame,
-        )));
+        return Err(ProtocolAborted::paillier_dec(blame).into());
     }
     debug_assert_eq!(shares.len(), usize::from(n) - 1);
 
@@ -569,9 +562,7 @@ where
         })
         .collect::<Vec<_>>();
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x_share(
-            blame,
-        )));
+        return Err(ProtocolAborted::invalid_x_share(blame).into());
     }
     // It is possible at this point to report a bad party to others, but we
     // don't implement it now
@@ -607,9 +598,7 @@ where
         },
     )?;
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_schnorr_proof(blame),
-        ));
+        return Err(ProtocolAborted::invalid_schnorr_proof(blame).into());
     }
 
     tracer.stage("Validate ψ_j (П_mod)");
@@ -627,9 +616,7 @@ where
         },
     );
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_mod_proof(blame),
-        ));
+        return Err(ProtocolAborted::invalid_mod_proof(blame).into());
     }
 
     tracer.stage("Validate ф_j (П_fac)");
@@ -656,9 +643,7 @@ where
         },
     );
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_fac_proof(blame),
-        ));
+        return Err(ProtocolAborted::invalid_fac_proof(blame).into());
     }
 
     // verifications passed, compute final key shares
@@ -709,35 +694,31 @@ where
 }
 
 #[derive(Debug, Error)]
-pub enum KeyRefreshError<IErr, OErr> {
+#[error("key refresh protocol failed to complete")]
+pub struct KeyRefreshError(#[source] Reason);
+
+crate::errors::impl_from! {
+    impl From for KeyRefreshError {
+        err: ProtocolAborted => KeyRefreshError(Reason::Aborted(err)),
+        err: IoError => KeyRefreshError(Reason::IoError(err)),
+        err: Bug => KeyRefreshError(Reason::InternalError(err)),
+    }
+}
+
+#[derive(Debug, Error)]
+enum Reason {
     /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
     Aborted(#[source] ProtocolAborted),
-    /// Receiving message error
-    #[error("receive message")]
-    ReceiveMessage(
-        #[source]
-        round_based::rounds_router::CompleteRoundError<
-            round_based::rounds_router::simple_store::RoundInputError,
-            IErr,
-        >,
-    ),
-    /// Sending message error
-    #[error("send message")]
-    SendError(#[source] OErr),
-    #[error("could not spawn worker thread")]
-    SpawnError,
+    #[error("i/o error")]
+    IoError(#[source] IoError),
     #[error("internal error")]
     InternalError(#[from] Bug),
-    #[error("couldn't decrypt a message")]
-    PaillierDec,
-    #[error("couldn't decode scalar bytes")]
-    InvalidScalar(generic_ec::errors::InvalidScalar),
 }
 
 /// Unexpected error in operation not caused by other parties
 #[derive(Debug, Error)]
-pub enum Bug {
+enum Bug {
     #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
     InvalidHashToCurveTag,
     #[error("Unexpected error when creating paillier decryption key")]
@@ -765,14 +746,14 @@ pub enum Bug {
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
 #[error("Protocol aborted; malicious parties: {parties:?}; reason: {reason}")]
-pub struct ProtocolAborted {
+struct ProtocolAborted {
     pub reason: ProtocolAbortReason,
     pub parties: Vec<AbortBlame>,
 }
 
 /// Reason for protocol abort: which exact check has failed
 #[derive(Debug, Error)]
-pub enum ProtocolAbortReason {
+enum ProtocolAbortReason {
     #[error("decommitment doesn't match commitment")]
     InvalidDecommitment,
     #[error("provided invalid schnorr proof")]
