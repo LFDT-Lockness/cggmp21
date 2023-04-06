@@ -242,10 +242,20 @@ where
     (oks, errs)
 }
 
-/// Calculates lagrange coefficient $\lambda_j$ to interpolate polynomial $f$ at point $x$
+/// Calculates lagrange coefficient $\lambda_j$ to interpolate a polynomial at point $x$
 ///
 /// Lagrange coefficient can be used to turn polynomial key shares into additive
 /// key shares.
+///
+/// ## Inputs
+///
+/// `xs` denotes the points with known values that define the polynomial. `j` is a index
+/// of element in `xs` for which lagrange coefficient is calculated. `x` is a point at
+/// which the polynomial is interpolated.
+///
+/// `xs` usually refer to "index of a party" of MPC protocol, and shared secret is assigned
+/// a coordinate `x=0`. For that reason, elements of `xs` are restricted to be non-zero to
+/// avoid an implementation flaw when one of the parties can occupy `xs[j] = 0`.
 ///
 /// ## Example
 /// E.g. we have a polynomial $f(x)$ with $deg(f) = 1$, and we have key shares
