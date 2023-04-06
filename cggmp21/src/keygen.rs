@@ -8,14 +8,14 @@ use generic_ec_zkp::{
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    rounds_router::simple_store::{RoundInput, RoundInputError},
-    rounds_router::{CompleteRoundError, RoundsRouter},
-    Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
+    rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
+    Outgoing, ProtocolMessage,
 };
 use round_based::{MsgId, PartyIndex};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::errors::IoError;
 use crate::execution_id::ProtocolChoice;
 use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
 use crate::security_level::SecurityLevel;
@@ -128,7 +128,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, L, D>>,
@@ -173,13 +173,13 @@ where
         outgoings
             .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
             .await
-            .map_err(KeygenError::SendError)?;
+            .map_err(IoError::send_message)?;
 
         // Round 2
         let commitments = rounds
             .complete(round1)
             .await
-            .map_err(KeygenError::ReceiveMessage)?
+            .map_err(IoError::receive_message)?
             .into_vec_including_me(my_commitment);
         let commitments_hash = commitments
             .iter()
@@ -191,7 +191,7 @@ where
                 commitments_hash.clone(),
             ))))
             .await
-            .map_err(KeygenError::SendError)?;
+            .map_err(IoError::send_message)?;
 
         let my_decommitment = MsgRound2 {
             rid,
@@ -202,14 +202,14 @@ where
         outgoings
             .send(Outgoing::broadcast(Msg::Round2(my_decommitment.clone())))
             .await
-            .map_err(KeygenError::SendError)?;
+            .map_err(IoError::send_message)?;
 
         // Round 3
         {
             let commitments_hashes = rounds
                 .complete(round1_sync)
                 .await
-                .map_err(KeygenError::ReceiveMessage)?;
+                .map_err(IoError::receive_message)?;
             let parties_have_different_hashes = commitments_hashes
                 .into_iter_indexed()
                 .filter(|(_j, _msg_id, hash)| hash.0 != commitments_hash)
@@ -222,7 +222,7 @@ where
         let decommitments = rounds
             .complete(round2)
             .await
-            .map_err(KeygenError::ReceiveMessage)?
+            .map_err(IoError::receive_message)?
             .into_vec_including_me(my_decommitment);
 
         // Validate decommitments
@@ -262,13 +262,13 @@ where
         outgoings
             .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
             .await
-            .map_err(KeygenError::SendError)?;
+            .map_err(IoError::send_message)?;
 
         // Round 4
         let sch_proofs = rounds
             .complete(round3)
             .await
-            .map_err(KeygenError::ReceiveMessage)?
+            .map_err(IoError::receive_message)?
             .into_vec_including_me(my_sch_proof);
 
         let mut blame = vec![];
@@ -303,9 +303,20 @@ where
     }
 }
 
-/// Keygen failed
 #[derive(Debug, Error)]
-pub enum KeygenError<IErr, OErr> {
+#[error("keygen protocol is failed to complete")]
+pub struct KeygenError(#[source] Reason);
+
+crate::errors::impl_from! {
+    impl From for KeygenError {
+        err: KeygenAborted => KeygenError(Reason::Aborted(err)),
+        err: IoError => KeygenError(Reason::IoError(err)),
+        err: Bug => KeygenError(Reason::Bug(err)),
+    }
+}
+
+#[derive(Debug, Error)]
+enum Reason {
     /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
     Aborted(
@@ -313,22 +324,18 @@ pub enum KeygenError<IErr, OErr> {
         #[from]
         KeygenAborted,
     ),
-    /// Receiving message error
-    #[error("receive message")]
-    ReceiveMessage(#[source] CompleteRoundError<RoundInputError, IErr>),
-    /// Sending message error
-    #[error("send message")]
-    SendError(#[source] OErr),
+    #[error("i/o error")]
+    IoError(#[source] IoError),
     /// Bug occurred
     #[error("bug occurred")]
-    Bug(InternalError),
+    Bug(Bug),
 }
 
 /// Error indicating that protocol was aborted by malicious party
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
-pub enum KeygenAborted {
+enum KeygenAborted {
     #[error("party decommitment doesn't match commitment: {parties:?}")]
     InvalidDecommitment { parties: Vec<u16> },
     #[error("party provided invalid schnorr proof: {parties:?}")]
@@ -336,13 +343,6 @@ pub enum KeygenAborted {
     #[error("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
 }
-
-/// Error indicating that internal bug was detected
-///
-/// Please, report this issue if you encounter it
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct InternalError(Bug);
 
 #[derive(Debug, Error)]
 enum Bug {
@@ -354,10 +354,4 @@ enum Bug {
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("hash message")]
     HashMessage(#[source] HashMessageError),
-}
-
-impl<IErr, OErr> From<Bug> for KeygenError<IErr, OErr> {
-    fn from(err: Bug) -> Self {
-        KeygenError::Bug(InternalError(err))
-    }
 }
