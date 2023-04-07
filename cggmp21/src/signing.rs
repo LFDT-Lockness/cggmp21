@@ -148,6 +148,7 @@ where
     key_share: &'r Valid<KeyShare<E, L>>,
     execution_id: ExecutionId<E, L, D>,
     tracer: Option<&'r mut dyn Tracer>,
+    enforce_reliable_broadcast: bool,
 }
 
 impl<'r, E, L, D> SigningBuilder<'r, E, L, D>
@@ -169,6 +170,7 @@ where
             key_share: secret_key_share,
             execution_id: Default::default(),
             tracer: None,
+            enforce_reliable_broadcast: true,
         }
     }
 
@@ -181,6 +183,7 @@ where
             parties_indexes_at_keygen: self.parties_indexes_at_keygen,
             key_share: self.key_share,
             tracer: self.tracer,
+            enforce_reliable_broadcast: self.enforce_reliable_broadcast,
             execution_id: Default::default(),
         }
     }
@@ -193,6 +196,22 @@ where
     pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
         Self {
             execution_id,
+            ..self
+        }
+    }
+
+    /// Ensures reliability of broadcast channel by adding one extra communication round
+    ///
+    /// CGGMP21 signing protocol requires message in the first round to be sent over reliable
+    /// broadcast channel. We ensure reliability of the broadcast channel by introducing extra
+    /// communication round (at const of additional latency). You may disable it, for instance,
+    /// if your transport layer is reliable by construction (e.g. you use blockchain for
+    /// communications).
+    ///
+    /// Default: `true`.
+    pub fn enforce_reliable_broadcast(self, v: bool) -> Self {
+        Self {
+            enforce_reliable_broadcast: v,
             ..self
         }
     }
@@ -215,6 +234,7 @@ where
             self.key_share,
             self.parties_indexes_at_keygen,
             None,
+            self.enforce_reliable_broadcast,
         )
         .await?
         {
@@ -242,6 +262,7 @@ where
             self.key_share,
             self.parties_indexes_at_keygen,
             Some(message_to_sign),
+            self.enforce_reliable_broadcast,
         )
         .await?
         {
@@ -260,6 +281,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     key_share: &Valid<KeyShare<E, L>>,
     S: &[PartyIndex],
     message_to_sign: Option<Message>,
+    enforce_reliable_broadcast: bool,
 ) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -337,6 +359,7 @@ where
         q_i,
         &R,
         message_to_sign,
+        enforce_reliable_broadcast,
     )
     .await
 }
@@ -355,6 +378,7 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     q_i: &BigNumber,
     R: &[PartyAux],
     message_to_sign: Option<Message>,
+    enforce_reliable_broadcast: bool,
 ) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -460,27 +484,47 @@ where
         .map_err(SigningError::ReceiveMessage)?;
     tracer.msgs_received();
 
-    // Step 1. Ensure reliability of round1a: broadcast hash(ciphertexts)
-    tracer.stage("Hash received msgs (reliability check)");
-    let h_i = ciphertexts
-        .iter_including_me(&MsgRound1a {
-            K: K_i.clone(),
-            G: G_i.clone(),
-        })
-        .try_fold(D::new(), hash_message)
-        .map_err(Bug::HashMessage)?
-        .finalize();
+    // Reliability check (if enabled)
+    if enforce_reliable_broadcast {
+        tracer.stage("Hash received msgs (reliability check)");
+        let h_i = ciphertexts
+            .iter_including_me(&MsgRound1a {
+                K: K_i.clone(),
+                G: G_i.clone(),
+            })
+            .try_fold(D::new(), hash_message)
+            .map_err(Bug::HashMessage)?
+            .finalize();
 
-    tracer.send_msg();
-    outgoings
-        .send(Outgoing::broadcast(Msg::ReliabilityCheck(
-            MsgReliabilityCheck(h_i),
-        )))
-        .await
-        .map_err(SigningError::SendError)?;
-    tracer.msg_sent();
+        tracer.send_msg();
+        outgoings
+            .send(Outgoing::broadcast(Msg::ReliabilityCheck(
+                MsgReliabilityCheck(h_i),
+            )))
+            .await
+            .map_err(SigningError::SendError)?;
+        tracer.msg_sent();
 
-    // Step 2. Verify proofs
+        tracer.round_begins();
+
+        tracer.receive_msgs();
+        let round1a_hashes = rounds
+            .complete(round1a_sync)
+            .await
+            .map_err(SigningError::ReceiveMessage)?;
+        tracer.msgs_received();
+        tracer.stage("Assert other parties hashed messages (reliability check)");
+        let parties_have_different_hashes = round1a_hashes
+            .into_iter_indexed()
+            .filter(|(_j, _msg_id, hash)| hash.0 != h_i)
+            .map(|(j, msg_id, _)| (j, msg_id))
+            .collect::<Vec<_>>();
+        if !parties_have_different_hashes.is_empty() {
+            return Err(SigningAborted::Round1aNotReliable(parties_have_different_hashes).into());
+        }
+    }
+
+    // Step 1. Verify proofs
     tracer.stage("Verify psi0 proofs");
     {
         let mut faulty_parties = vec![];
@@ -510,7 +554,7 @@ where
         }
     }
 
-    // Step 3
+    // Step 2
     let Gamma_i = Point::generator() * &gamma_i;
     let J = BigNumber::one() << L::ELL_PRIME;
 
@@ -660,26 +704,7 @@ where
     // Round 3
     tracer.round_begins();
 
-    // Step 1. Ensure reliability of round1a: receive hash(ciphertexts) from others
-    {
-        tracer.receive_msgs();
-        let round1a_hashes = rounds
-            .complete(round1a_sync)
-            .await
-            .map_err(SigningError::ReceiveMessage)?;
-        tracer.msgs_received();
-        tracer.stage("Assert other parties hashed messages (reliability check)");
-        let parties_have_different_hashes = round1a_hashes
-            .into_iter_indexed()
-            .filter(|(_j, _msg_id, hash)| hash.0 != h_i)
-            .map(|(j, msg_id, _)| (j, msg_id))
-            .collect::<Vec<_>>();
-        if !parties_have_different_hashes.is_empty() {
-            return Err(SigningAborted::Round1aNotReliable(parties_have_different_hashes).into());
-        }
-    }
-
-    // Step 2
+    // Step 1
     tracer.receive_msgs();
     let round2_msgs = rounds
         .complete(round2)
@@ -763,7 +788,7 @@ where
         return Err(SigningAborted::InvalidPsi(faulty_parties).into());
     }
 
-    // Step 3
+    // Step 2
     tracer.stage("Compute Gamma, Delta_i, delta_i, chi_i");
     let Gamma = Gamma_i + round2_msgs.iter().map(|msg| msg.Gamma).sum::<Point<E>>();
     let Delta_i = Gamma * &k_i;
