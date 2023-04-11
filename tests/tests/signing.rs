@@ -9,7 +9,7 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::signing::{Message, Msg};
+    use cggmp21::signing::{DataToSign, Msg};
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
     #[test_case::case(None, 2; "n2")]
@@ -37,7 +37,7 @@ mod generic {
 
         let mut original_message_to_sign = [0u8; 100];
         rng.fill_bytes(&mut original_message_to_sign);
-        let message_to_sign = Message::new::<Sha256>(&original_message_to_sign);
+        let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
 
         // Choose `t` signers to perform signing
         let t = shares[0].min_signers();

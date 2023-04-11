@@ -29,39 +29,43 @@ use crate::{
     ExecutionId,
 };
 
-/// A (prehashed) message to sign
+/// A (prehashed) data to be signed
+///
+/// `DataToSign` holds a scalar that represents data to be signed. Different ECDSA schemes define different
+/// ways to map an original data to be signed (slice of bytes) into the scalar, but it always must involve
+/// cryptographic hash functions. Most commonly, original data is hashed using SHA2-256, then output is parsed
+/// as big-endian integer and taken modulo curve order. This exact functionality is implemented in
+/// [DataToSign::digest] and [DataToSign::from_digest] constructors.
 #[derive(Debug, Clone, Copy)]
-pub struct Message([u8; 32]);
+pub struct DataToSign<E: Curve>(Scalar<E>);
 
-impl Message {
-    /// Construct a `Message` by hashing `data` with algorithm `D`
-    pub fn new<D>(data: &[u8]) -> Self
-    where
-        D: Digest<OutputSize = digest::typenum::U32>,
-    {
-        Message(D::digest(data).into())
-    }
-
-    /// Constructs a `Message` from `hash = H(message)`
-    pub fn from_digest<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = digest::typenum::U32>,
-    {
-        Message(hash.finalize().into())
-    }
-
-    /// Constructs a `Message` from `message_hash = H(message)`
+impl<E: Curve> DataToSign<E> {
+    /// Construct a `DataToSign` by hashing `data` with algorithm `D`
     ///
-    /// ** Note: [Message::new] and [Message::from_digest] are preferred way to construct the `Message` **
-    ///
-    /// `message_hash` must be an output of cryptographic function of 32 bytes length. If
-    /// `message_hash` is not 32 bytes size, `Err(InvalidMessage)` is returned.
-    pub fn from_slice(message_hash: &[u8]) -> Result<Self, InvalidMessage> {
-        message_hash.try_into().map(Self).or(Err(InvalidMessage))
+    /// `data_to_sign = hash(data) mod q`
+    pub fn digest<D: Digest>(data: &[u8]) -> Self {
+        DataToSign(Scalar::from_be_bytes_mod_order(D::digest(data)))
     }
 
-    fn to_scalar<E: Curve>(self) -> Scalar<E> {
-        Scalar::from_be_bytes_mod_order(self.0)
+    /// Constructs a `DataToSign` from output of given digest
+    ///
+    /// `data_to_sign = hash(data) mod q`
+    pub fn from_digest<D: Digest>(hash: D) -> Self {
+        DataToSign(Scalar::from_be_bytes_mod_order(hash.finalize()))
+    }
+
+    /// Constructs a `DataToSign` from scalar
+    ///
+    /// ** Note: [DataToSign::digest] and [DataToSign::from_digest] are preferred way to construct the `DataToSign` **
+    ///
+    /// `scalar` must be output of cryptographic hash function applied to original message to be signed
+    pub fn from_slice(scalar: Scalar<E>) -> Self {
+        Self(scalar)
+    }
+
+    /// Returns a scalar that represents a data to be signed
+    pub fn to_scalar(self) -> Scalar<E> {
+        self.0
     }
 }
 
@@ -245,7 +249,7 @@ where
         self,
         rng: &mut R,
         party: M,
-        message_to_sign: Message,
+        message_to_sign: DataToSign<E>,
     ) -> Result<Signature<E>, SigningError>
     where
         R: RngCore + CryptoRng,
@@ -284,7 +288,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     i: PartyIndex,
     key_share: &Valid<KeyShare<E, L>>,
     S: &[PartyIndex],
-    message_to_sign: Option<Message>,
+    message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
 ) -> Result<ProtocolOutput<E>, SigningError>
 where
@@ -388,7 +392,7 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     p_i: &BigNumber,
     q_i: &BigNumber,
     R: &[PartyAux],
-    message_to_sign: Option<Message>,
+    message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
 ) -> Result<ProtocolOutput<E>, SigningError>
 where
@@ -1006,9 +1010,9 @@ where
     E: Curve,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
-    pub fn partially_sign(self, message_to_sign: Message) -> PartialSignature<E> {
+    pub fn partially_sign(self, message_to_sign: DataToSign<E>) -> PartialSignature<E> {
         let r = self.R.x().to_scalar();
-        let m = message_to_sign.to_scalar::<E>();
+        let m = message_to_sign.to_scalar();
         let sigma_i = self.k.as_ref() * m + r * self.chi.as_ref();
         PartialSignature { r, sigma: sigma_i }
     }
@@ -1031,9 +1035,12 @@ where
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
     /// Verifies that signature matches specified public key and message
-    pub fn verify(&self, public_key: &Point<E>, message: &Message) -> Result<(), InvalidSignature> {
-        let r =
-            (Point::generator() * message.to_scalar::<E>() + public_key * self.r) * self.s.invert();
+    pub fn verify(
+        &self,
+        public_key: &Point<E>,
+        message: &DataToSign<E>,
+    ) -> Result<(), InvalidSignature> {
+        let r = (Point::generator() * message.to_scalar() + public_key * self.r) * self.s.invert();
         let r = NonZero::from_point(r).ok_or(InvalidSignature)?;
 
         if *self.r == r.x().to_scalar() {
