@@ -272,6 +272,12 @@ where
     }
 }
 
+/// t-out-of-n signing
+///
+/// CGGMP paper doesn't support threshold signing out of the box. However, threshold signing
+/// can be easily implemented on top of CGGMP's [`signing_n_out_of_n`] by converting polynomial
+/// (VSS) key shares into additive (by multiplying at lagrange coefficient) and calling
+/// t-out-of-t protocol. The trick is described in more details in the spec.
 async fn signing_t_out_of_n<M, E, L, D, R>(
     mut tracer: Option<&mut dyn Tracer>,
     rng: &mut R,
@@ -321,6 +327,7 @@ where
 
     // Assemble x_i and \vec X
     let (x_i, X) = if let Some(VssSetup { I, .. }) = &key_share.core.vss_setup {
+        // For t-out-of-n keys generated via VSS DKG scheme
         let I = subset(S, I).ok_or(Bug::Subset)?;
         let X = subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
 
@@ -336,6 +343,7 @@ where
 
         (x_i, X)
     } else {
+        // For n-out-of-n keys generated using original CGGMP DKG
         let X = subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
         (key_share.core.x.clone(), X)
     };
@@ -345,6 +353,7 @@ where
     let (p_i, q_i) = (&key_share.p, &key_share.q);
     let R = subset(S, &key_share.parties).ok_or(Bug::Subset)?;
 
+    // t-out-of-t signing
     signing_n_out_of_n(
         tracer,
         rng,
@@ -364,6 +373,10 @@ where
     .await
 }
 
+/// Original CGGMP n-out-of-n signing
+///
+/// Implementation has very little differences compared to original CGGMP protocol: we added broadcast
+/// reliability check, fixed some typos in CGGMP, etc. Differences are covered in the specs.
 async fn signing_n_out_of_n<M, E, L, D, R>(
     mut tracer: Option<&mut dyn Tracer>,
     rng: &mut R,
