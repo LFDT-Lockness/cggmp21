@@ -80,7 +80,7 @@ mod generic {
         // attempt to sign with new shares and verify the signature
 
         let signing_execution_id = ExecutionId::<E, ReasonablySecure>::from_bytes(&[228; 32]);
-        let mut simulation = Simulation::<cggmp21::signing::Msg<E, Sha256>>::new();
+        let mut simulation = Simulation::<cggmp21::signing::msg::Msg<E, Sha256>>::new();
         let message_to_sign = cggmp21::signing::DataToSign::digest::<Sha256>(&[42; 100]);
         let participants = &(0..n).collect::<Vec<_>>();
         let outputs = key_shares.iter().map(|share| {

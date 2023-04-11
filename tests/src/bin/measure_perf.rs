@@ -93,7 +93,7 @@ async fn main() {
             let message_to_sign = b"Dfns rules!";
             let message_to_sign = DataToSign::digest::<Sha256>(message_to_sign);
 
-            use cggmp21::signing::Msg;
+            use cggmp21::signing::msg::Msg;
             let mut simulation = Simulation::<Msg<E, D>>::new();
 
             let mut outputs = vec![];

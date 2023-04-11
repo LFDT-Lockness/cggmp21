@@ -3,18 +3,17 @@ use futures::SinkExt;
 use generic_ec::{
     coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar, SecretScalar,
 };
-use paillier_zk::libpaillier::{unknown_order::BigNumber, Ciphertext, DecryptionKey};
+use paillier_zk::libpaillier::{unknown_order::BigNumber, DecryptionKey};
 use paillier_zk::{
-    group_element_vs_paillier_encryption_in_range as pi_log, libpaillier,
+    group_element_vs_paillier_encryption_in_range as pi_log,
     paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
     BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
-    Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex, ProtocolMessage,
+    Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex,
 };
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::errors::IoError;
@@ -28,6 +27,8 @@ use crate::{
     utils::{encryption_key_from_n, scalar_to_bignumber},
     ExecutionId,
 };
+
+use self::msg::*;
 
 /// A (prehashed) data to be signed
 ///
@@ -69,6 +70,9 @@ impl<E: Curve> DataToSign<E> {
     }
 }
 
+/// Presignature, can be used to issue a [partial signature](PartialSignature) without interacting with other signers
+///
+/// [Threshold](KeyShare::min_signers) amount of partial signatures (from different signers) can be [combined](PartialSignature::combine) into regular signature
 pub struct Presignature<E: Curve> {
     pub R: NonZero<Point<E>>,
     pub k: SecretScalar<E>,
@@ -86,58 +90,86 @@ pub struct Signature<E: Curve> {
     pub s: NonZero<Scalar<E>>,
 }
 
-#[derive(Clone, ProtocolMessage)]
-#[allow(clippy::large_enum_variant)]
-pub enum Msg<E: Curve, D: Digest> {
-    Round1a(MsgRound1a),
-    Round1b(MsgRound1b),
-    Round2(MsgRound2<E>),
-    Round3(MsgRound3<E>),
-    Round4(MsgRound4<E>),
-    ReliabilityCheck(MsgReliabilityCheck<D>),
-}
+/// MPC network messages
+///
+/// This module contains types that define MPC messages that signers exchange
+/// during signing protocol
+pub mod msg {
+    use digest::Digest;
+    use generic_ec::Curve;
+    use generic_ec::{Point, Scalar};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct MsgRound1a {
-    pub K: libpaillier::Ciphertext,
-    pub G: libpaillier::Ciphertext,
-}
+    use libpaillier::Ciphertext;
+    use paillier_zk::libpaillier;
+    use paillier_zk::{
+        group_element_vs_paillier_encryption_in_range as pi_log,
+        paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
+    };
+    use round_based::ProtocolMessage;
+    use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct MsgRound1b {
-    pub psi0: (pi_enc::Commitment, pi_enc::Proof),
-}
+    /// Signing protocol message
+    ///
+    /// Enumerates messages from all rounds
+    #[derive(Clone, ProtocolMessage)]
+    #[allow(clippy::large_enum_variant)]
+    pub enum Msg<E: Curve, D: Digest> {
+        Round1a(MsgRound1a),
+        Round1b(MsgRound1b),
+        Round2(MsgRound2<E>),
+        Round3(MsgRound3<E>),
+        Round4(MsgRound4<E>),
+        ReliabilityCheck(MsgReliabilityCheck<D>),
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound2<E: Curve> {
-    pub Gamma: Point<E>,
-    pub D: Ciphertext,
-    pub F: Ciphertext,
-    pub hat_D: Ciphertext,
-    pub hat_F: Ciphertext,
-    pub psi: (pi_aff::Commitment<E>, pi_aff::Proof),
-    pub hat_psi: (pi_aff::Commitment<E>, pi_aff::Proof),
-    pub psi_prime: (pi_log::Commitment<E>, pi_log::Proof),
-}
+    /// Message from round 1a
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct MsgRound1a {
+        pub K: libpaillier::Ciphertext,
+        pub G: libpaillier::Ciphertext,
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound3<E: Curve> {
-    pub delta: Scalar<E>,
-    pub Delta: Point<E>,
-    pub psi_prime_prime: (pi_log::Commitment<E>, pi_log::Proof),
-}
+    /// Message from round 1b
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct MsgRound1b {
+        pub psi0: (pi_enc::Commitment, pi_enc::Proof),
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound4<E: Curve> {
-    pub sigma: Scalar<E>,
-}
+    /// Message from round 2
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound2<E: Curve> {
+        pub Gamma: Point<E>,
+        pub D: Ciphertext,
+        pub F: Ciphertext,
+        pub hat_D: Ciphertext,
+        pub hat_F: Ciphertext,
+        pub psi: (pi_aff::Commitment<E>, pi_aff::Proof),
+        pub hat_psi: (pi_aff::Commitment<E>, pi_aff::Proof),
+        pub psi_prime: (pi_log::Commitment<E>, pi_log::Proof),
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgReliabilityCheck<D: Digest>(digest::Output<D>);
+    /// Message from round 3
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound3<E: Curve> {
+        pub delta: Scalar<E>,
+        pub Delta: Point<E>,
+        pub psi_prime_prime: (pi_log::Commitment<E>, pi_log::Proof),
+    }
+
+    /// Message from round 4
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound4<E: Curve> {
+        pub sigma: Scalar<E>,
+    }
+
+    /// Message from auxiliary round for reliability check
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+}
 
 pub struct SigningBuilder<'r, E, L, D>
 where
@@ -943,7 +975,7 @@ where
     tracer.named_round_begins("Partial signing");
 
     // Round 1
-    let partial_sig = presig.partially_sign(message_to_sign);
+    let partial_sig = presig.issue_partial_signature(message_to_sign);
 
     tracer.send_msg();
     outgoings
@@ -1010,7 +1042,7 @@ where
     E: Curve,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
-    pub fn partially_sign(self, message_to_sign: DataToSign<E>) -> PartialSignature<E> {
+    pub fn issue_partial_signature(self, message_to_sign: DataToSign<E>) -> PartialSignature<E> {
         let r = self.R.x().to_scalar();
         let m = message_to_sign.to_scalar();
         let sigma_i = self.k.as_ref() * m + r * self.chi.as_ref();
@@ -1092,10 +1124,7 @@ enum ProtocolOutput<E: Curve> {
     Signature(Signature<E>),
 }
 
-#[derive(Debug, Error)]
-#[error("message to sign is not valid")]
-pub struct InvalidMessage;
-
+/// Error indicating that signing protocol failed
 #[derive(Debug, Error)]
 #[error("signing protocol failed")]
 pub struct SigningError(#[source] Reason);
@@ -1249,6 +1278,7 @@ enum BugSource {
     psi_prime_prime,
 }
 
+/// Error indicating that signature is not valid for given public key and message
 #[derive(Debug, Error)]
 #[error("signature is not valid")]
 pub struct InvalidSignature;
