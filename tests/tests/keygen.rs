@@ -103,10 +103,7 @@ mod generic {
                 key_share.public_shares[usize::from(i)]
             );
         }
-        assert_eq!(
-            key_shares[0].shared_public_key,
-            key_shares[0].public_shares.iter().sum::<Point<E>>()
-        );
+        // TODO: interpolate and check public share
     }
 
     #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]

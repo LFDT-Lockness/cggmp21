@@ -1,7 +1,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::hash_to_curve::{self, FromHash};
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
+use generic_ec::{Curve, Point, Scalar, SecretScalar, NonZero};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
@@ -14,7 +14,7 @@ use round_based::{
 use serde::{Deserialize, Serialize};
 
 use crate::execution_id::ProtocolChoice;
-use crate::key_share::{IncompleteKeyShare, Valid};
+use crate::key_share::{IncompleteKeyShare, Valid, VssSetup};
 use crate::security_level::SecurityLevel;
 use crate::utils;
 use crate::utils::{hash_message, xor_array};
@@ -244,8 +244,6 @@ where
     let sigma = SecretScalar::new(&mut sigma);
     debug_assert_eq!(Point::generator() * &sigma, ys[usize::from(i)]);
 
-    eprintln!("my ys: {:?}", ys);
-
     // Calculate challenge
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rid.as_ref()])
         .map_err(Bug::HashToScalarError)?;
@@ -290,6 +288,12 @@ where
         .iter_including_me(&my_decommitment)
         .map(|d| d.Ss[0])
         .sum();
+    let key_shares_indexes = (1..=n)
+        .map(|i| NonZero::from_scalar(Scalar::from(i)))
+        // Safety: safe because we start with 1 and go above, and overflowing on
+        // n is UB
+        .map(|s| unsafe { s.unwrap_unchecked() })
+        .collect::<Vec<_>>();
 
     Ok(IncompleteKeyShare {
         curve: Default::default(),
@@ -298,7 +302,10 @@ where
         shared_public_key: y,
         rid,
         public_shares: ys,
-        vss_setup: None,
+        vss_setup: Some(VssSetup {
+            min_signers: t,
+            I: key_shares_indexes,
+        }),
         x: sigma,
     }
     .try_into()
