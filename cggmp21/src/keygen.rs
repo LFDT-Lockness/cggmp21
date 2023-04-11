@@ -1,3 +1,5 @@
+mod threshold;
+
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::hash_to_curve::{self, FromHash};
@@ -32,6 +34,8 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round2(MsgRound2<E, L, D>),
     Round3(MsgRound3<E>),
 }
+
+pub type ThresholdMsg<E, L, D> = threshold::Msg<E, L, D>;
 
 /// Message from round 1
 #[derive(Clone, Serialize, Deserialize)]
@@ -300,6 +304,19 @@ where
         }
         .try_into()
         .map_err(Bug::InvalidKeyShare)?)
+    }
+
+    pub async fn start_thresholdized<R, M>(
+        self,
+        t: u16,
+        rng: &mut R,
+        party: M,
+    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
+    {
+        threshold::run_threshold_keygen(self.i, t, self.n, self.execution_id, rng, party).await
     }
 }
 

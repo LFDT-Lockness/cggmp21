@@ -297,6 +297,20 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Opt
         .collect()
 }
 
+/// `coefs` is polynomial coefficients, `coefs[i]` corresponding to `x^i`
+pub fn polynomial_value<A, B, C>(zero: C, point: &A, coefs: &[B]) -> C
+where
+    C: for<'a> core::ops::MulAssign<&'a A>,
+    C: for<'a> core::ops::AddAssign<&'a B>,
+{
+    let mut r = zero;
+    for c in coefs.iter().rev() {
+        r *= point;
+        r += c;
+    }
+    r
+}
+
 #[cfg(test)]
 mod test {
     #[test]
