@@ -18,7 +18,7 @@ use crate::utils::{lagrange_coefficient, subset};
 ///
 /// Core key share is obtained as an output of [key generation protocol](crate::keygen()).
 /// It can not be used in signing protocol as it lacks of required auxiliary information.
-/// You need to carry out [key refresh protocol](crate::refresh) to obtain "completed"
+/// You need to carry out [key refresh protocol](mod@crate::key_refresh) to obtain "completed"
 /// [KeyShare].
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
@@ -50,7 +50,7 @@ pub struct IncompleteKeyShare<E: Curve, L: SecurityLevel> {
 
 /// Key share
 ///
-/// Key share is obtained as output of [key refresh protocol](crate::refresh).
+/// Key share is obtained as output of [key refresh protocol](mod@crate::key_refresh).
 /// It contains a [core share](IncompleteKeyShare) and auxiliary data required to
 /// carry out signing.
 ///
@@ -236,7 +236,7 @@ impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for KeyShare<E,
 
 /// Reconstructs a secret key from set of at least [`min_signers`](KeyShare::min_signers) key shares
 ///
-/// Requires at least [`min_signers`](Self::min_signers) distinct key shares from the same generation
+/// Requires at least [`min_signers`](KeyShare::min_signers) distinct key shares from the same generation
 /// (key refresh produces key shares of the next generation). Accepts both `Valid<KeyShare>` and
 /// `Valid<IncompleteKeyShare>`. Returns error if input is invalid.
 ///

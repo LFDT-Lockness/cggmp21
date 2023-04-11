@@ -136,7 +136,7 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    /// Build aux info generating operation. Start it with [`start`].
+    /// Build aux info generating operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
     pub fn new(
@@ -151,7 +151,7 @@ where
         }
     }
 
-    /// Build key refresh operation. Start it with [`start`]
+    /// Build key refresh operation. Start it with [`start`](Self::start)
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
     pub fn new_refresh(
