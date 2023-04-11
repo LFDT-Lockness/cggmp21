@@ -190,61 +190,6 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
             .map(|s| s.min_signers)
             .unwrap_or(self.n)
     }
-
-    /// Reconstructs a secret key from set of at least [`min_signers`](Self::min_signers) key shares
-    ///
-    /// Requires at least [`min_signers`](Self::min_signers) distinct key shares from the same generation
-    /// (key refresh produces key shares of the next generation). Returns error if input is invalid.
-    ///
-    /// Note that, normally, secret key is not supposed to be reconstructed, and key
-    /// shares should never be at one place. This basically defeats purpose of MPC and
-    /// creates single point of failure/trust.
-    pub fn reconstruct_secret_key(key_shares: &[Self]) -> Result<SecretScalar<E>, InvalidKeyShare> {
-        if key_shares.is_empty() {
-            return Err(ReconstructError::NoKeyShares.into());
-        }
-
-        let t = key_shares[0].min_signers();
-        let pk = key_shares[0].shared_public_key;
-        let vss = &key_shares[0].vss_setup;
-        let X = &key_shares[0].public_shares;
-
-        if key_shares[1..].iter().any(|s| {
-            t != s.min_signers()
-                || pk != s.shared_public_key
-                || *vss != s.vss_setup
-                || *X != s.public_shares
-        }) {
-            return Err(ReconstructError::DifferentKeyShares.into());
-        }
-
-        if key_shares.len() < usize::from(t) {
-            return Err(ReconstructError::TooFewKeyShares {
-                len: key_shares.len(),
-                t,
-            }
-            .into());
-        }
-
-        if let Some(VssSetup { I, .. }) = vss {
-            let S = key_shares.iter().map(|s| s.i).collect::<Vec<_>>();
-            let I = subset(&S, I).ok_or(ReconstructError::Subset)?;
-            let lagrange_coefficients = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
-            let mut sk = lagrange_coefficients
-                .zip(key_shares)
-                .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
-                    Some(acc + lambda_j? * &key_share_j.x)
-                })
-                .ok_or(ReconstructError::Interpolation)?;
-            Ok(SecretScalar::new(&mut sk))
-        } else {
-            let mut sk = key_shares
-                .iter()
-                .map(|s| &s.x)
-                .fold(Scalar::zero(), |acc, x_j| acc + x_j);
-            Ok(SecretScalar::new(&mut sk))
-        }
-    }
 }
 
 impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
@@ -280,6 +225,70 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     /// and/or generate presignature
     pub fn min_signers(&self) -> u16 {
         self.core.min_signers()
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for KeyShare<E, L> {
+    fn as_ref(&self) -> &IncompleteKeyShare<E, L> {
+        &self.core
+    }
+}
+
+/// Reconstructs a secret key from set of at least [`min_signers`](KeyShare::min_signers) key shares
+///
+/// Requires at least [`min_signers`](Self::min_signers) distinct key shares from the same generation
+/// (key refresh produces key shares of the next generation). Accepts both `Valid<KeyShare>` and
+/// `Valid<IncompleteKeyShare>`. Returns error if input is invalid.
+///
+/// Note that, normally, secret key is not supposed to be reconstructed, and key
+/// shares should never be at one place. This basically defeats purpose of MPC and
+/// creates single point of failure/trust.
+pub fn reconstruct_secret_key<E: Curve, L: SecurityLevel>(
+    key_shares: &[Valid<impl AsRef<IncompleteKeyShare<E, L>>>],
+) -> Result<SecretScalar<E>, InvalidKeyShare> {
+    if key_shares.is_empty() {
+        return Err(ReconstructError::NoKeyShares.into());
+    }
+
+    let t = key_shares[0].as_ref().min_signers();
+    let pk = key_shares[0].as_ref().shared_public_key;
+    let vss = &key_shares[0].as_ref().vss_setup;
+    let X = &key_shares[0].as_ref().public_shares;
+
+    if key_shares[1..].iter().any(|s| {
+        t != s.as_ref().min_signers()
+            || pk != s.as_ref().shared_public_key
+            || *vss != s.as_ref().vss_setup
+            || *X != s.as_ref().public_shares
+    }) {
+        return Err(ReconstructError::DifferentKeyShares.into());
+    }
+
+    if key_shares.len() < usize::from(t) {
+        return Err(ReconstructError::TooFewKeyShares {
+            len: key_shares.len(),
+            t,
+        }
+        .into());
+    }
+
+    if let Some(VssSetup { I, .. }) = vss {
+        let S = key_shares.iter().map(|s| s.as_ref().i).collect::<Vec<_>>();
+        let I = subset(&S, I).ok_or(ReconstructError::Subset)?;
+        let lagrange_coefficients = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
+        let mut sk = lagrange_coefficients
+            .zip(key_shares)
+            .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
+                Some(acc + lambda_j? * &key_share_j.as_ref().x)
+            })
+            .ok_or(ReconstructError::Interpolation)?;
+        Ok(SecretScalar::new(&mut sk))
+    } else {
+        let mut sk = key_shares
+            .iter()
+            .map(|s| &s.as_ref().x)
+            .fold(Scalar::zero(), |acc, x_j| acc + x_j);
+        Ok(SecretScalar::new(&mut sk))
     }
 }
 

@@ -1,6 +1,6 @@
 #[generic_tests::define]
 mod test {
-    use cggmp21::{define_security_level, key_share::IncompleteKeyShare};
+    use cggmp21::{define_security_level, key_share::reconstruct_secret_key};
     use generic_ec::{Curve, Point};
     use rand::seq::SliceRandom;
     use rand_dev::DevRng;
@@ -35,10 +35,10 @@ mod test {
                 let t = t.unwrap_or(n);
                 let t_shares = shares
                     .choose_multiple(&mut rng, t.into())
-                    .map(|s| s.core.clone())
+                    .cloned()
                     .collect::<Vec<_>>();
 
-                let sk = IncompleteKeyShare::reconstruct_secret_key(&t_shares).unwrap();
+                let sk = reconstruct_secret_key(&t_shares).unwrap();
                 assert_eq!(Point::generator() * sk, shares[0].core.shared_public_key);
             }
         }
