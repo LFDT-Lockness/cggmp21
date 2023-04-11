@@ -105,19 +105,19 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
     /// Performs consistency checks against a key share, returns `Ok(())` if share looks OK.
     pub fn validate(&self) -> Result<(), InvalidKeyShare> {
         if self.n < 2 {
-            return Err(ErrorReason::TooFewParties.into());
+            return Err(InvalidKeyShareReason::TooFewParties.into());
         }
         if self.i >= self.n {
-            return Err(ErrorReason::PartyIndexOutOfBounds.into());
+            return Err(InvalidKeyShareReason::PartyIndexOutOfBounds.into());
         }
 
         if self.public_shares.len() != usize::from(self.n) {
-            return Err(ErrorReason::PublicSharesLen.into());
+            return Err(InvalidKeyShareReason::PublicSharesLen.into());
         }
 
         let party_public_share = self.public_shares[usize::from(self.i)];
         if party_public_share != Point::generator() * &self.x {
-            return Err(ErrorReason::PartySecretShareDoesntMatchPublicShare.into());
+            return Err(InvalidKeyShareReason::PartySecretShareDoesntMatchPublicShare.into());
         }
 
         match &self.vss_setup {
@@ -132,13 +132,13 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
         let t = vss_setup.min_signers;
 
         if !(2 <= t) {
-            return Err(ErrorReason::ThresholdTooSmall.into());
+            return Err(InvalidKeyShareReason::ThresholdTooSmall.into());
         }
         if !(t <= self.n) {
-            return Err(ErrorReason::ThresholdTooLarge.into());
+            return Err(InvalidKeyShareReason::ThresholdTooLarge.into());
         }
         if vss_setup.I.len() != usize::from(self.n) {
-            return Err(ErrorReason::ILen.into());
+            return Err(InvalidKeyShareReason::ILen.into());
         }
 
         // Now we need to check that public key shares indeed form a public key.
@@ -157,16 +157,16 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
                 .try_fold(Point::zero(), |acc, (lambda_j, X_j)| {
                     Some(acc + lambda_j? * X_j)
                 })
-                .ok_or(ErrorReason::INotPairwiseDistinct)
+                .ok_or(InvalidKeyShareReason::INotPairwiseDistinct)
         };
         let reconstructed_pk = interpolation(Scalar::zero())?;
         if reconstructed_pk != self.shared_public_key {
-            return Err(ErrorReason::SharesDontMatchPublicKey.into());
+            return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
         }
 
         for (&j, public_share_j) in vss_setup.I.iter().zip(&self.public_shares).skip(t.into()) {
             if interpolation(j.into())? != *public_share_j {
-                return Err(ErrorReason::SharesDontMatchPublicKey.into());
+                return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
             }
         }
 
@@ -175,7 +175,7 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
 
     fn validate_non_vss_key_share(&self) -> Result<(), InvalidKeyShare> {
         if self.shared_public_key != self.public_shares.iter().sum::<Point<E>>() {
-            return Err(ErrorReason::SharesDontMatchPublicKey.into());
+            return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
         }
         Ok(())
     }
@@ -200,12 +200,12 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
         self.core.validate()?;
 
         if self.core.public_shares.len() != self.parties.len() {
-            return Err(ErrorReason::AuxLen.into());
+            return Err(InvalidKeyShareReason::AuxLen.into());
         }
 
         let N_i = &self.parties[usize::from(self.core.i)].N;
         if *N_i != &self.p * &self.q {
-            return Err(ErrorReason::PrimesMul.into());
+            return Err(InvalidKeyShareReason::PrimesMul.into());
         }
 
         if self
@@ -213,7 +213,7 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
             .iter()
             .any(|p| p.s.gcd(&p.N) != BigNumber::one() || p.t.gcd(&p.N) != BigNumber::one())
         {
-            return Err(ErrorReason::StGcdN.into());
+            return Err(InvalidKeyShareReason::StGcdN.into());
         }
 
         Ok(())
@@ -245,9 +245,9 @@ impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for KeyShare<E,
 /// creates single point of failure/trust.
 pub fn reconstruct_secret_key<E: Curve, L: SecurityLevel>(
     key_shares: &[Valid<impl AsRef<IncompleteKeyShare<E, L>>>],
-) -> Result<SecretScalar<E>, InvalidKeyShare> {
+) -> Result<SecretScalar<E>, ReconstructError> {
     if key_shares.is_empty() {
-        return Err(ReconstructError::NoKeyShares.into());
+        return Err(ReconstructErrorReason::NoKeyShares.into());
     }
 
     let t = key_shares[0].as_ref().min_signers();
@@ -261,11 +261,11 @@ pub fn reconstruct_secret_key<E: Curve, L: SecurityLevel>(
             || *vss != s.as_ref().vss_setup
             || *X != s.as_ref().public_shares
     }) {
-        return Err(ReconstructError::DifferentKeyShares.into());
+        return Err(ReconstructErrorReason::DifferentKeyShares.into());
     }
 
     if key_shares.len() < usize::from(t) {
-        return Err(ReconstructError::TooFewKeyShares {
+        return Err(ReconstructErrorReason::TooFewKeyShares {
             len: key_shares.len(),
             t,
         }
@@ -274,14 +274,14 @@ pub fn reconstruct_secret_key<E: Curve, L: SecurityLevel>(
 
     if let Some(VssSetup { I, .. }) = vss {
         let S = key_shares.iter().map(|s| s.as_ref().i).collect::<Vec<_>>();
-        let I = subset(&S, I).ok_or(ReconstructError::Subset)?;
+        let I = subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
         let lagrange_coefficients = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
         let mut sk = lagrange_coefficients
             .zip(key_shares)
             .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
                 Some(acc + lambda_j? * &key_share_j.as_ref().x)
             })
-            .ok_or(ReconstructError::Interpolation)?;
+            .ok_or(ReconstructErrorReason::Interpolation)?;
         Ok(SecretScalar::new(&mut sk))
     } else {
         let mut sk = key_shares
@@ -364,10 +364,10 @@ where
 /// Error indicating that key share is not valid
 #[derive(Debug, Error)]
 #[error(transparent)]
-pub struct InvalidKeyShare(#[from] ErrorReason);
+pub struct InvalidKeyShare(#[from] InvalidKeyShareReason);
 
 #[derive(Debug, Error)]
-enum ErrorReason {
+enum InvalidKeyShareReason {
     #[error("amount of parties `n` is less than 2: n < 2")]
     TooFewParties,
     #[error("party index `i` out of bounds: i >= n")]
@@ -392,12 +392,18 @@ enum ErrorReason {
     ILen,
     #[error("indexes of shares in I are not pairwise distinct")]
     INotPairwiseDistinct,
-    #[error("reconstructing key shares resulted into error")]
-    Reconstruct(ReconstructError),
 }
 
 #[derive(Debug, Error)]
-enum ReconstructError {
+#[error("secret key reconstruction error")]
+pub struct ReconstructError(
+    #[source]
+    #[from]
+    ReconstructErrorReason,
+);
+
+#[derive(Debug, Error)]
+enum ReconstructErrorReason {
     #[error("no key shares provided")]
     NoKeyShares,
     #[error(
@@ -410,10 +416,4 @@ enum ReconstructError {
     Subset,
     #[error("interpolation failed (seems like a bug)")]
     Interpolation,
-}
-
-impl From<ReconstructError> for InvalidKeyShare {
-    fn from(err: ReconstructError) -> Self {
-        InvalidKeyShare(ErrorReason::Reconstruct(err))
-    }
 }
