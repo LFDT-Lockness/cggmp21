@@ -112,11 +112,12 @@ where
         .map(|s| Point::generator() * s)
         .collect::<Vec<_>>();
     let sigmas = (0..n)
-        .map(|x| {
-            let x = Scalar::from(x);
+        .map(|j| {
+            let x = Scalar::from(j + 1);
             utils::polynomial_value(Scalar::zero(), &x, &ss)
         })
         .collect::<Vec<_>>();
+    debug_assert_eq!(sigmas.len(), usize::from(n));
 
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
@@ -141,10 +142,9 @@ where
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(KeygenError::ReceiveMessage)?
-        .into_vec_including_me(my_commitment);
+        .map_err(KeygenError::ReceiveMessage)?;
     let commitments_hash = commitments
-        .iter()
+        .iter_including_me(&my_commitment)
         .try_fold(D::new(), hash_message)
         .map_err(Bug::HashMessage)?
         .finalize();
@@ -204,10 +204,10 @@ where
         .map_err(KeygenError::ReceiveMessage)?;
 
     // Validate decommitments
-    let blame = (0u16..)
-        .zip(&commitments)
-        .zip(decommitments.iter_including_me(&my_decommitment))
-        .filter(|((j, commitment), decommitment)| {
+    let blame = commitments
+        .iter_indexed()
+        .zip(decommitments.iter())
+        .filter(|((j, _, commitment), decommitment)| {
             HashCommit::<D>::builder()
                 .mix_bytes(sid)
                 .mix(n)
@@ -219,26 +219,49 @@ where
                 .verify(&commitment.commitment, &decommitment.decommit)
                 .is_err()
         })
-        .map(|((j, _), _)| j)
+        .map(|t| t.0 .0)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
         return Err(KeygenAborted::InvalidDecommitment { parties: blame }.into());
     }
 
+    // Validate data size
+    let blame = decommitments
+        .iter_indexed()
+        .filter(|(_, _, d)| d.Ss.len() != usize::from(t))
+        .map(|t| t.0)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeygenAborted::InvalidDataSize { parties: blame }.into());
+    }
+
     // Validate Feldmann VSS
-    // TODO
+    let blame = decommitments
+        .iter_indexed()
+        .zip(sigmas_msg.iter())
+        .filter(|((_, _, d), s)| {
+            utils::polynomial_value(Point::zero(), &Scalar::from(i + 1), &d.Ss)
+                != Point::generator() * s.sigma
+        })
+        .map(|t| t.0 .0)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeygenAborted::FeldmanVerificationFailed { parties: blame }.into());
+    }
 
     // Validation done, compute key data
     let rid = decommitments
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), xor_array);
-    let ys = (0..n).map(|l| {
-        decommitments
-            .iter_including_me(&my_decommitment)
-            .map(|d| utils::polynomial_value(Point::zero(), &Scalar::from(l), &d.Ss))
-            .sum()
-    }).collect::<Vec<_>>();
+    let ys = (0..n)
+        .map(|l| {
+            decommitments
+                .iter_including_me(&my_decommitment)
+                .map(|d| utils::polynomial_value(Point::zero(), &Scalar::from(l + 1), &d.Ss))
+                .sum()
+        })
+        .collect::<Vec<_>>();
     let sigma: Scalar<E> = sigmas_msg.iter().map(|msg| msg.sigma).sum();
     let mut sigma = sigma + sigmas[usize::from(i)];
     let sigma = SecretScalar::new(&mut sigma);

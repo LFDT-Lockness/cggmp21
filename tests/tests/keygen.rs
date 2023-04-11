@@ -1,6 +1,6 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
-    use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
+    use generic_ec::{hash_to_curve::FromHash, Curve, NonZero, Point, Scalar};
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rand_dev::DevRng;
@@ -103,7 +103,19 @@ mod generic {
                 key_share.public_shares[usize::from(i)]
             );
         }
-        // TODO: interpolate and check public share
+
+        let points = (1..=n).map(|x| NonZero::from_scalar(Scalar::from(x)).unwrap()).collect::<Vec<_>>();
+        let secret_key: Scalar<_> = key_shares
+            .iter()
+            .enumerate()
+            .map(|(i, share)| {
+                &share.x
+                    * cggmp21::utils::lagrange_coefficient(Scalar::zero(), i as u16, &points)
+                        .unwrap()
+            })
+            .sum();
+        let public_key = Point::generator() * secret_key;
+        assert_eq!(public_key, key_shares[0].shared_public_key);
     }
 
     #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]

@@ -350,6 +350,10 @@ pub enum KeygenAborted {
     InvalidDecommitment { parties: Vec<u16> },
     #[error("party provided invalid schnorr proof: {parties:?}")]
     InvalidSchnorrProof { parties: Vec<u16> },
+    #[error("party secret share is not consistent: {parties:?}")]
+    FeldmanVerificationFailed { parties: Vec<u16> },
+    #[error("party data size is not suitable for threshold parameters: {parties:?}")]
+    InvalidDataSize { parties: Vec<u16> },
     #[error("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
 }
