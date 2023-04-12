@@ -234,6 +234,12 @@ impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for KeyShare<E,
     }
 }
 
+impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for IncompleteKeyShare<E, L> {
+    fn as_ref(&self) -> &IncompleteKeyShare<E, L> {
+        self
+    }
+}
+
 /// Reconstructs a secret key from set of at least [`min_signers`](KeyShare::min_signers) key shares
 ///
 /// Requires at least [`min_signers`](Self::min_signers) distinct key shares from the same generation

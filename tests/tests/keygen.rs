@@ -1,13 +1,13 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
-    use generic_ec::{hash_to_curve::FromHash, Curve, NonZero, Point, Scalar};
-    use rand::{Rng, SeedableRng};
+    use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
+    use rand::{Rng, SeedableRng, seq::SliceRandom};
     use rand_chacha::ChaCha20Rng;
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::{security_level::ReasonablySecure, ExecutionId};
+    use cggmp21::{security_level::ReasonablySecure, ExecutionId, key_share::reconstruct_secret_key};
 
     #[test_case::case(3; "n3")]
     #[test_case::case(5; "n5")]
@@ -104,20 +104,14 @@ mod generic {
             );
         }
 
-        let points = (1..=n)
-            .map(|x| NonZero::from_scalar(Scalar::from(x)).unwrap())
+        // Choose `t` random key shares and reconstruct a secret key
+        let t_shares = key_shares
+            .choose_multiple(&mut rng, t.into())
+            .cloned()
             .collect::<Vec<_>>();
-        let secret_key: Scalar<_> = key_shares
-            .iter()
-            .enumerate()
-            .map(|(i, share)| {
-                &share.x
-                    * cggmp21::utils::lagrange_coefficient(Scalar::zero(), i as u16, &points)
-                        .unwrap()
-            })
-            .sum();
-        let public_key = Point::generator() * secret_key;
-        assert_eq!(public_key, key_shares[0].shared_public_key);
+
+        let sk = reconstruct_secret_key(&t_shares).unwrap();
+        assert_eq!(Point::generator() * sk, key_shares[0].shared_public_key);
     }
 
     #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]

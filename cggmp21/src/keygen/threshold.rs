@@ -106,7 +106,7 @@ where
     // r and h in paper
     let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
-    let ss = sample_polynomial(usize::from(t), rng);
+    let ss = utils::sample_polynomial(usize::from(t), rng);
     let Ss = ss
         .iter()
         .map(|s| Point::generator() * s)
@@ -333,12 +333,4 @@ where
     }
     .try_into()
     .map_err(Bug::InvalidKeyShare)?)
-}
-
-fn sample_polynomial<E, R>(t: usize, rng: &mut R) -> Vec<Scalar<E>>
-where
-    E: Curve,
-    R: RngCore + CryptoRng,
-{
-    (0..t).map(|_| Scalar::random(rng)).collect()
 }

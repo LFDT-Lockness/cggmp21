@@ -300,15 +300,10 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Opt
 /// `coefs` is polynomial coefficients, `coefs[i]` corresponding to `x^i`
 pub fn polynomial_value<A, B, C>(zero: C, point: &A, coefs: &[B]) -> C
 where
-    C: for<'a> core::ops::MulAssign<&'a A>,
-    C: for<'a> core::ops::AddAssign<&'a B>,
+    C: for<'a> core::ops::Mul<&'a A, Output = C>,
+    C: for<'a> core::ops::Add<&'a B, Output = C>,
 {
-    let mut r = zero;
-    for c in coefs.iter().rev() {
-        r *= point;
-        r += c;
-    }
-    r
+    coefs.iter().rev().fold(zero, |r, c| r * point + c)
 }
 
 #[cfg(test)]
@@ -343,13 +338,21 @@ mod test {
     }
 }
 
+pub fn sample_polynomial<E, R>(t: usize, rng: &mut R) -> Vec<Scalar<E>>
+where
+    E: Curve,
+    R: RngCore + rand_core::CryptoRng,
+{
+    (0..t).map(|_| Scalar::random(rng)).collect()
+}
+
 #[cfg(test)]
 #[generic_tests::define]
 mod generic_test {
     use generic_ec::{Curve, NonZero, Scalar};
     use rand_dev::DevRng;
 
-    use super::lagrange_coefficient;
+    use super::{lagrange_coefficient, polynomial_value};
 
     #[test]
     fn lagrange_coefficient_reconstructs_secret<E: Curve>() {
@@ -358,10 +361,7 @@ mod generic_test {
         // Polynomial of degree 1, f(x) = coef[0] + coef[1] * x
         let polynomial_coefs = [Scalar::random(&mut rng), Scalar::random(&mut rng)];
         let f = |x: &Scalar<E>| {
-            polynomial_coefs
-                .iter()
-                .rev()
-                .fold(Scalar::zero(), |acc, coef_i| acc * x + coef_i)
+            polynomial_value(Scalar::zero(), x, &polynomial_coefs)
         };
 
         // I_j represents share index of j-th party. Each party should have a

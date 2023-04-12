@@ -28,7 +28,7 @@ pub mod security_level;
 pub mod signing;
 pub mod supported_curves;
 pub mod trusted_dealer;
-pub mod utils; // FIXME not pub
+mod utils;
 pub mod zk;
 
 pub use self::execution_id::ExecutionId;
