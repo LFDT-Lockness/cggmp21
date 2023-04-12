@@ -1,7 +1,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::hash_to_curve::{self, FromHash};
-use generic_ec::{Curve, Point, Scalar, SecretScalar, NonZero};
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,

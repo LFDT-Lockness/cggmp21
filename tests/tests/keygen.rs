@@ -104,7 +104,9 @@ mod generic {
             );
         }
 
-        let points = (1..=n).map(|x| NonZero::from_scalar(Scalar::from(x)).unwrap()).collect::<Vec<_>>();
+        let points = (1..=n)
+            .map(|x| NonZero::from_scalar(Scalar::from(x)).unwrap())
+            .collect::<Vec<_>>();
         let secret_key: Scalar<_> = key_shares
             .iter()
             .enumerate()
