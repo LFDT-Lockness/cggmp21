@@ -90,10 +90,7 @@ pub struct Signature<E: Curve> {
     pub s: NonZero<Scalar<E>>,
 }
 
-/// MPC network messages
-///
-/// This module contains types that define MPC messages that signers exchange
-/// during signing protocol
+#[doc = include_str!("../docs/mpc_message.md")]
 pub mod msg {
     use digest::Digest;
     use generic_ec::Curve;

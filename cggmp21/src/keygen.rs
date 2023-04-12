@@ -2,63 +2,77 @@ use digest::Digest;
 use futures::SinkExt;
 use generic_ec::hash_to_curve::{self, FromHash};
 use generic_ec::{Curve, Point, Scalar, SecretScalar};
-use generic_ec_zkp::{
-    hash_commitment::{self, HashCommit},
-    schnorr_pok,
-};
+use generic_ec_zkp::{hash_commitment::HashCommit, schnorr_pok};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
-    Outgoing, ProtocolMessage,
+    Outgoing,
 };
 use round_based::{MsgId, PartyIndex};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::errors::IoError;
-use crate::execution_id::ProtocolChoice;
-use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
-use crate::security_level::SecurityLevel;
-use crate::utils::xor_array;
-use crate::utils::{hash_message, HashMessageError};
-use crate::ExecutionId;
+use crate::{
+    errors::IoError,
+    execution_id::ProtocolChoice,
+    key_share::{IncompleteKeyShare, InvalidKeyShare, Valid},
+    security_level::SecurityLevel,
+    utils::xor_array,
+    utils::{hash_message, HashMessageError},
+    ExecutionId,
+};
 
-/// Message of key generation protocol
-#[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
-    Round1(MsgRound1<D>),
-    Round1Sync(MsgSyncState<D>),
-    Round2(MsgRound2<E, L, D>),
-    Round3(MsgRound3<E>),
-}
+use self::msg::*;
 
-/// Message from round 1
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound1<D: Digest> {
-    pub commitment: HashCommit<D>,
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    use digest::Digest;
+    use generic_ec::{Curve, Point};
+    use generic_ec_zkp::{
+        hash_commitment::{self, HashCommit},
+        schnorr_pok,
+    };
+    use round_based::ProtocolMessage;
+    use serde::{Deserialize, Serialize};
+
+    use crate::security_level::SecurityLevel;
+
+    /// Message of key generation protocol
+    #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
+        Round1(MsgRound1<D>),
+        Round1Sync(MsgSyncState<D>),
+        Round2(MsgRound2<E, L, D>),
+        Round3(MsgRound3<E>),
+    }
+
+    /// Message from round 1
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound1<D: Digest> {
+        pub commitment: HashCommit<D>,
+    }
+    /// Message from round 2
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
+        #[serde(with = "hex::serde")]
+        pub rid: L::Rid,
+        pub X: Point<E>,
+        pub sch_commit: schnorr_pok::Commit<E>,
+        pub decommit: hash_commitment::DecommitNonce<D>,
+    }
+    /// Message from round 3
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound3<E: Curve> {
+        pub sch_proof: schnorr_pok::Proof<E>,
+    }
+    /// Message parties exchange to ensure reliability of broadcast channel
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgSyncState<D: Digest>(pub digest::Output<D>);
 }
-/// Message from round 2
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
-    #[serde(with = "hex::serde")]
-    pub rid: L::Rid,
-    pub X: Point<E>,
-    pub sch_commit: schnorr_pok::Commit<E>,
-    pub decommit: hash_commitment::DecommitNonce<D>,
-}
-/// Message from round 3
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound3<E: Curve> {
-    pub sch_proof: schnorr_pok::Proof<E>,
-}
-/// Message parties exchange to ensure reliability of broadcast channel
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgSyncState<D: Digest>(pub digest::Output<D>);
 
 /// Key generation entry point
 pub struct KeygenBuilder<E: Curve, L: SecurityLevel, D: Digest> {

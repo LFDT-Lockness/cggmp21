@@ -7,7 +7,7 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::keygen::Msg;
+    use cggmp21::keygen::msg::Msg;
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
     #[test_case::case(3; "n3")]
