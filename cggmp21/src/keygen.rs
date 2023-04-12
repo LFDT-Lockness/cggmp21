@@ -306,6 +306,7 @@ where
         .map_err(Bug::InvalidKeyShare)?)
     }
 
+    /// Starts threshold DKG
     pub async fn start_thresholdized<R, M>(
         self,
         t: u16,

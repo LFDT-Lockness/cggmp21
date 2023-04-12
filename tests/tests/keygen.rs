@@ -1,13 +1,15 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
     use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
-    use rand::{Rng, SeedableRng, seq::SliceRandom};
+    use rand::{seq::SliceRandom, Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::{security_level::ReasonablySecure, ExecutionId, key_share::reconstruct_secret_key};
+    use cggmp21::{
+        key_share::reconstruct_secret_key, security_level::ReasonablySecure, ExecutionId,
+    };
 
     #[test_case::case(3; "n3")]
     #[test_case::case(5; "n5")]

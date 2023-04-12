@@ -360,9 +360,7 @@ mod generic_test {
 
         // Polynomial of degree 1, f(x) = coef[0] + coef[1] * x
         let polynomial_coefs = [Scalar::random(&mut rng), Scalar::random(&mut rng)];
-        let f = |x: &Scalar<E>| {
-            polynomial_value(Scalar::zero(), x, &polynomial_coefs)
-        };
+        let f = |x: &Scalar<E>| polynomial_value(Scalar::zero(), x, &polynomial_coefs);
 
         // I_j represents share index of j-th party. Each party should have a
         // distinct non-zero index

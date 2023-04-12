@@ -281,7 +281,8 @@ where
         .await
         .map_err(KeygenError::SendError)?;
 
-    // Round 4
+    // Output determination
+
     let sch_proofs = rounds
         .complete(round3)
         .await
