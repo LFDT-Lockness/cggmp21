@@ -4,10 +4,7 @@ use generic_ec::{
     hash_to_curve::{self, FromHash},
     Curve, Point, Scalar, SecretScalar,
 };
-use generic_ec_zkp::{
-    hash_commitment::{self, HashCommit},
-    schnorr_pok,
-};
+use generic_ec_zkp::{hash_commitment::HashCommit, schnorr_pok};
 use paillier_zk::{
     libpaillier, no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
     unknown_order::BigNumber, BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
@@ -15,7 +12,7 @@ use paillier_zk::{
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
-    Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
+    Delivery, Mpc, MpcParty, Outgoing,
 };
 use thiserror::Error;
 
@@ -34,56 +31,75 @@ use crate::{
     ExecutionId,
 };
 
-/// Message of key refresh protocol
-#[derive(ProtocolMessage, Clone)]
-// 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
-#[allow(clippy::large_enum_variant)]
-pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
-    Round1(MsgRound1<D>),
-    Round2(MsgRound2<E, D, L>),
-    Round3(MsgRound3<E>),
-}
+use self::msg::*;
 
-/// Message from round 1
-#[derive(Clone)]
-pub struct MsgRound1<D: Digest> {
-    commitment: HashCommit<D>,
-}
-/// Message from round 2
-#[derive(Clone)]
-pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
-    /// **X_i** in paper
-    Xs: Vec<Point<E>>,
-    /// **A_i** in paper
-    sch_commits_a: Vec<schnorr_pok::Commit<E>>,
-    N: BigNumber,
-    s: BigNumber,
-    t: BigNumber,
-    /// psi_circonflexe_i in paper
-    // this should be L::M instead, but no rustc support yet
-    params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
-    /// rho_i in paper
-    // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
-    rho_bytes: L::Rid,
-    /// u_i in paper
-    decommit: hash_commitment::DecommitNonce<D>,
-}
-/// Unicast message of round 3, sent to each participant
-#[derive(Clone)]
-pub struct MsgRound3<E: Curve> {
-    /// psi_i in paper
-    // this should be L::M instead, but no rustc support yet
-    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
-    /// phi_i^j in paper
-    fac_proof: π_fac::Proof,
-    /// C_i^j in paper
-    C: BigNumber,
-    /// psi_i_j in paper
-    ///
-    /// Here in the paper you only send one proof, but later they require you to
-    /// verify by all the other proofs, that are never sent. We fix this here
-    /// and require each party to send every proof to everyone
-    sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    use digest::Digest;
+    use generic_ec::{Curve, Point};
+    use generic_ec_zkp::{
+        hash_commitment::{self, HashCommit},
+        schnorr_pok,
+    };
+    use paillier_zk::{
+        no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
+        unknown_order::BigNumber,
+    };
+    use round_based::ProtocolMessage;
+
+    use crate::{security_level::SecurityLevel, zk::ring_pedersen_parameters as π_prm};
+
+    /// Message of key refresh protocol
+    #[derive(ProtocolMessage, Clone)]
+    // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
+    #[allow(clippy::large_enum_variant)]
+    pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
+        Round1(MsgRound1<D>),
+        Round2(MsgRound2<E, D, L>),
+        Round3(MsgRound3<E>),
+    }
+
+    /// Message from round 1
+    #[derive(Clone)]
+    pub struct MsgRound1<D: Digest> {
+        pub commitment: HashCommit<D>,
+    }
+    /// Message from round 2
+    #[derive(Clone)]
+    pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
+        /// **X_i** in paper
+        pub Xs: Vec<Point<E>>,
+        /// **A_i** in paper
+        pub sch_commits_a: Vec<schnorr_pok::Commit<E>>,
+        pub N: BigNumber,
+        pub s: BigNumber,
+        pub t: BigNumber,
+        /// psi_circonflexe_i in paper
+        // this should be L::M instead, but no rustc support yet
+        pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
+        /// rho_i in paper
+        // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
+        pub rho_bytes: L::Rid,
+        /// u_i in paper
+        pub decommit: hash_commitment::DecommitNonce<D>,
+    }
+    /// Unicast message of round 3, sent to each participant
+    #[derive(Clone)]
+    pub struct MsgRound3<E: Curve> {
+        /// psi_i in paper
+        // this should be L::M instead, but no rustc support yet
+        pub mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
+        /// phi_i^j in paper
+        pub fac_proof: π_fac::Proof,
+        /// C_i^j in paper
+        pub C: BigNumber,
+        /// psi_i_j in paper
+        ///
+        /// Here in the paper you only send one proof, but later they require you to
+        /// verify by all the other proofs, that are never sent. We fix this here
+        /// and require each party to send every proof to everyone
+        pub sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
+    }
 }
 
 /// To speed up computations, it's possible to supply data to the algorithm

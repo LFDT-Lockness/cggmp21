@@ -29,7 +29,7 @@ mod generic {
         let refresh_execution_id =
             ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
         let mut simulation =
-            Simulation::<cggmp21::key_refresh::Msg<E, Sha256, ReasonablySecure>>::new();
+            Simulation::<cggmp21::key_refresh::msg::Msg<E, Sha256, ReasonablySecure>>::new();
         let outputs = shares.iter().map(|share| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
