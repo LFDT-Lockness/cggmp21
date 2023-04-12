@@ -291,10 +291,12 @@ where
         Ok(IncompleteKeyShare {
             curve: Default::default(),
             i: self.i,
+            n: self.n,
             shared_public_key: decommitments.iter().map(|d| d.X).sum(),
             rid,
             public_shares: decommitments.iter().map(|d| d.X).collect(),
             x: x_i,
+            vss_setup: None,
         }
         .try_into()
         .map_err(Bug::InvalidKeyShare)?)

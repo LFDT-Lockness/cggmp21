@@ -19,7 +19,7 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E>(n)
+            .get_shares::<E>(None, n)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
@@ -82,12 +82,13 @@ mod generic {
         let signing_execution_id = ExecutionId::<E, ReasonablySecure>::from_bytes(&[228; 32]);
         let mut simulation = Simulation::<cggmp21::signing::Msg<E, Sha256>>::new();
         let message_to_sign = cggmp21::signing::Message::new::<Sha256>(&[42; 100]);
+        let participants = &(0..n).collect::<Vec<_>>();
         let outputs = key_shares.iter().map(|share| {
             let party = simulation.add_party();
             let signing_execution_id = signing_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
             async move {
-                cggmp21::signing(share)
+                cggmp21::signing(share.core.i, participants, share)
                     .set_execution_id(signing_execution_id)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await

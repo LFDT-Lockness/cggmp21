@@ -35,16 +35,17 @@ fn args() -> Args {
     .run()
 }
 
-#[ignore = "performance tests are ignored by default"]
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = args();
     let mut rng = DevRng::new();
 
+    // Note that we don't parametrize performance tests by `t` as it doesn't make much sense
+    // since performance of t-out-of-n protocol should be roughly the same as t-out-of-t
     for n in args.n {
         println!("n = {n}");
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E>(n)
+            .get_shares::<E>(None, n)
             .expect("retrieve key shares from cache");
 
         if args.bench_refresh {
@@ -87,6 +88,8 @@ async fn main() {
             let signing_execution_id: [u8; 32] = rng.gen();
             let signing_execution_id = ExecutionId::<E, L>::from_bytes(&signing_execution_id);
 
+            let signers_indexes_at_keygen = &(0..n).collect::<Vec<_>>();
+
             let message_to_sign = b"Dfns rules!";
             let message_to_sign = Message::new::<Sha256>(message_to_sign);
 
@@ -94,7 +97,7 @@ async fn main() {
             let mut simulation = Simulation::<Msg<E, D>>::new();
 
             let mut outputs = vec![];
-            for share in &shares {
+            for (i, share) in (0..).zip(&shares) {
                 let party = simulation.add_party();
                 let signing_execution_id = signing_execution_id.clone();
                 let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
@@ -102,7 +105,7 @@ async fn main() {
                 let mut profiler = PerfProfiler::new();
 
                 outputs.push(async move {
-                    let _signature = cggmp21::signing(share)
+                    let _signature = cggmp21::signing(i, signers_indexes_at_keygen, share)
                         .set_execution_id(signing_execution_id)
                         .set_progress_tracer(&mut profiler)
                         .sign(&mut party_rng, party, message_to_sign)

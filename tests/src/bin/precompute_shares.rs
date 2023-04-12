@@ -57,8 +57,16 @@ where
     Scalar<E>: FromHash,
 {
     for n in [2, 3, 5, 7, 10] {
-        let shares = mock_keygen::<E, ReasonablySecure, _>(rng, n).context("generate shares")?;
-        cache.add_shares(n, &shares).context("add shares")?;
+        let threshold_values = [None, Some(2), Some(3), Some(5), Some(7)];
+        for t in threshold_values
+            .into_iter()
+            .filter(|t| t.map(|t| t <= n).unwrap_or(true))
+        {
+            eprintln!("t={t:?},n={n},curve={}", E::CURVE_NAME);
+            let shares =
+                mock_keygen::<E, ReasonablySecure, _>(rng, t, n).context("generate shares")?;
+            cache.add_shares(t, n, &shares).context("add shares")?;
+        }
     }
     Ok(())
 }

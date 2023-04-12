@@ -43,17 +43,19 @@ impl PrecomputedKeyShares {
 
     pub fn get_shares<E: Curve>(
         &self,
+        t: Option<u16>,
         n: u16,
     ) -> Result<Vec<Valid<KeyShare<E, ReasonablySecure>>>> {
         let key_shares = self
             .shares
-            .get(&format!("n={n},curve={}", E::CURVE_NAME))
+            .get(&format!("t={t:?},n={n},curve={}", E::CURVE_NAME))
             .context("shares not found")?;
         serde_json::from_value(key_shares.clone()).context("parse key shares")
     }
 
     pub fn add_shares<E: Curve>(
         &mut self,
+        t: Option<u16>,
         n: u16,
         shares: &[Valid<KeyShare<E, ReasonablySecure>>],
     ) -> Result<()> {
@@ -62,7 +64,7 @@ impl PrecomputedKeyShares {
         }
         let key_shares = serde_json::to_value(shares).context("serialize shares")?;
         self.shares
-            .insert(format!("n={n},curve={}", E::CURVE_NAME), key_shares);
+            .insert(format!("t={t:?},n={n},curve={}", E::CURVE_NAME), key_shares);
         Ok(())
     }
 }
