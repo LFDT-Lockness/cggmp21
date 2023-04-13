@@ -668,7 +668,7 @@ where
     let x_sum = shares.iter().sum::<Scalar<E>>() + my_share;
     let mut x_star = old_core_share.x + x_sum;
     tracer.stage("Calculate new X_i");
-    let X_prods = (0..n).map(|k| {
+    let X_sums = (0..n).map(|k| {
         let k = usize::from(k);
         decommitments
             .iter_including_me(&decommitment)
@@ -678,7 +678,7 @@ where
     let X_stars = old_core_share
         .public_shares
         .into_iter()
-        .zip(X_prods)
+        .zip(X_sums)
         .map(|(x, p)| x + p)
         .collect();
 
