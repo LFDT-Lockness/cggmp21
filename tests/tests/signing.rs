@@ -10,7 +10,7 @@ mod generic {
     use sha2::Sha256;
 
     use cggmp21::signing::{msg::Msg, DataToSign};
-    use cggmp21::{security_level::ReasonablySecure, ExecutionId};
+    use cggmp21::{key_share::AnyKeyShare, security_level::ReasonablySecure, ExecutionId};
 
     #[test_case::case(None, 2; "n2")]
     #[test_case::case(Some(2), 2; "t2n2")]

@@ -19,7 +19,7 @@ use thiserror::Error;
 use crate::{
     errors::IoError,
     execution_id::ProtocolChoice,
-    key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
+    key_share::{AnyKeyShare, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -140,7 +140,7 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    core_share: &'a IncompleteKeyShare<E, L>,
+    core_share: &'a DirtyIncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     tracer: Option<&'a mut dyn Tracer>,
@@ -155,27 +155,9 @@ where
     /// Build aux info generating operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new(
-        core_share: &'a Valid<IncompleteKeyShare<E, L>>,
-        pregenerated: PregeneratedPrimes<L>,
-    ) -> Self {
+    pub fn new(key_share: &'a impl AnyKeyShare<E, L>, pregenerated: PregeneratedPrimes<L>) -> Self {
         Self {
-            core_share,
-            execution_id: Default::default(),
-            pregenerated,
-            tracer: None,
-        }
-    }
-
-    /// Build key refresh operation. Start it with [`start`](Self::start)
-    ///
-    /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new_refresh(
-        key_share: &'a Valid<KeyShare<E, L>>,
-        pregenerated: PregeneratedPrimes<L>,
-    ) -> Self {
-        Self {
-            core_share: &key_share.core,
+            core_share: key_share.core(),
             execution_id: Default::default(),
             pregenerated,
             tracer: None,
@@ -208,11 +190,7 @@ where
     }
 
     /// Carry out the refresh procedure. Takes a lot of time
-    pub async fn start<R, M>(
-        self,
-        rng: &mut R,
-        party: M,
-    ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E, L>, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -239,8 +217,8 @@ async fn run_refresh<R, M, E, L, D>(
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
-    core_share: &IncompleteKeyShare<E, L>,
-) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError>
+    core_share: &DirtyIncompleteKeyShare<E, L>,
+) -> Result<KeyShare<E, L>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -684,7 +662,7 @@ where
         .collect();
 
     tracer.stage("Assemble new core share");
-    let new_core_share = IncompleteKeyShare {
+    let new_core_share = DirtyIncompleteKeyShare {
         public_shares: X_stars,
         x: SecretScalar::new(&mut x_star),
         ..old_core_share
@@ -698,7 +676,7 @@ where
             t: d.t.clone(),
         })
         .collect();
-    let key_share = KeyShare {
+    let key_share = DirtyKeyShare {
         core: new_core_share,
         p,
         q,

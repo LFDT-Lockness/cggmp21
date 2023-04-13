@@ -11,10 +11,11 @@ use round_based::{
 use round_based::{MsgId, PartyIndex};
 use thiserror::Error;
 
+use crate::key_share::IncompleteKeyShare;
 use crate::{
     errors::IoError,
     execution_id::ProtocolChoice,
-    key_share::{IncompleteKeyShare, InvalidKeyShare, Valid},
+    key_share::{DirtyIncompleteKeyShare, InvalidKeyShare},
     security_level::SecurityLevel,
     utils::xor_array,
     utils::{hash_message, HashMessageError},
@@ -142,7 +143,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError>
+    ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, L, D>>,
@@ -302,10 +303,9 @@ where
             return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
         }
 
-        Ok(IncompleteKeyShare {
+        Ok(DirtyIncompleteKeyShare {
             curve: Default::default(),
             i: self.i,
-            n: self.n,
             shared_public_key: decommitments.iter().map(|d| d.X).sum(),
             rid,
             public_shares: decommitments.iter().map(|d| d.X).collect(),

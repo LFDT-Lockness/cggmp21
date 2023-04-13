@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use cggmp21::{
-    key_share::{KeyShare, Valid},
+    key_share::{DirtyKeyShare, KeyShare, Valid},
     security_level::ReasonablySecure,
     unknown_order::BigNumber,
 };
@@ -45,7 +45,7 @@ impl PrecomputedKeyShares {
         &self,
         t: Option<u16>,
         n: u16,
-    ) -> Result<Vec<Valid<KeyShare<E, ReasonablySecure>>>> {
+    ) -> Result<Vec<KeyShare<E, ReasonablySecure>>> {
         let key_shares = self
             .shares
             .get(&format!("t={t:?},n={n},curve={}", E::CURVE_NAME))
@@ -57,7 +57,7 @@ impl PrecomputedKeyShares {
         &mut self,
         t: Option<u16>,
         n: u16,
-        shares: &[Valid<KeyShare<E, ReasonablySecure>>],
+        shares: &[KeyShare<E, ReasonablySecure>],
     ) -> Result<()> {
         if usize::from(n) != shares.len() {
             bail!("expected {n} key shares, only {} provided", shares.len());

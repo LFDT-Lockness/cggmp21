@@ -17,12 +17,12 @@ use round_based::{
 use thiserror::Error;
 
 use crate::errors::IoError;
-use crate::key_share::{PartyAux, VssSetup};
+use crate::key_share::{KeyShare, PartyAux, VssSetup};
 use crate::progress::Tracer;
 use crate::utils::{hash_message, iter_peers, lagrange_coefficient, subset, HashMessageError};
 use crate::{
     execution_id::ProtocolChoice,
-    key_share::{InvalidKeyShare, KeyShare, Valid},
+    key_share::InvalidKeyShare,
     security_level::SecurityLevel,
     utils::{encryption_key_from_n, scalar_to_bignumber},
     ExecutionId,
@@ -72,7 +72,7 @@ impl<E: Curve> DataToSign<E> {
 
 /// Presignature, can be used to issue a [partial signature](PartialSignature) without interacting with other signers
 ///
-/// [Threshold](KeyShare::min_signers) amount of partial signatures (from different signers) can be [combined](PartialSignature::combine) into regular signature
+/// [Threshold](crate::key_share::AnyKeyShare::min_signers) amount of partial signatures (from different signers) can be [combined](PartialSignature::combine) into regular signature
 pub struct Presignature<E: Curve> {
     pub R: NonZero<Point<E>>,
     pub k: SecretScalar<E>,
@@ -176,7 +176,7 @@ where
 {
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r Valid<KeyShare<E, L>>,
+    key_share: &'r KeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
     tracer: Option<&'r mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
@@ -193,7 +193,7 @@ where
     pub fn new(
         i: PartyIndex,
         parties_indexes_at_keygen: &'r [PartyIndex],
-        secret_key_share: &'r Valid<KeyShare<E, L>>,
+        secret_key_share: &'r KeyShare<E, L>,
     ) -> Self {
         Self {
             i,
@@ -315,7 +315,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     party: M,
     sid: ExecutionId<E, L, D>,
     i: PartyIndex,
-    key_share: &Valid<KeyShare<E, L>>,
+    key_share: &KeyShare<E, L>,
     S: &[PartyIndex],
     message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
