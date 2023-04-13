@@ -463,28 +463,13 @@ where
         &mut rng,
     )
     .map_err(Bug::PiMod)?;
-    tracer.stage("Compute П_fac (ф_i)");
+    tracer.stage("Assemble security params for П_fac (ф_i)");
     let π_fac_security = π_fac::SecurityParams {
         l: L::ELL,
         epsilon: L::EPSILON,
         q: L::q(),
     };
-    let phi = π_fac::prove(
-        parties_shared_state.clone(),
-        &π_fac::Aux {
-            s: s.clone(),
-            t: t.clone(),
-            rsa_modulo: N.clone(),
-        },
-        π_fac::Data {
-            n: &N,
-            n_root: &utils::sqrt(&N),
-        },
-        π_fac::PrivateData { p: &p, q: &q },
-        &π_fac_security,
-        &mut rng,
-    )
-    .map_err(Bug::PiFac)?;
+    let n_sqrt = utils::sqrt(&N);
     tracer.stage("Compute schnorr proof ψ_i^j");
     let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
         .map_err(Bug::HashToScalarError)?;
@@ -500,12 +485,30 @@ where
         // use every share except ours
         but_nth(i, xs.iter())
         .zip(&encs)
+        .zip(decommitments.iter())
         .zip(iter_peers(i, n));
-    for ((x, enc), j) in iterator {
+    for (((x, enc), d), j) in iterator {
         tracer.stage("Paillier encryption of x_i^j");
         let (C, _) = enc
             .encrypt_with_random(&scalar_to_bignumber(x), &mut rng)
             .map_err(|_| Bug::PaillierEnc)?;
+        tracer.stage("Compute П_fac (ф_i^j)");
+        let phi = π_fac::prove(
+            parties_shared_state.clone(),
+            &π_fac::Aux {
+                s: d.s.clone(),
+                t: d.t.clone(),
+                rsa_modulo: d.N.clone(),
+            },
+            π_fac::Data {
+                n: &N,
+                n_root: &n_sqrt,
+            },
+            π_fac::PrivateData { p: &p, q: &q },
+            &π_fac_security,
+            &mut rng,
+        )
+        .map_err(Bug::PiFac)?;
 
         tracer.send_msg();
         let msg = MsgRound3 {
@@ -638,9 +641,9 @@ where
             π_fac::verify(
                 parties_shared_state.clone(),
                 &π_fac::Aux {
-                    s: decommitment.s.clone(),
-                    t: decommitment.t.clone(),
-                    rsa_modulo: decommitment.N.clone(),
+                    s: s.clone(),
+                    t: t.clone(),
+                    rsa_modulo: N.clone(),
                 },
                 π_fac::Data {
                     n: &decommitment.N,
