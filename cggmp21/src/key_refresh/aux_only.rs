@@ -1,7 +1,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::Curve;
-use generic_ec_zkp::hash_commitment::{HashCommit, self};
+use generic_ec_zkp::hash_commitment::{self, HashCommit};
 use paillier_zk::{
     no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
     unknown_order::BigNumber, BigNumberExt,
@@ -18,14 +18,12 @@ use crate::{
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
-    utils::{collect_blame, collect_simple_blame, iter_peers},
+    utils::{collect_blame, collect_simple_blame},
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId, errors::IoError,
 };
 
-use super::{
-    Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted,
-};
+use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 
 /// Message of key refresh protocol
 #[derive(ProtocolMessage, Clone)]
@@ -237,32 +235,36 @@ where
         &mut rng,
     )
     .map_err(Bug::PiMod)?;
-    tracer.stage("Compute П_fac (ф_i)");
+    tracer.stage("Assemble security params for П_fac (ф_i)");
     let π_fac_security = π_fac::SecurityParams {
         l: L::ELL,
         epsilon: L::EPSILON,
         q: L::q(),
     };
-    let phi = π_fac::prove(
-        parties_shared_state.clone(),
-        &π_fac::Aux {
-            s: s.clone(),
-            t: t.clone(),
-            rsa_modulo: N.clone(),
-        },
-        π_fac::Data {
-            n: &N,
-            n_root: &utils::sqrt(&N),
-        },
-        π_fac::PrivateData { p: &p, q: &q },
-        &π_fac_security,
-        &mut rng,
-    )
-    .map_err(Bug::PiFac)?;
+    let n_sqrt = utils::sqrt(&N);
 
     // message to each party
-    for j in iter_peers(i, n) {
+    for (j, _, d) in decommitments.iter_indexed() {
         tracer.send_msg();
+
+        tracer.stage("Compute П_fac (ф_i^j)");
+        let phi = π_fac::prove(
+            parties_shared_state.clone(),
+            &π_fac::Aux {
+                s: d.s.clone(),
+                t: d.t.clone(),
+                rsa_modulo: d.N.clone(),
+            },
+            π_fac::Data {
+                n: &N,
+                n_root: &n_sqrt,
+            },
+            π_fac::PrivateData { p: &p, q: &q },
+            &π_fac_security,
+            &mut rng,
+        )
+        .map_err(Bug::PiFac)?;
+
         let msg = MsgRound3 {
             mod_proof: psi.clone(),
             fac_proof: phi.clone(),
@@ -306,17 +308,18 @@ where
 
     tracer.stage("Validate ф_j (П_fac)");
     // verify fac proofs
+    let phi_common_aux = π_fac::Aux {
+        s: s.clone(),
+        t: t.clone(),
+        rsa_modulo: N.clone(),
+    };
     let blame = collect_blame(
         &decommitments,
         &shares_msg_b,
         |_, decommitment, proof_msg| {
             π_fac::verify(
                 parties_shared_state.clone(),
-                &π_fac::Aux {
-                    s: decommitment.s.clone(),
-                    t: decommitment.t.clone(),
-                    rsa_modulo: decommitment.N.clone(),
-                },
+                &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,
                     n_root: &utils::sqrt(&decommitment.N),

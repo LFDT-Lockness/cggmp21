@@ -681,17 +681,18 @@ where
 
     tracer.stage("Validate ф_j (П_fac)");
     // verify fac proofs
+    let phi_common_aux = π_fac::Aux {
+        s: s.clone(),
+        t: t.clone(),
+        rsa_modulo: N.clone(),
+    };
     let blame = collect_blame(
         &decommitments,
         &shares_msg_b,
         |_, decommitment, proof_msg| {
             π_fac::verify(
                 parties_shared_state.clone(),
-                &π_fac::Aux {
-                    s: s.clone(),
-                    t: t.clone(),
-                    rsa_modulo: N.clone(),
-                },
+                &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,
                     n_root: &utils::sqrt(&decommitment.N),
