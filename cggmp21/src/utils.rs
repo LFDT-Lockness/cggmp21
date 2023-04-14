@@ -1,5 +1,5 @@
 use digest::Digest;
-use generic_ec::{Curve, NonZero, Scalar};
+use generic_ec::{Curve, NonZero, Scalar, SecretScalar};
 use paillier_zk::libpaillier::{unknown_order::BigNumber, EncryptionKey};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as pi_log,
@@ -306,6 +306,14 @@ where
     coefs.iter().rev().fold(zero, |r, c| r * point + c)
 }
 
+pub fn sample_polynomial<E, R>(t: usize, rng: &mut R) -> Vec<SecretScalar<E>>
+where
+    E: Curve,
+    R: RngCore + rand_core::CryptoRng,
+{
+    (0..t).map(|_| SecretScalar::random(rng)).collect()
+}
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -336,14 +344,6 @@ mod test {
             assert!(&root * &root > x);
         }
     }
-}
-
-pub fn sample_polynomial<E, R>(t: usize, rng: &mut R) -> Vec<Scalar<E>>
-where
-    E: Curve,
-    R: RngCore + rand_core::CryptoRng,
-{
-    (0..t).map(|_| Scalar::random(rng)).collect()
 }
 
 #[cfg(test)]
