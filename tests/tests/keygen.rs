@@ -20,13 +20,13 @@ mod generic {
     where
         Scalar<E>: FromHash,
     {
-        use cggmp21::keygen::Msg;
+        use cggmp21::keygen::NonThresholdMsg;
         let mut rng = DevRng::new();
 
         let keygen_execution_id: [u8; 32] = rng.gen();
         let keygen_execution_id =
             ExecutionId::<E, ReasonablySecure>::from_bytes(&keygen_execution_id);
-        let mut simulation = Simulation::<Msg<E, ReasonablySecure, Sha256>>::new();
+        let mut simulation = Simulation::<NonThresholdMsg<E, ReasonablySecure, Sha256>>::new();
 
         let mut outputs = vec![];
         for i in 0..n {
