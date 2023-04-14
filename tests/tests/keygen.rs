@@ -86,7 +86,8 @@ mod generic {
             outputs.push(async move {
                 cggmp21::keygen(i, n)
                     .set_execution_id(keygen_execution_id)
-                    .start_thresholdized(t, &mut party_rng, party)
+                    .set_threshold(t)
+                    .start(&mut party_rng, party)
                     .await
             })
         }

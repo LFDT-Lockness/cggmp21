@@ -15,17 +15,28 @@ use crate::security_level::SecurityLevel;
 use crate::utils::HashMessageError;
 use crate::ExecutionId;
 
-pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
-pub type ThresholdMsg<E, L, D> = threshold::Msg<E, L, D>;
+/// Key generation entry point. You can call [`set_threshold`] to make it into a
+/// threshold DKG
+pub type KeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, NonThreshold>;
 
-/// Key generation entry point
-pub struct KeygenBuilder<E: Curve, L: SecurityLevel, D: Digest> {
+/// Key generation entry point with choice for threshold or non-threshold
+/// variant
+pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
     i: u16,
     n: u16,
+    optional_t: M,
     execution_id: ExecutionId<E, L, D>,
 }
 
-impl<E, L, D> KeygenBuilder<E, L, D>
+/// Indicates non-threshold DKG
+pub struct NonThreshold;
+/// Indicates threshold DKG
+pub struct WithThreshold(u16);
+
+pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
+pub type ThresholdMsg<E, L, D> = threshold::Msg<E, L, D>;
+
+impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -39,21 +50,39 @@ where
         Self {
             i,
             n,
+            optional_t: NonThreshold,
             execution_id: ExecutionId::default(),
         }
     }
+}
 
+impl<E, L, D, M> GenericKeygenBuilder<E, L, D, M>
+where
+    E: Curve,
+    Scalar<E>: FromHash,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<E, L, D, WithThreshold> {
+        GenericKeygenBuilder {
+            i: self.i,
+            n: self.n,
+            optional_t: WithThreshold(t),
+            execution_id: Default::default(),
+        }
+    }
     /// Specifies another hash function to use
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2>(self) -> KeygenBuilder<E, L, D2>
+    pub fn set_digest<D2>(self) -> GenericKeygenBuilder<E, L, D2, M>
     where
         D2: Digest + Clone + 'static,
     {
-        KeygenBuilder {
+        GenericKeygenBuilder {
             i: self.i,
             n: self.n,
+            optional_t: self.optional_t,
             execution_id: Default::default(),
         }
     }
@@ -62,13 +91,14 @@ where
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_security_level<L2>(self) -> KeygenBuilder<E, L2, D>
+    pub fn set_security_level<L2>(self) -> GenericKeygenBuilder<E, L2, D, M>
     where
         L2: SecurityLevel,
     {
-        KeygenBuilder {
+        GenericKeygenBuilder {
             i: self.i,
             n: self.n,
+            optional_t: self.optional_t,
             execution_id: Default::default(),
         }
     }
@@ -80,7 +110,15 @@ where
             ..self
         }
     }
+}
 
+impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
+where
+    E: Curve,
+    Scalar<E>: FromHash,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
     /// Starts key generation
     pub async fn start<R, M>(
         self,
@@ -93,11 +131,18 @@ where
     {
         non_threshold::run_keygen(self.i, self.n, self.execution_id, rng, party).await
     }
+}
 
-    /// Starts threshold DKG
-    pub async fn start_thresholdized<R, M>(
+impl<E, L, D> GenericKeygenBuilder<E, L, D, WithThreshold>
+where
+    E: Curve,
+    Scalar<E>: FromHash,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Starts threshold key generation
+    pub async fn start<R, M>(
         self,
-        t: u16,
         rng: &mut R,
         party: M,
     ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
@@ -105,7 +150,15 @@ where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
     {
-        threshold::run_threshold_keygen(self.i, t, self.n, self.execution_id, rng, party).await
+        threshold::run_threshold_keygen(
+            self.i,
+            self.optional_t.0,
+            self.n,
+            self.execution_id,
+            rng,
+            party,
+        )
+        .await
     }
 }
 
