@@ -436,6 +436,14 @@ impl<E: Curve, L: SecurityLevel> TryFrom<DirtyIncompleteKeyShare<E, L>>
     }
 }
 
+impl TryFrom<DirtyAuxInfo> for AuxInfo {
+    type Error = InvalidKeyShare;
+    fn try_from(value: DirtyAuxInfo) -> Result<Self, Self::Error> {
+        value.validate()?;
+        Ok(Self(value))
+    }
+}
+
 impl<E: Curve, L: SecurityLevel> TryFrom<DirtyKeyShare<E, L>> for KeyShare<E, L> {
     type Error = InvalidKeyShare;
     fn try_from(key_share: DirtyKeyShare<E, L>) -> Result<Self, Self::Error> {
