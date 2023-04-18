@@ -1,88 +1,42 @@
+mod non_threshold;
+mod threshold;
+
 use digest::Digest;
-use futures::SinkExt;
-use generic_ec::hash_to_curve::{self, FromHash};
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
-use generic_ec_zkp::{hash_commitment::HashCommit, schnorr_pok};
+use generic_ec::hash_to_curve::FromHash;
+use generic_ec::{Curve, Scalar};
 use rand_core::{CryptoRng, RngCore};
-use round_based::{
-    rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
-    Outgoing,
-};
-use round_based::{MsgId, PartyIndex};
+use round_based::rounds_router::simple_store::RoundInputError;
+use round_based::rounds_router::CompleteRoundError;
+use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
 
-use crate::key_share::IncompleteKeyShare;
-use crate::{
-    errors::IoError,
-    execution_id::ProtocolChoice,
-    key_share::{DirtyIncompleteKeyShare, InvalidKeyShare},
-    security_level::SecurityLevel,
-    utils::xor_array,
-    utils::{hash_message, HashMessageError},
-    ExecutionId,
-};
+use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
+use crate::security_level::SecurityLevel;
+use crate::utils::HashMessageError;
+use crate::ExecutionId;
 
-use self::msg::*;
+/// Key generation entry point. You can call [`set_threshold`] to make it into a
+/// threshold DKG
+pub type KeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, NonThreshold>;
 
-#[doc = include_str!("../docs/mpc_message.md")]
-pub mod msg {
-    use digest::Digest;
-    use generic_ec::{Curve, Point};
-    use generic_ec_zkp::{
-        hash_commitment::{self, HashCommit},
-        schnorr_pok,
-    };
-    use round_based::ProtocolMessage;
-    use serde::{Deserialize, Serialize};
-
-    use crate::security_level::SecurityLevel;
-
-    /// Message of key generation protocol
-    #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
-    #[serde(bound = "")]
-    pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
-        Round1(MsgRound1<D>),
-        Round1Sync(MsgSyncState<D>),
-        Round2(MsgRound2<E, L, D>),
-        Round3(MsgRound3<E>),
-    }
-
-    /// Message from round 1
-    #[derive(Clone, Serialize, Deserialize)]
-    #[serde(bound = "")]
-    pub struct MsgRound1<D: Digest> {
-        pub commitment: HashCommit<D>,
-    }
-    /// Message from round 2
-    #[derive(Clone, Serialize, Deserialize)]
-    #[serde(bound = "")]
-    pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
-        #[serde(with = "hex::serde")]
-        pub rid: L::Rid,
-        pub X: Point<E>,
-        pub sch_commit: schnorr_pok::Commit<E>,
-        pub decommit: hash_commitment::DecommitNonce<D>,
-    }
-    /// Message from round 3
-    #[derive(Clone, Serialize, Deserialize)]
-    #[serde(bound = "")]
-    pub struct MsgRound3<E: Curve> {
-        pub sch_proof: schnorr_pok::Proof<E>,
-    }
-    /// Message parties exchange to ensure reliability of broadcast channel
-    #[derive(Clone, Serialize, Deserialize)]
-    #[serde(bound = "")]
-    pub struct MsgSyncState<D: Digest>(pub digest::Output<D>);
-}
-
-/// Key generation entry point
-pub struct KeygenBuilder<E: Curve, L: SecurityLevel, D: Digest> {
+/// Key generation entry point with choice for threshold or non-threshold
+/// variant
+pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
     i: u16,
     n: u16,
+    optional_t: M,
     execution_id: ExecutionId<E, L, D>,
 }
 
-impl<E, L, D> KeygenBuilder<E, L, D>
+/// Indicates non-threshold DKG
+pub struct NonThreshold;
+/// Indicates threshold DKG
+pub struct WithThreshold(u16);
+
+pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
+pub type ThresholdMsg<E, L, D> = threshold::Msg<E, L, D>;
+
+impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -96,21 +50,39 @@ where
         Self {
             i,
             n,
+            optional_t: NonThreshold,
             execution_id: ExecutionId::default(),
         }
     }
+}
 
+impl<E, L, D, M> GenericKeygenBuilder<E, L, D, M>
+where
+    E: Curve,
+    Scalar<E>: FromHash,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<E, L, D, WithThreshold> {
+        GenericKeygenBuilder {
+            i: self.i,
+            n: self.n,
+            optional_t: WithThreshold(t),
+            execution_id: Default::default(),
+        }
+    }
     /// Specifies another hash function to use
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2>(self) -> KeygenBuilder<E, L, D2>
+    pub fn set_digest<D2>(self) -> GenericKeygenBuilder<E, L, D2, M>
     where
         D2: Digest + Clone + 'static,
     {
-        KeygenBuilder {
+        GenericKeygenBuilder {
             i: self.i,
             n: self.n,
+            optional_t: self.optional_t,
             execution_id: Default::default(),
         }
     }
@@ -119,13 +91,14 @@ where
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_security_level<L2>(self) -> KeygenBuilder<E, L2, D>
+    pub fn set_security_level<L2>(self) -> GenericKeygenBuilder<E, L2, D, M>
     where
         L2: SecurityLevel,
     {
-        KeygenBuilder {
+        GenericKeygenBuilder {
             i: self.i,
             n: self.n,
+            optional_t: self.optional_t,
             execution_id: Default::default(),
         }
     }
@@ -137,7 +110,15 @@ where
             ..self
         }
     }
+}
 
+impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
+where
+    E: Curve,
+    Scalar<E>: FromHash,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
     /// Starts key generation
     pub async fn start<R, M>(
         self,
@@ -146,174 +127,38 @@ where
     ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = Msg<E, L, D>>,
+        M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
     {
-        let MpcParty { delivery, .. } = party.into_party();
-        let (incomings, mut outgoings) = delivery.split();
+        non_threshold::run_keygen(self.i, self.n, self.execution_id, rng, party).await
+    }
+}
 
-        // Setup networking
-        let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
-        let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(self.i, self.n));
-        let round1_sync =
-            rounds.add_round(RoundInput::<MsgSyncState<D>>::broadcast(self.i, self.n));
-        let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L, D>>::broadcast(self.i, self.n));
-        let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(self.i, self.n));
-        let mut rounds = rounds.listen(incomings);
-
-        // Round 1
-        let execution_id = self.execution_id.evaluate(ProtocolChoice::Keygen);
-        let sid = execution_id.as_slice();
-        let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
-
-        let x_i = SecretScalar::<E>::random(rng);
-        let X_i = Point::generator() * &x_i;
-
-        let mut rid = L::Rid::default();
-        rng.fill_bytes(rid.as_mut());
-
-        let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
-
-        let (hash_commit, decommit) = HashCommit::<D>::builder()
-            .mix_bytes(sid)
-            .mix(self.n)
-            .mix(self.i)
-            .mix_bytes(&rid)
-            .mix(X_i)
-            .mix(sch_commit.0)
-            .commit(rng);
-
-        let my_commitment = MsgRound1 {
-            commitment: hash_commit,
-        };
-        outgoings
-            .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
-            .await
-            .map_err(IoError::send_message)?;
-
-        // Round 2
-        let commitments = rounds
-            .complete(round1)
-            .await
-            .map_err(IoError::receive_message)?
-            .into_vec_including_me(my_commitment);
-        let commitments_hash = commitments
-            .iter()
-            .try_fold(D::new(), hash_message)
-            .map_err(Bug::HashMessage)?
-            .finalize();
-        outgoings
-            .send(Outgoing::broadcast(Msg::Round1Sync(MsgSyncState(
-                commitments_hash.clone(),
-            ))))
-            .await
-            .map_err(IoError::send_message)?;
-
-        let my_decommitment = MsgRound2 {
-            rid,
-            X: X_i,
-            sch_commit,
-            decommit,
-        };
-        outgoings
-            .send(Outgoing::broadcast(Msg::Round2(my_decommitment.clone())))
-            .await
-            .map_err(IoError::send_message)?;
-
-        // Round 3
-        {
-            let commitments_hashes = rounds
-                .complete(round1_sync)
-                .await
-                .map_err(IoError::receive_message)?;
-            let parties_have_different_hashes = commitments_hashes
-                .into_iter_indexed()
-                .filter(|(_j, _msg_id, hash)| hash.0 != commitments_hash)
-                .map(|(j, msg_id, _hash)| (j, msg_id))
-                .collect::<Vec<_>>();
-            if !parties_have_different_hashes.is_empty() {
-                return Err(KeygenAborted::Round1NotReliable(parties_have_different_hashes).into());
-            }
-        }
-        let decommitments = rounds
-            .complete(round2)
-            .await
-            .map_err(IoError::receive_message)?
-            .into_vec_including_me(my_decommitment);
-
-        // Validate decommitments
-        let blame = (0u16..)
-            .zip(&commitments)
-            .zip(&decommitments)
-            .filter(|((j, commitment), decommitment)| {
-                HashCommit::<D>::builder()
-                    .mix_bytes(sid)
-                    .mix(self.n)
-                    .mix(j)
-                    .mix_bytes(&decommitment.rid)
-                    .mix(decommitment.X)
-                    .mix(decommitment.sch_commit.0)
-                    .verify(&commitment.commitment, &decommitment.decommit)
-                    .is_err()
-            })
-            .map(|((j, _), _)| j)
-            .collect::<Vec<_>>();
-        if !blame.is_empty() {
-            return Err(KeygenAborted::InvalidDecommitment { parties: blame }.into());
-        }
-
-        // Calculate challenge
-        let rid = decommitments
-            .iter()
-            .map(|d| &d.rid)
-            .fold(L::Rid::default(), xor_array);
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&self.i.to_be_bytes(), rid.as_ref()])
-            .map_err(Bug::HashToScalarError)?;
-        let challenge = schnorr_pok::Challenge { nonce: challenge };
-
-        // Prove knowledge of `x_i`
-        let sch_proof = schnorr_pok::prove(&sch_secret, &challenge, &x_i);
-
-        let my_sch_proof = MsgRound3 { sch_proof };
-        outgoings
-            .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
-            .await
-            .map_err(IoError::send_message)?;
-
-        // Round 4
-        let sch_proofs = rounds
-            .complete(round3)
-            .await
-            .map_err(IoError::receive_message)?
-            .into_vec_including_me(my_sch_proof);
-
-        let mut blame = vec![];
-        for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
-            let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
-                .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
-                .map_err(Bug::HashToScalarError)?;
-            if sch_proof
-                .sch_proof
-                .verify(&decommitment.sch_commit, &challenge, &decommitment.X)
-                .is_err()
-            {
-                blame.push(j);
-            }
-        }
-        if !blame.is_empty() {
-            return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
-        }
-
-        Ok(DirtyIncompleteKeyShare {
-            curve: Default::default(),
-            i: self.i,
-            shared_public_key: decommitments.iter().map(|d| d.X).sum(),
-            rid,
-            public_shares: decommitments.iter().map(|d| d.X).collect(),
-            x: x_i,
-            vss_setup: None,
-        }
-        .try_into()
-        .map_err(Bug::InvalidKeyShare)?)
+impl<E, L, D> GenericKeygenBuilder<E, L, D, WithThreshold>
+where
+    E: Curve,
+    Scalar<E>: FromHash,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Starts threshold key generation
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
+        party: M,
+    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
+    {
+        threshold::run_threshold_keygen(
+            self.i,
+            self.optional_t.0,
+            self.n,
+            self.execution_id,
+            rng,
+            party,
+        )
+        .await
     }
 }
 
@@ -354,6 +199,10 @@ enum KeygenAborted {
     InvalidDecommitment { parties: Vec<u16> },
     #[error("party provided invalid schnorr proof: {parties:?}")]
     InvalidSchnorrProof { parties: Vec<u16> },
+    #[error("party secret share is not consistent: {parties:?}")]
+    FeldmanVerificationFailed { parties: Vec<u16> },
+    #[error("party data size is not suitable for threshold parameters: {parties:?}")]
+    InvalidDataSize { parties: Vec<u16> },
     #[error("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
 }
@@ -368,4 +217,6 @@ enum Bug {
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("hash message")]
     HashMessage(#[source] HashMessageError),
+    #[error("unexpected zero value")]
+    NonZeroScalar,
 }

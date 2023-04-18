@@ -1,5 +1,5 @@
 use digest::Digest;
-use generic_ec::{Curve, NonZero, Scalar};
+use generic_ec::{Curve, NonZero, Scalar, SecretScalar};
 use paillier_zk::libpaillier::{unknown_order::BigNumber, EncryptionKey};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as pi_log,
@@ -297,6 +297,23 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Opt
         .collect()
 }
 
+/// `coefs` is polynomial coefficients, `coefs[i]` corresponding to `x^i`
+pub fn polynomial_value<A, B, C>(zero: C, point: &A, coefs: &[B]) -> C
+where
+    C: for<'a> core::ops::Mul<&'a A, Output = C>,
+    C: for<'a> core::ops::Add<&'a B, Output = C>,
+{
+    coefs.iter().rev().fold(zero, |r, c| r * point + c)
+}
+
+pub fn sample_polynomial<E, R>(t: usize, rng: &mut R) -> Vec<SecretScalar<E>>
+where
+    E: Curve,
+    R: RngCore + rand_core::CryptoRng,
+{
+    (0..t).map(|_| SecretScalar::random(rng)).collect()
+}
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -335,7 +352,7 @@ mod generic_test {
     use generic_ec::{Curve, NonZero, Scalar};
     use rand_dev::DevRng;
 
-    use super::lagrange_coefficient;
+    use super::{lagrange_coefficient, polynomial_value};
 
     #[test]
     fn lagrange_coefficient_reconstructs_secret<E: Curve>() {
@@ -343,12 +360,7 @@ mod generic_test {
 
         // Polynomial of degree 1, f(x) = coef[0] + coef[1] * x
         let polynomial_coefs = [Scalar::random(&mut rng), Scalar::random(&mut rng)];
-        let f = |x: &Scalar<E>| {
-            polynomial_coefs
-                .iter()
-                .rev()
-                .fold(Scalar::zero(), |acc, coef_i| acc * x + coef_i)
-        };
+        let f = |x: &Scalar<E>| polynomial_value(Scalar::zero(), x, &polynomial_coefs);
 
         // I_j represents share index of j-th party. Each party should have a
         // distinct non-zero index
