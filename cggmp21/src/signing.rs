@@ -60,7 +60,7 @@ impl<E: Curve> DataToSign<E> {
     /// ** Note: [DataToSign::digest] and [DataToSign::from_digest] are preferred way to construct the `DataToSign` **
     ///
     /// `scalar` must be output of cryptographic hash function applied to original message to be signed
-    pub fn from_slice(scalar: Scalar<E>) -> Self {
+    pub fn from_scalar(scalar: Scalar<E>) -> Self {
         Self(scalar)
     }
 

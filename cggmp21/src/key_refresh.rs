@@ -152,7 +152,7 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    /// Build aux info generating operation. Start it with [`start`](Self::start).
+    /// Build key refresh operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
     pub fn new(key_share: &'a impl AnyKeyShare<E, L>, pregenerated: PregeneratedPrimes<L>) -> Self {
