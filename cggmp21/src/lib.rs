@@ -36,10 +36,12 @@ pub use self::execution_id::ExecutionId;
 /// Distributed key generation protocol
 ///
 /// Instantiates [KeygenBuilder] with [ReasonablySecure] security level
-/// and sha2-256 digest.
+/// and sha2-256 digest. You can switch to threshold DKG by using
+/// [`set_threshold`]
 ///
 /// [KeygenBuilder]: keygen::KeygenBuilder
 /// [ReasonablySecure]: security_level::ReasonablySecure
+/// [`set_threshold`]: keygen::GenericKeygenBuilder::set_threshold
 pub fn keygen<E>(
     i: u16,
     n: u16,

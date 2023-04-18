@@ -139,6 +139,4 @@ enum Reason {
     PowMod,
     #[error("deriving key share index failed")]
     DeriveKeyShareIndex,
-    #[error("deriving public key failed")]
-    DerivePublicKey,
 }
