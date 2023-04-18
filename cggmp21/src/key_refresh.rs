@@ -19,7 +19,7 @@ use thiserror::Error;
 use crate::{
     errors::IoError,
     execution_id::ProtocolChoice,
-    key_share::{AnyKeyShare, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux},
+    key_share::{AnyKeyShare, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux, DirtyAuxInfo},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -706,11 +706,14 @@ where
             t: d.t.clone(),
         })
         .collect();
-    let key_share = DirtyKeyShare {
-        core: new_core_share,
+    let aux = DirtyAuxInfo {
         p,
         q,
         parties: party_auxes,
+    };
+    let key_share = DirtyKeyShare {
+        core: new_core_share,
+        aux,
     };
 
     tracer.protocol_ends();
@@ -1004,11 +1007,14 @@ where
             t: d.t.clone(),
         })
         .collect();
-    let key_share = DirtyKeyShare {
-        core: core_share.clone(),
+    let aux = DirtyAuxInfo {
         p,
         q,
         parties: party_auxes,
+    };
+    let key_share = DirtyKeyShare {
+        core: core_share.clone(),
+        aux,
     };
 
     tracer.protocol_ends();

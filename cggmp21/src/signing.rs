@@ -334,6 +334,7 @@ where
 
     // Validate arguments
     let n: u16 = key_share
+        .aux
         .parties
         .len()
         .try_into()
@@ -381,8 +382,8 @@ where
     debug_assert_eq!(key_share.core.shared_public_key, X.iter().sum::<Point<E>>());
 
     // Assemble rest of the data
-    let (p_i, q_i) = (&key_share.p, &key_share.q);
-    let R = subset(S, &key_share.parties).ok_or(Bug::Subset)?;
+    let (p_i, q_i) = (&key_share.aux.p, &key_share.aux.q);
+    let R = subset(S, &key_share.aux.parties).ok_or(Bug::Subset)?;
 
     // t-out-of-t signing
     signing_n_out_of_n(
