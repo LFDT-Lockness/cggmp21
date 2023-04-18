@@ -13,11 +13,14 @@ use round_based::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::execution_id::ProtocolChoice;
-use crate::key_share::{IncompleteKeyShare, Valid};
-use crate::security_level::SecurityLevel;
-use crate::utils::{hash_message, xor_array};
-use crate::ExecutionId;
+use crate::{
+    errors::IoError,
+    execution_id::ProtocolChoice,
+    key_share::{DirtyIncompleteKeyShare, IncompleteKeyShare},
+    security_level::SecurityLevel,
+    utils::{hash_message, xor_array},
+    ExecutionId,
+};
 
 use super::{Bug, KeygenAborted, KeygenError};
 
@@ -64,7 +67,7 @@ pub async fn run_keygen<E, R, M, L, D>(
     execution_id: ExecutionId<E, L, D>,
     rng: &mut R,
     party: M,
-) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+) -> Result<IncompleteKeyShare<E, L>, KeygenError>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -112,13 +115,13 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     // Round 2
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(KeygenError::ReceiveMessage)?
+        .map_err(IoError::receive_message)?
         .into_vec_including_me(my_commitment);
     let commitments_hash = commitments
         .iter()
@@ -130,7 +133,7 @@ where
             commitments_hash.clone(),
         ))))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     let my_decommitment = MsgRound2 {
         rid,
@@ -141,14 +144,14 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round2(my_decommitment.clone())))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     // Round 3
     {
         let commitments_hashes = rounds
             .complete(round1_sync)
             .await
-            .map_err(KeygenError::ReceiveMessage)?;
+            .map_err(IoError::receive_message)?;
         let parties_have_different_hashes = commitments_hashes
             .into_iter_indexed()
             .filter(|(_j, _msg_id, hash)| hash.0 != commitments_hash)
@@ -161,7 +164,7 @@ where
     let decommitments = rounds
         .complete(round2)
         .await
-        .map_err(KeygenError::ReceiveMessage)?
+        .map_err(IoError::receive_message)?
         .into_vec_including_me(my_decommitment);
 
     // Validate decommitments
@@ -201,13 +204,13 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     // Round 4
     let sch_proofs = rounds
         .complete(round3)
         .await
-        .map_err(KeygenError::ReceiveMessage)?
+        .map_err(IoError::receive_message)?
         .into_vec_including_me(my_sch_proof);
 
     let mut blame = vec![];
@@ -227,10 +230,9 @@ where
         return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
     }
 
-    Ok(IncompleteKeyShare {
+    Ok(DirtyIncompleteKeyShare {
         curve: Default::default(),
         i,
-        n,
         shared_public_key: decommitments.iter().map(|d| d.X).sum(),
         rid,
         public_shares: decommitments.iter().map(|d| d.X).collect(),

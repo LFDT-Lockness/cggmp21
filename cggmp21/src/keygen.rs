@@ -5,15 +5,16 @@ use digest::Digest;
 use generic_ec::hash_to_curve::FromHash;
 use generic_ec::{Curve, Scalar};
 use rand_core::{CryptoRng, RngCore};
-use round_based::rounds_router::simple_store::RoundInputError;
-use round_based::rounds_router::CompleteRoundError;
 use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
 
-use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
-use crate::security_level::SecurityLevel;
-use crate::utils::HashMessageError;
-use crate::ExecutionId;
+use crate::{
+    errors::IoError,
+    key_share::{IncompleteKeyShare, InvalidKeyShare},
+    security_level::SecurityLevel,
+    utils::HashMessageError,
+    ExecutionId,
+};
 
 /// Key generation entry point. You can call [`set_threshold`] to make it into a
 /// threshold DKG
@@ -145,7 +146,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,

@@ -1,9 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cggmp21::{
-    key_share::{DirtyKeyShare, KeyShare, Valid},
-    security_level::ReasonablySecure,
-    unknown_order::BigNumber,
-};
+use cggmp21::{key_share::KeyShare, security_level::ReasonablySecure, unknown_order::BigNumber};
 use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};

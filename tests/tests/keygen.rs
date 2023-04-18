@@ -7,7 +7,7 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::keygen::msg::Msg;
+    use cggmp21::keygen::{NonThresholdMsg, ThresholdMsg};
     use cggmp21::{
         key_share::reconstruct_secret_key, security_level::ReasonablySecure, ExecutionId,
     };
@@ -21,7 +21,6 @@ mod generic {
     where
         Scalar<E>: FromHash,
     {
-        use cggmp21::keygen::NonThresholdMsg;
         let mut rng = DevRng::new();
 
         let keygen_execution_id: [u8; 32] = rng.gen();
@@ -70,7 +69,6 @@ mod generic {
     where
         Scalar<E>: FromHash,
     {
-        use cggmp21::keygen::ThresholdMsg;
         let mut rng = DevRng::new();
 
         let keygen_execution_id: [u8; 32] = rng.gen();
