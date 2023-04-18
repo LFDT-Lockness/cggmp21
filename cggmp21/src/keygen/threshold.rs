@@ -103,8 +103,7 @@ where
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
 
-    // r and h in paper
-    let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
+    let (r, h) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
     let ss = utils::sample_polynomial(usize::from(t), rng);
     let Ss = ss
@@ -126,7 +125,7 @@ where
         .mix(t)
         .mix_bytes(&rid)
         .mix_many(Ss.iter())
-        .mix(sch_commit.0)
+        .mix(h.0)
         .commit(rng);
 
     let my_commitment = MsgRound1 {
@@ -158,7 +157,7 @@ where
     let my_decommitment = MsgRound2Broad {
         rid,
         Ss: Ss.clone(),
-        sch_commit,
+        sch_commit: h,
         decommit,
     };
     outgoings
@@ -268,14 +267,22 @@ where
     debug_assert_eq!(Point::generator() * &sigma, ys[usize::from(i)]);
 
     // Calculate challenge
-    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rid.as_ref()])
-        .map_err(Bug::HashToScalarError)?;
+    let challenge = Scalar::<E>::hash_concat(
+        tag_htc,
+        &[
+            &i.to_be_bytes(),
+            rid.as_ref(),
+            &ys[usize::from(i)].to_bytes(true),            // y_i
+            &my_decommitment.sch_commit.0.to_bytes(false), // h
+        ],
+    )
+    .map_err(Bug::HashToScalarError)?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     // Prove knowledge of `sigma_i`
-    let sch_proof = schnorr_pok::prove(&sch_secret, &challenge, &sigma);
+    let z = schnorr_pok::prove(&r, &challenge, &sigma);
 
-    let my_sch_proof = MsgRound3 { sch_proof };
+    let my_sch_proof = MsgRound3 { sch_proof: z };
     outgoings
         .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
         .await
@@ -293,9 +300,17 @@ where
         .zip(decommitments.iter())
         .zip(sch_proofs.iter())
     {
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
-            .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
-            .map_err(Bug::HashToScalarError)?;
+        let challenge = Scalar::<E>::hash_concat(
+            tag_htc,
+            &[
+                &j.to_be_bytes(),
+                rid.as_ref(),
+                &ys[usize::from(j)].to_bytes(true),         // y_i
+                &decommitment.sch_commit.0.to_bytes(false), // h
+            ],
+        )
+        .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
+        .map_err(Bug::HashToScalarError)?;
         if sch_proof
             .sch_proof
             .verify(&decommitment.sch_commit, &challenge, &ys[usize::from(j)])
@@ -314,10 +329,8 @@ where
         .sum();
     let key_shares_indexes = (1..=n)
         .map(|i| NonZero::from_scalar(Scalar::from(i)))
-        // Safety: safe because we start with 1 and go above, and overflowing on
-        // n is UB
-        .map(|s| unsafe { s.unwrap_unchecked() })
-        .collect::<Vec<_>>();
+        .collect::<Option<Vec<_>>>()
+        .ok_or(Bug::NonZeroScalar)?;
 
     Ok(IncompleteKeyShare {
         curve: Default::default(),

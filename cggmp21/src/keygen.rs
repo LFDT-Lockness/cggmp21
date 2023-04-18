@@ -217,6 +217,8 @@ enum Bug {
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("hash message")]
     HashMessage(#[source] HashMessageError),
+    #[error("unexpected zero value")]
+    NonZeroScalar,
 }
 
 impl<IErr, OErr> From<Bug> for KeygenError<IErr, OErr> {
