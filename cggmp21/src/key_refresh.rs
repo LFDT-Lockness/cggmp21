@@ -4,10 +4,7 @@ use generic_ec::{
     hash_to_curve::{self, FromHash},
     Curve, Point, Scalar, SecretScalar,
 };
-use generic_ec_zkp::{
-    hash_commitment::{self, HashCommit},
-    schnorr_pok,
-};
+use generic_ec_zkp::{hash_commitment::HashCommit, schnorr_pok};
 use paillier_zk::{
     libpaillier, no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
     unknown_order::BigNumber, BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
@@ -15,13 +12,14 @@ use paillier_zk::{
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
-    Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
+    Delivery, Mpc, MpcParty, Outgoing,
 };
 use thiserror::Error;
 
 use crate::{
+    errors::IoError,
     execution_id::ProtocolChoice,
-    key_share::{IncompleteKeyShare, KeyShare, PartyAux, Valid},
+    key_share::{AnyKeyShare, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -33,56 +31,75 @@ use crate::{
     ExecutionId,
 };
 
-/// Message of key refresh protocol
-#[derive(ProtocolMessage, Clone)]
-// 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
-#[allow(clippy::large_enum_variant)]
-pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
-    Round1(MsgRound1<D>),
-    Round2(MsgRound2<E, D, L>),
-    Round3(MsgRound3<E>),
-}
+use self::msg::*;
 
-/// Message from round 1
-#[derive(Clone)]
-pub struct MsgRound1<D: Digest> {
-    commitment: HashCommit<D>,
-}
-/// Message from round 2
-#[derive(Clone)]
-pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
-    /// **X_i** in paper
-    Xs: Vec<Point<E>>,
-    /// **A_i** in paper
-    sch_commits_a: Vec<schnorr_pok::Commit<E>>,
-    N: BigNumber,
-    s: BigNumber,
-    t: BigNumber,
-    /// psi_circonflexe_i in paper
-    // this should be L::M instead, but no rustc support yet
-    params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
-    /// rho_i in paper
-    // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
-    rho_bytes: L::Rid,
-    /// u_i in paper
-    decommit: hash_commitment::DecommitNonce<D>,
-}
-/// Unicast message of round 3, sent to each participant
-#[derive(Clone)]
-pub struct MsgRound3<E: Curve> {
-    /// psi_i in paper
-    // this should be L::M instead, but no rustc support yet
-    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
-    /// phi_i^j in paper
-    fac_proof: π_fac::Proof,
-    /// C_i^j in paper
-    C: BigNumber,
-    /// psi_i_j in paper
-    ///
-    /// Here in the paper you only send one proof, but later they require you to
-    /// verify by all the other proofs, that are never sent. We fix this here
-    /// and require each party to send every proof to everyone
-    sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    use digest::Digest;
+    use generic_ec::{Curve, Point};
+    use generic_ec_zkp::{
+        hash_commitment::{self, HashCommit},
+        schnorr_pok,
+    };
+    use paillier_zk::{
+        no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
+        unknown_order::BigNumber,
+    };
+    use round_based::ProtocolMessage;
+
+    use crate::{security_level::SecurityLevel, zk::ring_pedersen_parameters as π_prm};
+
+    /// Message of key refresh protocol
+    #[derive(ProtocolMessage, Clone)]
+    // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
+    #[allow(clippy::large_enum_variant)]
+    pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
+        Round1(MsgRound1<D>),
+        Round2(MsgRound2<E, D, L>),
+        Round3(MsgRound3<E>),
+    }
+
+    /// Message from round 1
+    #[derive(Clone)]
+    pub struct MsgRound1<D: Digest> {
+        pub commitment: HashCommit<D>,
+    }
+    /// Message from round 2
+    #[derive(Clone)]
+    pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
+        /// **X_i** in paper
+        pub Xs: Vec<Point<E>>,
+        /// **A_i** in paper
+        pub sch_commits_a: Vec<schnorr_pok::Commit<E>>,
+        pub N: BigNumber,
+        pub s: BigNumber,
+        pub t: BigNumber,
+        /// psi_circonflexe_i in paper
+        // this should be L::M instead, but no rustc support yet
+        pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
+        /// rho_i in paper
+        // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
+        pub rho_bytes: L::Rid,
+        /// u_i in paper
+        pub decommit: hash_commitment::DecommitNonce<D>,
+    }
+    /// Unicast message of round 3, sent to each participant
+    #[derive(Clone)]
+    pub struct MsgRound3<E: Curve> {
+        /// psi_i in paper
+        // this should be L::M instead, but no rustc support yet
+        pub mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
+        /// phi_i^j in paper
+        pub fac_proof: π_fac::Proof,
+        /// C_i^j in paper
+        pub C: BigNumber,
+        /// psi_i_j in paper
+        ///
+        /// Here in the paper you only send one proof, but later they require you to
+        /// verify by all the other proofs, that are never sent. We fix this here
+        /// and require each party to send every proof to everyone
+        pub sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
+    }
 }
 
 /// To speed up computations, it's possible to supply data to the algorithm
@@ -123,7 +140,7 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    core_share: &'a IncompleteKeyShare<E, L>,
+    core_share: &'a DirtyIncompleteKeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     tracer: Option<&'a mut dyn Tracer>,
@@ -135,30 +152,12 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    /// Build aux info generating operation. Start it with [`start`].
+    /// Build key refresh operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new(
-        core_share: &'a Valid<IncompleteKeyShare<E, L>>,
-        pregenerated: PregeneratedPrimes<L>,
-    ) -> Self {
+    pub fn new(key_share: &'a impl AnyKeyShare<E, L>, pregenerated: PregeneratedPrimes<L>) -> Self {
         Self {
-            core_share,
-            execution_id: Default::default(),
-            pregenerated,
-            tracer: None,
-        }
-    }
-
-    /// Build key refresh operation. Start it with [`start`]
-    ///
-    /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new_refresh(
-        key_share: &'a Valid<KeyShare<E, L>>,
-        pregenerated: PregeneratedPrimes<L>,
-    ) -> Self {
-        Self {
-            core_share: &key_share.core,
+            core_share: key_share.core(),
             execution_id: Default::default(),
             pregenerated,
             tracer: None,
@@ -191,11 +190,7 @@ where
     }
 
     /// Carry out the refresh procedure. Takes a lot of time
-    pub async fn start<R, M>(
-        self,
-        rng: &mut R,
-        party: M,
-    ) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E, L>, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -222,8 +217,8 @@ async fn run_refresh<R, M, E, L, D>(
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
-    core_share: &IncompleteKeyShare<E, L>,
-) -> Result<Valid<KeyShare<E, L>>, KeyRefreshError<M::ReceiveError, M::SendError>>
+    core_share: &DirtyIncompleteKeyShare<E, L>,
+) -> Result<KeyShare<E, L>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -336,7 +331,7 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(commitment.clone())))
         .await
-        .map_err(KeyRefreshError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Round 2
@@ -346,7 +341,7 @@ where
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
     tracer.send_msg();
     let decommitment = MsgRound2 {
@@ -362,7 +357,7 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round2(decommitment.clone())))
         .await
-        .map_err(KeyRefreshError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Round 3
@@ -372,7 +367,7 @@ where
     let decommitments = rounds
         .complete(round2)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     // validate decommitments
@@ -394,9 +389,7 @@ where
             .is_err()
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_decommitment(blame),
-        ));
+        return Err(ProtocolAborted::invalid_decommitment(blame).into());
     }
     // Validate parties didn't skip any data
     tracer.stage("Validate data sizes");
@@ -405,9 +398,7 @@ where
         decommitment.Xs.len() != n || decommitment.sch_commits_a.len() != n
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_data_size(blame),
-        ));
+        return Err(ProtocolAborted::invalid_data_size(blame).into());
     }
     // validate parameters and param_proofs
     tracer.stage("Validate П_prm (ψ_i)");
@@ -424,9 +415,7 @@ where
         }
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_ring_pedersen_parameters(blame),
-        ));
+        return Err(ProtocolAborted::invalid_ring_pedersen_parameters(blame).into());
     }
     // validate Xs add to zero
     tracer.stage("Validate X_i");
@@ -434,7 +423,7 @@ where
         d.Xs.iter().sum::<Point<E>>() != Point::zero()
     });
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x(blame)));
+        return Err(ProtocolAborted::invalid_x(blame).into());
     }
 
     tracer.stage("Compute paillier encryption keys");
@@ -520,7 +509,7 @@ where
         outgoings
             .send(Outgoing::p2p(j, Msg::Round3(msg)))
             .await
-            .map_err(KeyRefreshError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -531,7 +520,7 @@ where
     let shares_msg_b = rounds
         .complete(round3)
         .await
-        .map_err(KeyRefreshError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     tracer.stage("Paillier decrypt x_j^i from C_j^i");
@@ -547,9 +536,7 @@ where
             Ok::<_, AbortBlame>(bigint.to_scalar())
         }));
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::paillier_dec(
-            blame,
-        )));
+        return Err(ProtocolAborted::paillier_dec(blame).into());
     }
     debug_assert_eq!(shares.len(), usize::from(n) - 1);
 
@@ -569,9 +556,7 @@ where
         })
         .collect::<Vec<_>>();
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(ProtocolAborted::invalid_x_share(
-            blame,
-        )));
+        return Err(ProtocolAborted::invalid_x_share(blame).into());
     }
     // It is possible at this point to report a bad party to others, but we
     // don't implement it now
@@ -607,9 +592,7 @@ where
         },
     )?;
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_schnorr_proof(blame),
-        ));
+        return Err(ProtocolAborted::invalid_schnorr_proof(blame).into());
     }
 
     tracer.stage("Validate ψ_j (П_mod)");
@@ -627,9 +610,7 @@ where
         },
     );
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_mod_proof(blame),
-        ));
+        return Err(ProtocolAborted::invalid_mod_proof(blame).into());
     }
 
     tracer.stage("Validate ф_j (П_fac)");
@@ -656,9 +637,7 @@ where
         },
     );
     if !blame.is_empty() {
-        return Err(KeyRefreshError::Aborted(
-            ProtocolAborted::invalid_fac_proof(blame),
-        ));
+        return Err(ProtocolAborted::invalid_fac_proof(blame).into());
     }
 
     // verifications passed, compute final key shares
@@ -683,7 +662,7 @@ where
         .collect();
 
     tracer.stage("Assemble new core share");
-    let new_core_share = IncompleteKeyShare {
+    let new_core_share = DirtyIncompleteKeyShare {
         public_shares: X_stars,
         x: SecretScalar::new(&mut x_star),
         ..old_core_share
@@ -697,7 +676,7 @@ where
             t: d.t.clone(),
         })
         .collect();
-    let key_share = KeyShare {
+    let key_share = DirtyKeyShare {
         core: new_core_share,
         p,
         q,
@@ -709,35 +688,31 @@ where
 }
 
 #[derive(Debug, Error)]
-pub enum KeyRefreshError<IErr, OErr> {
+#[error("key refresh protocol failed to complete")]
+pub struct KeyRefreshError(#[source] Reason);
+
+crate::errors::impl_from! {
+    impl From for KeyRefreshError {
+        err: ProtocolAborted => KeyRefreshError(Reason::Aborted(err)),
+        err: IoError => KeyRefreshError(Reason::IoError(err)),
+        err: Bug => KeyRefreshError(Reason::InternalError(err)),
+    }
+}
+
+#[derive(Debug, Error)]
+enum Reason {
     /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
     Aborted(#[source] ProtocolAborted),
-    /// Receiving message error
-    #[error("receive message")]
-    ReceiveMessage(
-        #[source]
-        round_based::rounds_router::CompleteRoundError<
-            round_based::rounds_router::simple_store::RoundInputError,
-            IErr,
-        >,
-    ),
-    /// Sending message error
-    #[error("send message")]
-    SendError(#[source] OErr),
-    #[error("could not spawn worker thread")]
-    SpawnError,
+    #[error("i/o error")]
+    IoError(#[source] IoError),
     #[error("internal error")]
     InternalError(#[from] Bug),
-    #[error("couldn't decrypt a message")]
-    PaillierDec,
-    #[error("couldn't decode scalar bytes")]
-    InvalidScalar(generic_ec::errors::InvalidScalar),
 }
 
 /// Unexpected error in operation not caused by other parties
 #[derive(Debug, Error)]
-pub enum Bug {
+enum Bug {
     #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
     InvalidHashToCurveTag,
     #[error("Unexpected error when creating paillier decryption key")]
@@ -765,14 +740,14 @@ pub enum Bug {
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
 #[error("Protocol aborted; malicious parties: {parties:?}; reason: {reason}")]
-pub struct ProtocolAborted {
+struct ProtocolAborted {
     pub reason: ProtocolAbortReason,
     pub parties: Vec<AbortBlame>,
 }
 
 /// Reason for protocol abort: which exact check has failed
 #[derive(Debug, Error)]
-pub enum ProtocolAbortReason {
+enum ProtocolAbortReason {
     #[error("decommitment doesn't match commitment")]
     InvalidDecommitment,
     #[error("provided invalid schnorr proof")]

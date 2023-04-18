@@ -13,12 +13,13 @@ pub use {
 };
 
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
-use key_share::{IncompleteKeyShare, KeyShare, Valid};
+use key_share::{AnyKeyShare, IncompleteKeyShare, KeyShare};
 use round_based::PartyIndex;
 use security_level::SecurityLevel;
 use sha2::Sha256;
 use signing::SigningBuilder;
 
+mod errors;
 mod execution_id;
 pub mod key_refresh;
 pub mod key_share;
@@ -29,7 +30,7 @@ pub mod signing;
 pub mod supported_curves;
 pub mod trusted_dealer;
 mod utils;
-pub mod zk;
+mod zk;
 
 pub use self::execution_id::ExecutionId;
 
@@ -58,7 +59,7 @@ where
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 pub fn aux_info_gen<E, L>(
-    core_share: &Valid<IncompleteKeyShare<E, L>>,
+    core_share: &IncompleteKeyShare<E, L>,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
 ) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
 where
@@ -72,20 +73,20 @@ where
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 pub fn key_refresh<E, L>(
-    key_share: &Valid<KeyShare<E, L>>,
+    key_share: &impl AnyKeyShare<E, L>,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
 ) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
 where
     E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::KeyRefreshBuilder::new_refresh(key_share, pregenerated)
+    key_refresh::KeyRefreshBuilder::new(key_share, pregenerated)
 }
 
 pub fn signing<'r, E, L>(
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r Valid<KeyShare<E, L>>,
+    key_share: &'r KeyShare<E, L>,
 ) -> SigningBuilder<'r, E, L, Sha256>
 where
     E: Curve,

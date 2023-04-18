@@ -1,5 +1,5 @@
 use anyhow::Context;
-use cggmp21::{progress::PerfProfiler, signing::Message, ExecutionId};
+use cggmp21::{progress::PerfProfiler, signing::DataToSign, ExecutionId};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rand_dev::DevRng;
@@ -52,7 +52,7 @@ async fn main() {
             let refresh_execution_id: [u8; 32] = rng.gen();
             let refresh_execution_id = ExecutionId::<E, L>::from_bytes(&refresh_execution_id);
 
-            use cggmp21::key_refresh::Msg;
+            use cggmp21::key_refresh::msg::Msg;
             let mut simulation = Simulation::<Msg<E, D, L>>::new();
 
             let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
@@ -91,9 +91,9 @@ async fn main() {
             let signers_indexes_at_keygen = &(0..n).collect::<Vec<_>>();
 
             let message_to_sign = b"Dfns rules!";
-            let message_to_sign = Message::new::<Sha256>(message_to_sign);
+            let message_to_sign = DataToSign::digest::<Sha256>(message_to_sign);
 
-            use cggmp21::signing::Msg;
+            use cggmp21::signing::msg::Msg;
             let mut simulation = Simulation::<Msg<E, D>>::new();
 
             let mut outputs = vec![];

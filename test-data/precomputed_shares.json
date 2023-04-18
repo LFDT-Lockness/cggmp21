@@ -4,7 +4,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -92,7 +91,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -180,7 +178,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -268,7 +265,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -356,7 +352,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -444,7 +439,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -532,7 +526,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -620,7 +613,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -708,7 +700,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -796,7 +787,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "034e870eafc23e1293a0e2ceaefbf70e1dddc118aba9f5fa6fb4fc9ccbbf79e28c",
           "0299bd7ddb142008c5ba65c4b47323cfddacf38669efe1c6e3c3f841c128dc5044",
@@ -886,7 +876,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -974,7 +963,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1062,7 +1050,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1150,7 +1137,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1238,7 +1224,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1326,7 +1311,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1414,7 +1398,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1502,7 +1485,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1590,7 +1572,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1678,7 +1659,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "0244ec9b31ee128202fb8533582cfc6a47e1c8837fcd9ca26af2a5c168cbf8b8a3",
           "02da31e7d3ed2de8248f6bf928134e81099103c0c2148f168a41a4d0945f8934bc",
@@ -1768,7 +1748,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 2,
         "public_shares": [
           "0271ae730c73764730c2cf29c47935268933d3e4d112d9a9153ec152f4a1767f3a",
           "03e9c172600ceea120d0d9fc8360fd930dba48b192ed785c8fe4c34228d7a274d0"
@@ -1800,7 +1779,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 2,
         "public_shares": [
           "0271ae730c73764730c2cf29c47935268933d3e4d112d9a9153ec152f4a1767f3a",
           "03e9c172600ceea120d0d9fc8360fd930dba48b192ed785c8fe4c34228d7a274d0"
@@ -1834,7 +1812,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 2,
         "public_shares": [
           "039392ac079cc6d6c44c1b5c3939a6099f9eafc858e6bdd67ca5499c0eeac37c39",
           "0279fb75e94e2c54ab4c6ad9423adc65347f4776e32f4ccaa54142df9339e30573"
@@ -1866,7 +1843,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 2,
         "public_shares": [
           "039392ac079cc6d6c44c1b5c3939a6099f9eafc858e6bdd67ca5499c0eeac37c39",
           "0279fb75e94e2c54ab4c6ad9423adc65347f4776e32f4ccaa54142df9339e30573"
@@ -1900,7 +1876,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 3,
         "public_shares": [
           "02ba071a85345c586327240e8b853eb0b5bb8018696e851c3582ae6f0d5708655f",
           "029a1b2831b5afdde23db7b49fe739898af734da66b0c9599f07a17612c0373dca",
@@ -1939,7 +1914,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 3,
         "public_shares": [
           "02ba071a85345c586327240e8b853eb0b5bb8018696e851c3582ae6f0d5708655f",
           "029a1b2831b5afdde23db7b49fe739898af734da66b0c9599f07a17612c0373dca",
@@ -1978,7 +1952,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 3,
         "public_shares": [
           "02ba071a85345c586327240e8b853eb0b5bb8018696e851c3582ae6f0d5708655f",
           "029a1b2831b5afdde23db7b49fe739898af734da66b0c9599f07a17612c0373dca",
@@ -2019,7 +1992,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 3,
         "public_shares": [
           "036d33ee059f9a058d2c0d79367d1830566ec146e9c051339dd22316d1350f0cac",
           "029f4d4c232e539d8d047ad6003c9b2fb9233b6acdbd7d84e60f18e864cb6ebbd6",
@@ -2058,7 +2030,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 3,
         "public_shares": [
           "036d33ee059f9a058d2c0d79367d1830566ec146e9c051339dd22316d1350f0cac",
           "029f4d4c232e539d8d047ad6003c9b2fb9233b6acdbd7d84e60f18e864cb6ebbd6",
@@ -2097,7 +2068,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 3,
         "public_shares": [
           "036d33ee059f9a058d2c0d79367d1830566ec146e9c051339dd22316d1350f0cac",
           "029f4d4c232e539d8d047ad6003c9b2fb9233b6acdbd7d84e60f18e864cb6ebbd6",
@@ -2138,7 +2108,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "02fc570306bb40eda75a2750dfbc0a237e24f4daba5b91ef54e96e1142e6249efa",
           "02409f640607c448414245ec11cf7d8edfcd303efa13c9ab13b08732ec2eabc878",
@@ -2191,7 +2160,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "02fc570306bb40eda75a2750dfbc0a237e24f4daba5b91ef54e96e1142e6249efa",
           "02409f640607c448414245ec11cf7d8edfcd303efa13c9ab13b08732ec2eabc878",
@@ -2244,7 +2212,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "02fc570306bb40eda75a2750dfbc0a237e24f4daba5b91ef54e96e1142e6249efa",
           "02409f640607c448414245ec11cf7d8edfcd303efa13c9ab13b08732ec2eabc878",
@@ -2297,7 +2264,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "02fc570306bb40eda75a2750dfbc0a237e24f4daba5b91ef54e96e1142e6249efa",
           "02409f640607c448414245ec11cf7d8edfcd303efa13c9ab13b08732ec2eabc878",
@@ -2350,7 +2316,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "02fc570306bb40eda75a2750dfbc0a237e24f4daba5b91ef54e96e1142e6249efa",
           "02409f640607c448414245ec11cf7d8edfcd303efa13c9ab13b08732ec2eabc878",
@@ -2405,7 +2370,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "039e6648b870c60f850a04886d8972b8d52502a33d87a24c5f086e98e7751a9953",
           "0266e28c038e92a9a5b97a6fc87215c60029ec50dda3b05c8077a7e66b713b4c60",
@@ -2458,7 +2422,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "039e6648b870c60f850a04886d8972b8d52502a33d87a24c5f086e98e7751a9953",
           "0266e28c038e92a9a5b97a6fc87215c60029ec50dda3b05c8077a7e66b713b4c60",
@@ -2511,7 +2474,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "039e6648b870c60f850a04886d8972b8d52502a33d87a24c5f086e98e7751a9953",
           "0266e28c038e92a9a5b97a6fc87215c60029ec50dda3b05c8077a7e66b713b4c60",
@@ -2564,7 +2526,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "039e6648b870c60f850a04886d8972b8d52502a33d87a24c5f086e98e7751a9953",
           "0266e28c038e92a9a5b97a6fc87215c60029ec50dda3b05c8077a7e66b713b4c60",
@@ -2617,7 +2578,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "039e6648b870c60f850a04886d8972b8d52502a33d87a24c5f086e98e7751a9953",
           "0266e28c038e92a9a5b97a6fc87215c60029ec50dda3b05c8077a7e66b713b4c60",
@@ -2672,7 +2632,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -2739,7 +2698,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -2806,7 +2764,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -2873,7 +2830,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -2940,7 +2896,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -3007,7 +2962,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -3074,7 +3028,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "02f263c01572e888f31c87297254ebe4b112142b8733c7b15d80ccf0c08fba131c",
           "02c04c4524cbcf55bc7cd176eaefe7e15bdcd40de429f9e730b0e2f16a3089cc2d",
@@ -3143,7 +3096,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3210,7 +3162,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3277,7 +3228,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3344,7 +3294,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3411,7 +3360,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3478,7 +3426,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3545,7 +3492,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "03afdc431a4f43a43855b557255852ea75c57cc8fec7949af26eec15b0ee1388be",
           "0213453eaabbfa5e734811d41703dc85890b9b743c443025565ebb91139933a064",
@@ -3614,7 +3560,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -3746,7 +3691,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -3878,7 +3822,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4010,7 +3953,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4142,7 +4084,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4274,7 +4215,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4406,7 +4346,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4538,7 +4477,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4670,7 +4608,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4802,7 +4739,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "023fb3e10d6aa6261ea274b4db44ab429dd3cf45ccf794cf56aca17a6b7647f183",
           "022128029565a310287fd7a2e98dd80f57a828a8408f80fb08f8c73e4287562fa0",
@@ -4936,7 +4872,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5068,7 +5003,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5200,7 +5134,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5332,7 +5265,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5464,7 +5396,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5596,7 +5527,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5728,7 +5658,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5860,7 +5789,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -5992,7 +5920,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -6124,7 +6051,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "020c6987515e6edddb27145f581e013fbb3973da30fe7bf00be17e99c6855db539",
           "0329483a2e1d9db15f79ef977270c3b61fdde60ab8e026271b2ca4187e703b2c47",
@@ -6258,7 +6184,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 2,
         "public_shares": [
           "03766a4e0d7cae13597c79eb4ff6daa1d09457c874898fa7e82e01fb5b8fc5d44b",
           "0376a49e9ac87cb8f39c9d3d0e9a207b5fc279820238c84b5729dc69cb45ddabbd"
@@ -6302,7 +6227,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 2,
         "public_shares": [
           "03766a4e0d7cae13597c79eb4ff6daa1d09457c874898fa7e82e01fb5b8fc5d44b",
           "0376a49e9ac87cb8f39c9d3d0e9a207b5fc279820238c84b5729dc69cb45ddabbd"
@@ -6348,7 +6272,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 2,
         "public_shares": [
           "022b00b114754cd012d88ed44c0fcd6186db5b30335fb3cb2368fbf0b68e0edd93",
           "03da38b87568e5889d66427c80cda0c0507aa4938337ec74569a65c5f88a2ee95d"
@@ -6392,7 +6315,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 2,
         "public_shares": [
           "022b00b114754cd012d88ed44c0fcd6186db5b30335fb3cb2368fbf0b68e0edd93",
           "03da38b87568e5889d66427c80cda0c0507aa4938337ec74569a65c5f88a2ee95d"
@@ -6438,7 +6360,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 3,
         "public_shares": [
           "02da667e7c2a3ec864c789141f14ad9c1148c774be3d2162b2a907833f8d32e633",
           "031933584d08956dc4b74a1d3e5a5d4dfa08d82d48c4dee2e138fb496eca7a9137",
@@ -6493,7 +6414,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 3,
         "public_shares": [
           "02da667e7c2a3ec864c789141f14ad9c1148c774be3d2162b2a907833f8d32e633",
           "031933584d08956dc4b74a1d3e5a5d4dfa08d82d48c4dee2e138fb496eca7a9137",
@@ -6548,7 +6468,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 3,
         "public_shares": [
           "02da667e7c2a3ec864c789141f14ad9c1148c774be3d2162b2a907833f8d32e633",
           "031933584d08956dc4b74a1d3e5a5d4dfa08d82d48c4dee2e138fb496eca7a9137",
@@ -6605,7 +6524,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 3,
         "public_shares": [
           "02c5196d947571bc74f102c33d0e030c2f7295b288a33dfbc50747419c9328679b",
           "0278fc2129ab5175f9fe6efdcb53dcc06b9ee9528338c1bb357091f1bbed8d0dd2",
@@ -6660,7 +6578,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 3,
         "public_shares": [
           "02c5196d947571bc74f102c33d0e030c2f7295b288a33dfbc50747419c9328679b",
           "0278fc2129ab5175f9fe6efdcb53dcc06b9ee9528338c1bb357091f1bbed8d0dd2",
@@ -6715,7 +6632,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 3,
         "public_shares": [
           "02c5196d947571bc74f102c33d0e030c2f7295b288a33dfbc50747419c9328679b",
           "0278fc2129ab5175f9fe6efdcb53dcc06b9ee9528338c1bb357091f1bbed8d0dd2",
@@ -6772,7 +6688,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "02ff32bf9cc719b7f5b5d62b0393ab0f89a92ea88c2ca664e3ef84cbe4e7e200c8",
           "03d4d6bfe84d9ed5323d5041620cd074cd64558755ce1f201ba06abdb8b8c0a5b4",
@@ -6849,7 +6764,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "02ff32bf9cc719b7f5b5d62b0393ab0f89a92ea88c2ca664e3ef84cbe4e7e200c8",
           "03d4d6bfe84d9ed5323d5041620cd074cd64558755ce1f201ba06abdb8b8c0a5b4",
@@ -6926,7 +6840,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "02ff32bf9cc719b7f5b5d62b0393ab0f89a92ea88c2ca664e3ef84cbe4e7e200c8",
           "03d4d6bfe84d9ed5323d5041620cd074cd64558755ce1f201ba06abdb8b8c0a5b4",
@@ -7003,7 +6916,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "02ff32bf9cc719b7f5b5d62b0393ab0f89a92ea88c2ca664e3ef84cbe4e7e200c8",
           "03d4d6bfe84d9ed5323d5041620cd074cd64558755ce1f201ba06abdb8b8c0a5b4",
@@ -7080,7 +6992,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "02ff32bf9cc719b7f5b5d62b0393ab0f89a92ea88c2ca664e3ef84cbe4e7e200c8",
           "03d4d6bfe84d9ed5323d5041620cd074cd64558755ce1f201ba06abdb8b8c0a5b4",
@@ -7159,7 +7070,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "02687e1661764bed6ce9200660e866ba13b2befa4e9e4c05567d986a6a0aaa916f",
           "0308fceaaecd72d812a7868791a0e51127578766a9cf77d69425d298456f81e4db",
@@ -7236,7 +7146,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "02687e1661764bed6ce9200660e866ba13b2befa4e9e4c05567d986a6a0aaa916f",
           "0308fceaaecd72d812a7868791a0e51127578766a9cf77d69425d298456f81e4db",
@@ -7313,7 +7222,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "02687e1661764bed6ce9200660e866ba13b2befa4e9e4c05567d986a6a0aaa916f",
           "0308fceaaecd72d812a7868791a0e51127578766a9cf77d69425d298456f81e4db",
@@ -7390,7 +7298,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "02687e1661764bed6ce9200660e866ba13b2befa4e9e4c05567d986a6a0aaa916f",
           "0308fceaaecd72d812a7868791a0e51127578766a9cf77d69425d298456f81e4db",
@@ -7467,7 +7374,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "02687e1661764bed6ce9200660e866ba13b2befa4e9e4c05567d986a6a0aaa916f",
           "0308fceaaecd72d812a7868791a0e51127578766a9cf77d69425d298456f81e4db",
@@ -7546,7 +7452,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -7645,7 +7550,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -7744,7 +7648,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -7843,7 +7746,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -7942,7 +7844,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -8041,7 +7942,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -8140,7 +8040,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "02b548d396ccd231183f2f771fd8b04ffda6f1af18f0638d02b1e0887bad045973",
           "02beee92af1d2dfea82aa26c7c06bf42a7ee055fb10450d254d94b490efc9eb5f8",
@@ -8241,7 +8140,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8340,7 +8238,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8439,7 +8336,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8538,7 +8434,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8637,7 +8532,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8736,7 +8630,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8835,7 +8728,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "03e692276f924eabe269da8b37555e79d885584ea687cc4bd4aa5d2d800f813902",
           "028aab9e7477dbedc4bd5c2f284373b4a6c5b5d21c7f19ec47fa7b29323aaa0a2c",
@@ -8936,7 +8828,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9068,7 +8959,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9200,7 +9090,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9332,7 +9221,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9464,7 +9352,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9596,7 +9483,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9728,7 +9614,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9860,7 +9745,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -9992,7 +9876,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -10124,7 +10007,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "028be1036c07bf2023805992cadd31ba1416673ebf60518e26d3eef848e6b52d63",
           "0250542ad9825f5efe0c1b1ab480561014f3e039a97205fcfe3e595e5526a3eb73",
@@ -10258,7 +10140,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -10390,7 +10271,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -10522,7 +10402,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -10654,7 +10533,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -10786,7 +10664,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -10918,7 +10795,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -11050,7 +10926,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -11182,7 +11057,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -11314,7 +11188,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -11446,7 +11319,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "03c5bc006243508966b18e51b9c4545fce25682f41b614e147680421a4d96aa2f5",
           "03d7f2fe4f673037707aa8e29fddc537385b806021266c140d8af010745b3107bf",
@@ -11580,7 +11452,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 3,
         "public_shares": [
           "03bce975d11bdeb2b32cd1addbc12557e1afeb2fc41458b05da193566bcddbca80",
           "02c84d5d4b728470f8d83728aae31f1029a375953fd414b83da7b30fbf695c770a",
@@ -11635,7 +11506,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 3,
         "public_shares": [
           "03bce975d11bdeb2b32cd1addbc12557e1afeb2fc41458b05da193566bcddbca80",
           "02c84d5d4b728470f8d83728aae31f1029a375953fd414b83da7b30fbf695c770a",
@@ -11690,7 +11560,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 3,
         "public_shares": [
           "03bce975d11bdeb2b32cd1addbc12557e1afeb2fc41458b05da193566bcddbca80",
           "02c84d5d4b728470f8d83728aae31f1029a375953fd414b83da7b30fbf695c770a",
@@ -11747,7 +11616,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 3,
         "public_shares": [
           "02ba4223611213c64cbcc6edc96b68a6d484c7696b5eb03ad447e21de60f0ff4bf",
           "02c8c6476262816830c616fe871600f2cf616652ea09b892b0c727618118afcc11",
@@ -11802,7 +11670,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 3,
         "public_shares": [
           "02ba4223611213c64cbcc6edc96b68a6d484c7696b5eb03ad447e21de60f0ff4bf",
           "02c8c6476262816830c616fe871600f2cf616652ea09b892b0c727618118afcc11",
@@ -11857,7 +11724,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 3,
         "public_shares": [
           "02ba4223611213c64cbcc6edc96b68a6d484c7696b5eb03ad447e21de60f0ff4bf",
           "02c8c6476262816830c616fe871600f2cf616652ea09b892b0c727618118afcc11",
@@ -11914,7 +11780,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "02333e176209f2d3208038f1f7032e20132771c5c62af85717e0f222795c0e8230",
           "03be7b536e129906774365c4bfa217b8252f40bfec4214038bfa91a56f06ff6393",
@@ -11991,7 +11856,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "02333e176209f2d3208038f1f7032e20132771c5c62af85717e0f222795c0e8230",
           "03be7b536e129906774365c4bfa217b8252f40bfec4214038bfa91a56f06ff6393",
@@ -12068,7 +11932,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "02333e176209f2d3208038f1f7032e20132771c5c62af85717e0f222795c0e8230",
           "03be7b536e129906774365c4bfa217b8252f40bfec4214038bfa91a56f06ff6393",
@@ -12145,7 +12008,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "02333e176209f2d3208038f1f7032e20132771c5c62af85717e0f222795c0e8230",
           "03be7b536e129906774365c4bfa217b8252f40bfec4214038bfa91a56f06ff6393",
@@ -12222,7 +12084,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "02333e176209f2d3208038f1f7032e20132771c5c62af85717e0f222795c0e8230",
           "03be7b536e129906774365c4bfa217b8252f40bfec4214038bfa91a56f06ff6393",
@@ -12301,7 +12162,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "03858a2facedaafc4fefcc808c35cfce3222693125c90d2b8e437a11187eea8b24",
           "03272bb836ba9e327b8defdc559b9a7ce8c3bf492cc04a69158ab4e29a1b47417c",
@@ -12378,7 +12238,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "03858a2facedaafc4fefcc808c35cfce3222693125c90d2b8e437a11187eea8b24",
           "03272bb836ba9e327b8defdc559b9a7ce8c3bf492cc04a69158ab4e29a1b47417c",
@@ -12455,7 +12314,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "03858a2facedaafc4fefcc808c35cfce3222693125c90d2b8e437a11187eea8b24",
           "03272bb836ba9e327b8defdc559b9a7ce8c3bf492cc04a69158ab4e29a1b47417c",
@@ -12532,7 +12390,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "03858a2facedaafc4fefcc808c35cfce3222693125c90d2b8e437a11187eea8b24",
           "03272bb836ba9e327b8defdc559b9a7ce8c3bf492cc04a69158ab4e29a1b47417c",
@@ -12609,7 +12466,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "03858a2facedaafc4fefcc808c35cfce3222693125c90d2b8e437a11187eea8b24",
           "03272bb836ba9e327b8defdc559b9a7ce8c3bf492cc04a69158ab4e29a1b47417c",
@@ -12688,7 +12544,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -12787,7 +12642,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -12886,7 +12740,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -12985,7 +12838,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -13084,7 +12936,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -13183,7 +13034,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -13282,7 +13132,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "0355dfe8ef8d027c65635f3f2030e3c1ea945e5c61c637126602fde0b9fe20a56c",
           "02722328bc88bfcfa64df0011f93d9e3322bcdf27f25e0e322657a5e89a6732c39",
@@ -13383,7 +13232,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -13482,7 +13330,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -13581,7 +13428,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -13680,7 +13526,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -13779,7 +13624,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -13878,7 +13722,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -13977,7 +13820,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "02357634a17542b1ff9e2971a062a83990c73827f62386e3fb84d3315e3d57aa2e",
           "0330e035ce7ed54214935b0574a838c5cc9619d4ceb42e657ad1d8a8741d8fbb52",
@@ -14078,7 +13920,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -14210,7 +14051,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -14342,7 +14182,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -14474,7 +14313,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -14606,7 +14444,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -14738,7 +14575,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -14870,7 +14706,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -15002,7 +14837,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -15134,7 +14968,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -15266,7 +15099,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "02344353d78d6c50b98c4f30abc9f55be99c69f3ee67c5c180df0746e4880ae788",
           "0211ddec357fa5ae2ce21fc7d170321916a06f5684832e9093f23b4e54c6ef131e",
@@ -15400,7 +15232,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -15532,7 +15363,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -15664,7 +15494,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -15796,7 +15625,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -15928,7 +15756,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -16060,7 +15887,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -16192,7 +16018,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -16324,7 +16149,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -16456,7 +16280,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -16588,7 +16411,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "034213afb33ee85710688a9e4c6300190db7b6ec64ffc0050606ae70f8d2a368e1",
           "02250f54dff859b97dde49fb5f407a8cf5cf7059bd4b7b96dc8a41a87748d0e218",
@@ -16722,7 +16544,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "020bb790f141f8558a7a2953bd12d89ddee55c60a0de457c80b6143cfcf21aeb4f",
           "025ad9ee31ccf53f7ed97f403574349e06bd2c34245a52e07104b0092ecc466ec3",
@@ -16799,7 +16620,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "020bb790f141f8558a7a2953bd12d89ddee55c60a0de457c80b6143cfcf21aeb4f",
           "025ad9ee31ccf53f7ed97f403574349e06bd2c34245a52e07104b0092ecc466ec3",
@@ -16876,7 +16696,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "020bb790f141f8558a7a2953bd12d89ddee55c60a0de457c80b6143cfcf21aeb4f",
           "025ad9ee31ccf53f7ed97f403574349e06bd2c34245a52e07104b0092ecc466ec3",
@@ -16953,7 +16772,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "020bb790f141f8558a7a2953bd12d89ddee55c60a0de457c80b6143cfcf21aeb4f",
           "025ad9ee31ccf53f7ed97f403574349e06bd2c34245a52e07104b0092ecc466ec3",
@@ -17030,7 +16848,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "020bb790f141f8558a7a2953bd12d89ddee55c60a0de457c80b6143cfcf21aeb4f",
           "025ad9ee31ccf53f7ed97f403574349e06bd2c34245a52e07104b0092ecc466ec3",
@@ -17109,7 +16926,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 5,
         "public_shares": [
           "0250def1b25653aac25542fc30b9e44c3601f2d0fd605279336cde7685bf714e3f",
           "035fd31b63bf185e8ec74c27b5572a9b6f9534861ab02c38591e9ceb0ef0d63af7",
@@ -17186,7 +17002,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 5,
         "public_shares": [
           "0250def1b25653aac25542fc30b9e44c3601f2d0fd605279336cde7685bf714e3f",
           "035fd31b63bf185e8ec74c27b5572a9b6f9534861ab02c38591e9ceb0ef0d63af7",
@@ -17263,7 +17078,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 5,
         "public_shares": [
           "0250def1b25653aac25542fc30b9e44c3601f2d0fd605279336cde7685bf714e3f",
           "035fd31b63bf185e8ec74c27b5572a9b6f9534861ab02c38591e9ceb0ef0d63af7",
@@ -17340,7 +17154,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 5,
         "public_shares": [
           "0250def1b25653aac25542fc30b9e44c3601f2d0fd605279336cde7685bf714e3f",
           "035fd31b63bf185e8ec74c27b5572a9b6f9534861ab02c38591e9ceb0ef0d63af7",
@@ -17417,7 +17230,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 5,
         "public_shares": [
           "0250def1b25653aac25542fc30b9e44c3601f2d0fd605279336cde7685bf714e3f",
           "035fd31b63bf185e8ec74c27b5572a9b6f9534861ab02c38591e9ceb0ef0d63af7",
@@ -17496,7 +17308,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -17595,7 +17406,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -17694,7 +17504,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -17793,7 +17602,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -17892,7 +17700,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -17991,7 +17798,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -18090,7 +17896,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "03a56d08f4736013ddd83d8f38cb4acdf4296bec44e34420b9523674196518c2ad",
           "02c93d87b8b3d9cb550faabd7e964e5b049f02283202c8c89e6dff40977507ebfb",
@@ -18191,7 +17996,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18290,7 +18094,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18389,7 +18192,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18488,7 +18290,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18587,7 +18388,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18686,7 +18486,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18785,7 +18584,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "02e45ce5dbb7323c5cdbe5a8cd9947ce04d320b4d9939a9eb497cd4b9bb0ed7c26",
           "03c41831f56362ba998e4d49c45ee359e6cc61392786cd08ded5a6e0dff968dbfb",
@@ -18886,7 +18684,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19018,7 +18815,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19150,7 +18946,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19282,7 +19077,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19414,7 +19208,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19546,7 +19339,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19678,7 +19470,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19810,7 +19601,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -19942,7 +19732,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -20074,7 +19863,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "0328b2f98730a7d024e8f5d93f70d5cd779966b55cfb4d78778d554ac8a2ebc25c",
           "02faf46d4f52fca9bab98aa0bd46e38636efb41f83d4b8d980bd5e4a32c755016a",
@@ -20208,7 +19996,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -20340,7 +20127,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -20472,7 +20258,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -20604,7 +20389,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -20736,7 +20520,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -20868,7 +20651,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -21000,7 +20782,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -21132,7 +20913,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 7,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -21264,7 +21044,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 8,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -21396,7 +21175,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 9,
-        "n": 10,
         "public_shares": [
           "03ed347e02a86f3068cf76634b897753050df3adb55fcc1b072453e7e9995e43d0",
           "02214ceb414d97ab50cc56a97d1940a10311317b16b130ab98b184192b0ab0f8b9",
@@ -21530,7 +21308,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -21629,7 +21406,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -21728,7 +21504,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -21827,7 +21602,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -21926,7 +21700,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -22025,7 +21798,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -22124,7 +21896,6 @@
       "core": {
         "curve": "secp256k1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "0216255361f9bb634076ef749ab6304890bd7ceb3b38e6475b5734803655c20eb4",
           "0263cb864aedf59fa893226890e342ebf972d45d8d3d9d10273cc25d87623db657",
@@ -22225,7 +21996,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 0,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",
@@ -22324,7 +22094,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 1,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",
@@ -22423,7 +22192,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 2,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",
@@ -22522,7 +22290,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 3,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",
@@ -22621,7 +22388,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 4,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",
@@ -22720,7 +22486,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 5,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",
@@ -22819,7 +22584,6 @@
       "core": {
         "curve": "secp256r1",
         "i": 6,
-        "n": 7,
         "public_shares": [
           "02496b53030feb4e74c6e687cd073b11bb53c68531f1c9c21d98b7d1b4a41369b6",
           "02e293f22086541e161a5df0727f5cf57b99308431e14c951c2bcac2e16fb1e40f",

@@ -5,15 +5,16 @@ use digest::Digest;
 use generic_ec::hash_to_curve::FromHash;
 use generic_ec::{Curve, Scalar};
 use rand_core::{CryptoRng, RngCore};
-use round_based::rounds_router::simple_store::RoundInputError;
-use round_based::rounds_router::CompleteRoundError;
 use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
 
-use crate::key_share::{IncompleteKeyShare, InvalidKeyShare, Valid};
-use crate::security_level::SecurityLevel;
-use crate::utils::HashMessageError;
-use crate::ExecutionId;
+use crate::{
+    errors::IoError,
+    key_share::{IncompleteKeyShare, InvalidKeyShare},
+    security_level::SecurityLevel,
+    utils::HashMessageError,
+    ExecutionId,
+};
 
 /// Key generation entry point. You can call [`set_threshold`] to make it into a
 /// threshold DKG
@@ -124,7 +125,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
@@ -145,7 +146,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+    ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
@@ -162,9 +163,20 @@ where
     }
 }
 
-/// Keygen failed
 #[derive(Debug, Error)]
-pub enum KeygenError<IErr, OErr> {
+#[error("keygen protocol is failed to complete")]
+pub struct KeygenError(#[source] Reason);
+
+crate::errors::impl_from! {
+    impl From for KeygenError {
+        err: KeygenAborted => KeygenError(Reason::Aborted(err)),
+        err: IoError => KeygenError(Reason::IoError(err)),
+        err: Bug => KeygenError(Reason::Bug(err)),
+    }
+}
+
+#[derive(Debug, Error)]
+enum Reason {
     /// Protocol was maliciously aborted by another party
     #[error("protocol was aborted by malicious party")]
     Aborted(
@@ -172,22 +184,18 @@ pub enum KeygenError<IErr, OErr> {
         #[from]
         KeygenAborted,
     ),
-    /// Receiving message error
-    #[error("receive message")]
-    ReceiveMessage(#[source] CompleteRoundError<RoundInputError, IErr>),
-    /// Sending message error
-    #[error("send message")]
-    SendError(#[source] OErr),
+    #[error("i/o error")]
+    IoError(#[source] IoError),
     /// Bug occurred
     #[error("bug occurred")]
-    Bug(InternalError),
+    Bug(Bug),
 }
 
 /// Error indicating that protocol was aborted by malicious party
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
-pub enum KeygenAborted {
+enum KeygenAborted {
     #[error("party decommitment doesn't match commitment: {parties:?}")]
     InvalidDecommitment { parties: Vec<u16> },
     #[error("party provided invalid schnorr proof: {parties:?}")]
@@ -199,13 +207,6 @@ pub enum KeygenAborted {
     #[error("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
 }
-
-/// Error indicating that internal bug was detected
-///
-/// Please, report this issue if you encounter it
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct InternalError(Bug);
 
 #[derive(Debug, Error)]
 enum Bug {
@@ -219,10 +220,4 @@ enum Bug {
     HashMessage(#[source] HashMessageError),
     #[error("unexpected zero value")]
     NonZeroScalar,
-}
-
-impl<IErr, OErr> From<Bug> for KeygenError<IErr, OErr> {
-    fn from(err: Bug) -> Self {
-        KeygenError::Bug(InternalError(err))
-    }
 }

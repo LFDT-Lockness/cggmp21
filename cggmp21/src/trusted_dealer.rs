@@ -8,7 +8,9 @@ use thiserror::Error;
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{
-    key_share::{IncompleteKeyShare, InvalidKeyShare, KeyShare, PartyAux, Valid, VssSetup},
+    key_share::{
+        DirtyIncompleteKeyShare, DirtyKeyShare, InvalidKeyShare, KeyShare, PartyAux, VssSetup,
+    },
     security_level::SecurityLevel,
     utils::sample_bigint_in_mult_group,
 };
@@ -17,7 +19,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
     t: Option<u16>,
     n: u16,
-) -> Result<Vec<Valid<KeyShare<E, L>>>, TrustedDealerError> {
+) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
     let key_shares_indexes = (1..=n)
         .map(|i| NonZero::from_scalar(Scalar::from(i)))
         .collect::<Option<Vec<_>>>()
@@ -62,10 +64,9 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
 
     let core_shares = (0u16..)
         .zip(secret_shares)
-        .map(|(i, x_i)| IncompleteKeyShare::<E, L> {
+        .map(|(i, x_i)| DirtyIncompleteKeyShare::<E, L> {
             curve: Default::default(),
             i,
-            n,
             shared_public_key,
             rid: rid.clone(),
             public_shares: public_shares.clone(),
@@ -89,7 +90,7 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
     let key_shares = core_shares
         .zip(primes_setups)
         .map(|(core_share, primes_setup)| {
-            KeyShare {
+            DirtyKeyShare {
                 p: primes_setup.p,
                 q: primes_setup.q,
                 parties: parties_aux.clone(),

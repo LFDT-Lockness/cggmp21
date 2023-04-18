@@ -13,12 +13,16 @@ use round_based::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::execution_id::ProtocolChoice;
-use crate::key_share::{IncompleteKeyShare, Valid, VssSetup};
-use crate::security_level::SecurityLevel;
-use crate::utils;
-use crate::utils::{hash_message, xor_array};
-use crate::ExecutionId;
+use crate::key_share::DirtyIncompleteKeyShare;
+use crate::{
+    errors::IoError,
+    execution_id::ProtocolChoice,
+    key_share::{IncompleteKeyShare, VssSetup},
+    security_level::SecurityLevel,
+    utils,
+    utils::{hash_message, xor_array},
+    ExecutionId,
+};
 
 use super::{Bug, KeygenAborted, KeygenError};
 
@@ -73,7 +77,7 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
     execution_id: ExecutionId<E, L, D>,
     rng: &mut R,
     party: M,
-) -> Result<Valid<IncompleteKeyShare<E, L>>, KeygenError<M::ReceiveError, M::SendError>>
+) -> Result<IncompleteKeyShare<E, L>, KeygenError>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -134,14 +138,14 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     // Round 2
 
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(KeygenError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     let commitments_hash = commitments
         .iter_including_me(&my_commitment)
         .try_fold(D::new(), hash_message)
@@ -152,7 +156,7 @@ where
             commitments_hash.clone(),
         ))))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     let my_decommitment = MsgRound2Broad {
         rid,
@@ -165,7 +169,7 @@ where
             my_decommitment.clone(),
         )))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     for j in utils::iter_peers(i, n) {
         let message = MsgRound2Uni {
@@ -174,7 +178,7 @@ where
         outgoings
             .send(Outgoing::p2p(j, Msg::Round2Uni(message)))
             .await
-            .map_err(KeygenError::SendError)?;
+            .map_err(IoError::send_message)?;
     }
 
     // Round 3
@@ -183,7 +187,7 @@ where
         let commitments_hashes = rounds
             .complete(round1_sync)
             .await
-            .map_err(KeygenError::ReceiveMessage)?;
+            .map_err(IoError::receive_message)?;
         let parties_have_different_hashes = commitments_hashes
             .into_iter_indexed()
             .filter(|(_j, _msg_id, hash)| hash.0 != commitments_hash)
@@ -196,11 +200,11 @@ where
     let decommitments = rounds
         .complete(round2_broad)
         .await
-        .map_err(KeygenError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     let sigmas_msg = rounds
         .complete(round2_uni)
         .await
-        .map_err(KeygenError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
 
     // Validate decommitments
     let blame = commitments
@@ -286,14 +290,14 @@ where
     outgoings
         .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
         .await
-        .map_err(KeygenError::SendError)?;
+        .map_err(IoError::send_message)?;
 
     // Output determination
 
     let sch_proofs = rounds
         .complete(round3)
         .await
-        .map_err(KeygenError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
 
     let mut blame = vec![];
     for ((j, decommitment), sch_proof) in utils::iter_peers(i, n)
@@ -332,10 +336,9 @@ where
         .collect::<Option<Vec<_>>>()
         .ok_or(Bug::NonZeroScalar)?;
 
-    Ok(IncompleteKeyShare {
+    Ok(DirtyIncompleteKeyShare {
         curve: Default::default(),
         i,
-        n,
         shared_public_key: y,
         rid,
         public_shares: ys,

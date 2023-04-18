@@ -3,70 +3,76 @@ use futures::SinkExt;
 use generic_ec::{
     coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar, SecretScalar,
 };
-use paillier_zk::libpaillier::{unknown_order::BigNumber, Ciphertext, DecryptionKey};
+use paillier_zk::libpaillier::{unknown_order::BigNumber, DecryptionKey};
 use paillier_zk::{
-    group_element_vs_paillier_encryption_in_range as pi_log, libpaillier,
+    group_element_vs_paillier_encryption_in_range as pi_log,
     paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
     BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    rounds_router::{
-        simple_store::{RoundInput, RoundInputError},
-        CompleteRoundError, RoundsRouter,
-    },
-    Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex, ProtocolMessage,
+    rounds_router::{simple_store::RoundInput, RoundsRouter},
+    Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex,
 };
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::key_share::{PartyAux, VssSetup};
+use crate::errors::IoError;
+use crate::key_share::{KeyShare, PartyAux, VssSetup};
 use crate::progress::Tracer;
 use crate::utils::{hash_message, iter_peers, lagrange_coefficient, subset, HashMessageError};
 use crate::{
     execution_id::ProtocolChoice,
-    key_share::{InvalidKeyShare, KeyShare, Valid},
+    key_share::InvalidKeyShare,
     security_level::SecurityLevel,
     utils::{encryption_key_from_n, scalar_to_bignumber},
     ExecutionId,
 };
 
-/// A (prehashed) message to sign
+use self::msg::*;
+
+/// A (prehashed) data to be signed
+///
+/// `DataToSign` holds a scalar that represents data to be signed. Different ECDSA schemes define different
+/// ways to map an original data to be signed (slice of bytes) into the scalar, but it always must involve
+/// cryptographic hash functions. Most commonly, original data is hashed using SHA2-256, then output is parsed
+/// as big-endian integer and taken modulo curve order. This exact functionality is implemented in
+/// [DataToSign::digest] and [DataToSign::from_digest] constructors.
 #[derive(Debug, Clone, Copy)]
-pub struct Message([u8; 32]);
+pub struct DataToSign<E: Curve>(Scalar<E>);
 
-impl Message {
-    /// Construct a `Message` by hashing `data` with algorithm `D`
-    pub fn new<D>(data: &[u8]) -> Self
-    where
-        D: Digest<OutputSize = digest::typenum::U32>,
-    {
-        Message(D::digest(data).into())
-    }
-
-    /// Constructs a `Message` from `hash = H(message)`
-    pub fn from_digest<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = digest::typenum::U32>,
-    {
-        Message(hash.finalize().into())
-    }
-
-    /// Constructs a `Message` from `message_hash = H(message)`
+impl<E: Curve> DataToSign<E> {
+    /// Construct a `DataToSign` by hashing `data` with algorithm `D`
     ///
-    /// ** Note: [Message::new] and [Message::from_digest] are preferred way to construct the `Message` **
-    ///
-    /// `message_hash` must be an output of cryptographic function of 32 bytes length. If
-    /// `message_hash` is not 32 bytes size, `Err(InvalidMessage)` is returned.
-    pub fn from_slice(message_hash: &[u8]) -> Result<Self, InvalidMessage> {
-        message_hash.try_into().map(Self).or(Err(InvalidMessage))
+    /// `data_to_sign = hash(data) mod q`
+    pub fn digest<D: Digest>(data: &[u8]) -> Self {
+        DataToSign(Scalar::from_be_bytes_mod_order(D::digest(data)))
     }
 
-    fn to_scalar<E: Curve>(self) -> Scalar<E> {
-        Scalar::from_be_bytes_mod_order(self.0)
+    /// Constructs a `DataToSign` from output of given digest
+    ///
+    /// `data_to_sign = hash(data) mod q`
+    pub fn from_digest<D: Digest>(hash: D) -> Self {
+        DataToSign(Scalar::from_be_bytes_mod_order(hash.finalize()))
+    }
+
+    /// Constructs a `DataToSign` from scalar
+    ///
+    /// ** Note: [DataToSign::digest] and [DataToSign::from_digest] are preferred way to construct the `DataToSign` **
+    ///
+    /// `scalar` must be output of cryptographic hash function applied to original message to be signed
+    pub fn from_scalar(scalar: Scalar<E>) -> Self {
+        Self(scalar)
+    }
+
+    /// Returns a scalar that represents a data to be signed
+    pub fn to_scalar(self) -> Scalar<E> {
+        self.0
     }
 }
 
+/// Presignature, can be used to issue a [partial signature](PartialSignature) without interacting with other signers
+///
+/// [Threshold](crate::key_share::AnyKeyShare::min_signers) amount of partial signatures (from different signers) can be [combined](PartialSignature::combine) into regular signature
 pub struct Presignature<E: Curve> {
     pub R: NonZero<Point<E>>,
     pub k: SecretScalar<E>,
@@ -84,58 +90,83 @@ pub struct Signature<E: Curve> {
     pub s: NonZero<Scalar<E>>,
 }
 
-#[derive(Clone, ProtocolMessage)]
-#[allow(clippy::large_enum_variant)]
-pub enum Msg<E: Curve, D: Digest> {
-    Round1a(MsgRound1a),
-    Round1b(MsgRound1b),
-    Round2(MsgRound2<E>),
-    Round3(MsgRound3<E>),
-    Round4(MsgRound4<E>),
-    ReliabilityCheck(MsgReliabilityCheck<D>),
-}
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    use digest::Digest;
+    use generic_ec::Curve;
+    use generic_ec::{Point, Scalar};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct MsgRound1a {
-    pub K: libpaillier::Ciphertext,
-    pub G: libpaillier::Ciphertext,
-}
+    use libpaillier::Ciphertext;
+    use paillier_zk::libpaillier;
+    use paillier_zk::{
+        group_element_vs_paillier_encryption_in_range as pi_log,
+        paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
+    };
+    use round_based::ProtocolMessage;
+    use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct MsgRound1b {
-    pub psi0: (pi_enc::Commitment, pi_enc::Proof),
-}
+    /// Signing protocol message
+    ///
+    /// Enumerates messages from all rounds
+    #[derive(Clone, ProtocolMessage)]
+    #[allow(clippy::large_enum_variant)]
+    pub enum Msg<E: Curve, D: Digest> {
+        Round1a(MsgRound1a),
+        Round1b(MsgRound1b),
+        Round2(MsgRound2<E>),
+        Round3(MsgRound3<E>),
+        Round4(MsgRound4<E>),
+        ReliabilityCheck(MsgReliabilityCheck<D>),
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound2<E: Curve> {
-    pub Gamma: Point<E>,
-    pub D: Ciphertext,
-    pub F: Ciphertext,
-    pub hat_D: Ciphertext,
-    pub hat_F: Ciphertext,
-    pub psi: (pi_aff::Commitment<E>, pi_aff::Proof),
-    pub hat_psi: (pi_aff::Commitment<E>, pi_aff::Proof),
-    pub psi_prime: (pi_log::Commitment<E>, pi_log::Proof),
-}
+    /// Message from round 1a
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct MsgRound1a {
+        pub K: libpaillier::Ciphertext,
+        pub G: libpaillier::Ciphertext,
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound3<E: Curve> {
-    pub delta: Scalar<E>,
-    pub Delta: Point<E>,
-    pub psi_prime_prime: (pi_log::Commitment<E>, pi_log::Proof),
-}
+    /// Message from round 1b
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct MsgRound1b {
+        pub psi0: (pi_enc::Commitment, pi_enc::Proof),
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgRound4<E: Curve> {
-    pub sigma: Scalar<E>,
-}
+    /// Message from round 2
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound2<E: Curve> {
+        pub Gamma: Point<E>,
+        pub D: Ciphertext,
+        pub F: Ciphertext,
+        pub hat_D: Ciphertext,
+        pub hat_F: Ciphertext,
+        pub psi: (pi_aff::Commitment<E>, pi_aff::Proof),
+        pub hat_psi: (pi_aff::Commitment<E>, pi_aff::Proof),
+        pub psi_prime: (pi_log::Commitment<E>, pi_log::Proof),
+    }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct MsgReliabilityCheck<D: Digest>(digest::Output<D>);
+    /// Message from round 3
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound3<E: Curve> {
+        pub delta: Scalar<E>,
+        pub Delta: Point<E>,
+        pub psi_prime_prime: (pi_log::Commitment<E>, pi_log::Proof),
+    }
+
+    /// Message from round 4
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgRound4<E: Curve> {
+        pub sigma: Scalar<E>,
+    }
+
+    /// Message from auxiliary round for reliability check
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+}
 
 pub struct SigningBuilder<'r, E, L, D>
 where
@@ -145,7 +176,7 @@ where
 {
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r Valid<KeyShare<E, L>>,
+    key_share: &'r KeyShare<E, L>,
     execution_id: ExecutionId<E, L, D>,
     tracer: Option<&'r mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
@@ -162,7 +193,7 @@ where
     pub fn new(
         i: PartyIndex,
         parties_indexes_at_keygen: &'r [PartyIndex],
-        secret_key_share: &'r Valid<KeyShare<E, L>>,
+        secret_key_share: &'r KeyShare<E, L>,
     ) -> Self {
         Self {
             i,
@@ -220,7 +251,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<Presignature<E>, SigningError<M::ReceiveError, M::SendError>>
+    ) -> Result<Presignature<E>, SigningError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -247,8 +278,8 @@ where
         self,
         rng: &mut R,
         party: M,
-        message_to_sign: Message,
-    ) -> Result<Signature<E>, SigningError<M::ReceiveError, M::SendError>>
+        message_to_sign: DataToSign<E>,
+    ) -> Result<Signature<E>, SigningError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -284,11 +315,11 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     party: M,
     sid: ExecutionId<E, L, D>,
     i: PartyIndex,
-    key_share: &Valid<KeyShare<E, L>>,
+    key_share: &KeyShare<E, L>,
     S: &[PartyIndex],
-    message_to_sign: Option<Message>,
+    message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
-) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
+) -> Result<ProtocolOutput<E>, SigningError>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
     E: Curve,
@@ -390,9 +421,9 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     p_i: &BigNumber,
     q_i: &BigNumber,
     R: &[PartyAux],
-    message_to_sign: Option<Message>,
+    message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
-) -> Result<ProtocolOutput<E>, SigningError<M::ReceiveError, M::SendError>>
+) -> Result<ProtocolOutput<E>, SigningError>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
     E: Curve,
@@ -450,7 +481,7 @@ where
             G: G_i.clone(),
         })))
         .await
-        .map_err(SigningError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     let parties_shared_state = D::new_with_prefix(sid);
@@ -478,7 +509,7 @@ where
         outgoings
             .send(Outgoing::p2p(j, Msg::Round1b(MsgRound1b { psi0 })))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -490,11 +521,11 @@ where
     let ciphertexts = rounds
         .complete(round1a)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     let psi0 = rounds
         .complete(round1b)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     // Reliability check (if enabled)
@@ -515,7 +546,7 @@ where
                 MsgReliabilityCheck(h_i),
             )))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
 
         tracer.round_begins();
@@ -524,7 +555,7 @@ where
         let round1a_hashes = rounds
             .complete(round1a_sync)
             .await
-            .map_err(SigningError::ReceiveMessage)?;
+            .map_err(IoError::receive_message)?;
         tracer.msgs_received();
         tracer.stage("Assert other parties hashed messages (reliability check)");
         let parties_have_different_hashes = round1a_hashes
@@ -710,7 +741,7 @@ where
                 }),
             ))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -722,7 +753,7 @@ where
     let round2_msgs = rounds
         .complete(round2)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     let mut faulty_parties = vec![];
@@ -862,7 +893,7 @@ where
                 }),
             ))
             .await
-            .map_err(SigningError::SendError)?;
+            .map_err(IoError::send_message)?;
         tracer.msg_sent();
     }
 
@@ -874,7 +905,7 @@ where
     let round3_msgs = rounds
         .complete(round3)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     tracer.stage("Validate psi_prime_prime");
@@ -941,7 +972,7 @@ where
     tracer.named_round_begins("Partial signing");
 
     // Round 1
-    let partial_sig = presig.partially_sign(message_to_sign);
+    let partial_sig = presig.issue_partial_signature(message_to_sign);
 
     tracer.send_msg();
     outgoings
@@ -949,7 +980,7 @@ where
             sigma: partial_sig.sigma,
         })))
         .await
-        .map_err(SigningError::SendError)?;
+        .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Output
@@ -959,7 +990,7 @@ where
     let partial_sigs = rounds
         .complete(round4)
         .await
-        .map_err(SigningError::ReceiveMessage)?;
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
     let sig = {
         let r = NonZero::from_scalar(partial_sig.r);
@@ -1008,9 +1039,9 @@ where
     E: Curve,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
-    pub fn partially_sign(self, message_to_sign: Message) -> PartialSignature<E> {
+    pub fn issue_partial_signature(self, message_to_sign: DataToSign<E>) -> PartialSignature<E> {
         let r = self.R.x().to_scalar();
-        let m = message_to_sign.to_scalar::<E>();
+        let m = message_to_sign.to_scalar();
         let sigma_i = self.k.as_ref() * m + r * self.chi.as_ref();
         PartialSignature { r, sigma: sigma_i }
     }
@@ -1033,9 +1064,12 @@ where
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
     /// Verifies that signature matches specified public key and message
-    pub fn verify(&self, public_key: &Point<E>, message: &Message) -> Result<(), InvalidSignature> {
-        let r =
-            (Point::generator() * message.to_scalar::<E>() + public_key * self.r) * self.s.invert();
+    pub fn verify(
+        &self,
+        public_key: &Point<E>,
+        message: &DataToSign<E>,
+    ) -> Result<(), InvalidSignature> {
+        let r = (Point::generator() * message.to_scalar() + public_key * self.r) * self.s.invert();
         let r = NonZero::from_point(r).ok_or(InvalidSignature)?;
 
         if *self.r == r.x().to_scalar() {
@@ -1087,13 +1121,25 @@ enum ProtocolOutput<E: Curve> {
     Signature(Signature<E>),
 }
 
+/// Error indicating that signing protocol failed
 #[derive(Debug, Error)]
-#[error("message to sign is not valid")]
-pub struct InvalidMessage;
+#[error("signing protocol failed")]
+pub struct SigningError(#[source] Reason);
+
+crate::errors::impl_from! {
+    impl From for SigningError {
+        err: InvalidArgs => SigningError(Reason::InvalidArgs(err)),
+        err: InvalidKeyShare => SigningError(Reason::InvalidKeyShare(err)),
+        err: InvalidSecurityLevel => SigningError(Reason::InvalidSecurityLevel(err)),
+        err: SigningAborted => SigningError(Reason::Aborted(err)),
+        err: IoError => SigningError(Reason::IoError(err)),
+        err: Bug => SigningError(Reason::Bug(err)),
+    }
+}
 
 /// Error indicating that signing failed
 #[derive(Debug, Error)]
-pub enum SigningError<IErr, OErr> {
+enum Reason {
     #[error("invalid arguments")]
     InvalidArgs(
         #[from]
@@ -1113,21 +1159,17 @@ pub enum SigningError<IErr, OErr> {
         InvalidSecurityLevel,
     ),
     /// Signing protocol was maliciously aborted by another party
-    #[error("signing protocol was maliciously aborted by another party")]
+    #[error("protocol was maliciously aborted by another party")]
     Aborted(
         #[source]
         #[from]
         SigningAborted,
     ),
-    /// Receiving message error
-    #[error("receive message")]
-    ReceiveMessage(#[source] CompleteRoundError<RoundInputError, IErr>),
-    /// Sending message error
-    #[error("send message")]
-    SendError(#[source] OErr),
+    #[error("i/o error")]
+    IoError(#[source] IoError),
     /// Bug occurred
     #[error("bug occurred")]
-    Bug(InternalError),
+    Bug(Bug),
 }
 
 /// Error indicating that protocol was aborted by malicious party
@@ -1135,7 +1177,7 @@ pub enum SigningError<IErr, OErr> {
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[allow(clippy::type_complexity)]
 #[derive(Debug, Error)]
-pub enum SigningAborted {
+enum SigningAborted {
     #[error("pi_enc::verify(K) failed")]
     EncProofOfK(Vec<(PartyIndex, MsgId, MsgId)>),
     #[error("ψ, ψˆ, or ψ' proofs are invalid")]
@@ -1162,7 +1204,7 @@ pub enum SigningAborted {
 }
 
 #[derive(Debug, Error)]
-pub enum InvalidSecurityLevel {
+enum InvalidSecurityLevel {
     #[error("specified security level is too small to carry out protocol")]
     SecurityLevelTooSmall,
     #[error("epsilon is too small to carry out protocol")]
@@ -1170,7 +1212,7 @@ pub enum InvalidSecurityLevel {
 }
 
 #[derive(Debug, Error)]
-pub enum InvalidArgs {
+enum InvalidArgs {
     #[error("exactly `threshold` amount of parties should take part in signing")]
     MismatchedAmountOfParties,
     #[error("signer index `i` is out of bounds (must be < n)")]
@@ -1178,13 +1220,6 @@ pub enum InvalidArgs {
     #[error("party index in S is out of bounds (must be < n)")]
     InvalidS,
 }
-
-/// Error indicating that internal bug was detected
-///
-/// Please, report this issue if you encounter it
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct InternalError(Bug);
 
 #[derive(Debug, Error)]
 enum Bug {
@@ -1240,12 +1275,7 @@ enum BugSource {
     psi_prime_prime,
 }
 
+/// Error indicating that signature is not valid for given public key and message
 #[derive(Debug, Error)]
 #[error("signature is not valid")]
 pub struct InvalidSignature;
-
-impl<IErr, OErr> From<Bug> for SigningError<IErr, OErr> {
-    fn from(e: Bug) -> Self {
-        SigningError::Bug(InternalError(e))
-    }
-}

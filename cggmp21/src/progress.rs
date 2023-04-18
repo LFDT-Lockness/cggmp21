@@ -9,10 +9,10 @@
 //! Provide tracer to the protocol builder and obtain results after protocol is completed:
 //!
 //! ```rust,no_run
-//! # use cggmp21::key_share::{Valid, KeyShare};
+//! # use cggmp21::key_share::{KeyShare};
 //! # type E = cggmp21::supported_curves::Secp256r1;
 //! # type L = cggmp21::security_level::ReasonablySecure;
-//! # fn load_key_share() -> Result<Valid<KeyShare<E, L>>, std::convert::Infallible> { unimplemented!() }
+//! # fn load_key_share() -> Result<KeyShare<E, L>, std::convert::Infallible> { unimplemented!() }
 //! # async fn connect_to_network<M>() -> Result<(u16, round_based::MpcParty<M, round_based::simulation::MockedDelivery<M>>), std::convert::Infallible> { unimplemented!() }
 //! # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
 //! # let participants = &[1, 2, 3];
