@@ -51,6 +51,8 @@ pub mod msg {
 
     use crate::{security_level::SecurityLevel, zk::ring_pedersen_parameters as π_prm};
 
+    pub type AuxOnlyMsg<D> = super::aux_only::Msg<D>;
+
     /// Message of key refresh protocol
     #[derive(ProtocolMessage, Clone)]
     // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
@@ -174,54 +176,6 @@ where
             tracer: None,
         }
     }
-}
-
-impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, L, D, AuxOnly>
-where
-    E: Curve,
-    L: SecurityLevel,
-    D: Digest,
-{
-    pub fn new_aux_gen(i: u16, n: u16, pregenerated: PregeneratedPrimes<L>) -> Self {
-        Self {
-            target: AuxOnly { i, n },
-            execution_id: Default::default(),
-            pregenerated,
-            tracer: None,
-        }
-    }
-}
-
-impl<'a, E, L, D> KeyRefreshBuilder<'a, E, L, D>
-where
-    E: Curve,
-    L: SecurityLevel,
-    D: Digest,
-{
-    /// Specifies another hash function to use
-    ///
-    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
-    /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2: Digest>(self) -> KeyRefreshBuilder<'a, E, L, D2> {
-        KeyRefreshBuilder {
-            target: self.target,
-            execution_id: Default::default(),
-            pregenerated: self.pregenerated,
-            tracer: None,
-        }
-    }
-
-    pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
-        Self {
-            execution_id,
-            ..self
-        }
-    }
-
-    pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
-        self.tracer = Some(tracer);
-        self
-    }
 
     /// Carry out the refresh procedure. Takes a lot of time
     pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E, L>, KeyRefreshError>
@@ -251,7 +205,16 @@ where
     L: SecurityLevel,
     D: Digest,
 {
-    pub async fn start_aux_only<R, M>(
+    pub fn new_aux_gen(i: u16, n: u16, pregenerated: PregeneratedPrimes<L>) -> Self {
+        Self {
+            target: AuxOnly { i, n },
+            execution_id: Default::default(),
+            pregenerated,
+            tracer: None,
+        }
+    }
+
+    pub async fn start<R, M>(
         self,
         rng: &mut R,
         party: M,
@@ -274,6 +237,38 @@ where
             self.tracer,
         )
         .await
+    }
+}
+
+impl<'a, E, L, D, T> GenericKeyRefreshBuilder<'a, E, L, D, T>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest,
+{
+    /// Specifies another hash function to use
+    ///
+    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
+    /// you specify execution ID **after** calling this function.
+    pub fn set_digest<D2: Digest>(self) -> GenericKeyRefreshBuilder<'a, E, L, D2, T> {
+        GenericKeyRefreshBuilder {
+            target: self.target,
+            execution_id: Default::default(),
+            pregenerated: self.pregenerated,
+            tracer: None,
+        }
+    }
+
+    pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
+        Self {
+            execution_id,
+            ..self
+        }
+    }
+
+    pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
+        self.tracer = Some(tracer);
+        self
     }
 }
 

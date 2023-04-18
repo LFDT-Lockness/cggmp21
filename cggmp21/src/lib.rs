@@ -13,7 +13,7 @@ pub use {
 };
 
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
-use key_share::{AnyKeyShare, IncompleteKeyShare, KeyShare};
+use key_share::{AnyKeyShare, KeyShare};
 use round_based::PartyIndex;
 use security_level::SecurityLevel;
 use sha2::Sha256;
@@ -58,18 +58,20 @@ where
 /// initial key refresh.
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
-pub fn aux_info_gen<E, L>(
-    core_share: &IncompleteKeyShare<E, L>,
+pub fn aux_info_gen<'a, E, L>(
+    t: u16,
+    n: u16,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
-) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
+) -> key_refresh::GenericKeyRefreshBuilder<'a, E, L, Sha256, key_refresh::AuxOnly>
 where
     E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::KeyRefreshBuilder::new(core_share, pregenerated)
+    key_refresh::GenericKeyRefreshBuilder::new_aux_gen(t, n, pregenerated)
 }
 
-/// Protocol for performing key refresh
+/// Protocol for performing key refresh. Can be used to perform initial refresh
+/// with aux info generation, or for a refersh of a complete keyshare.
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 pub fn key_refresh<E, L>(

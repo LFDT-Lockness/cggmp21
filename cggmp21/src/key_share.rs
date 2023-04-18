@@ -219,15 +219,6 @@ impl DirtyAuxInfo {
 }
 
 impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
-    pub fn make(core: IncompleteKeyShare<E, L>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
-        let r = Self {
-            core: core.0,
-            aux: aux.0,
-        };
-        r.validate_consistency()?;
-        Ok(r)
-    }
-
     /// Perform consistency check between core and aux
     fn validate_consistency(&self) -> Result<(), InvalidKeyShare> {
         if self.core.public_shares.len() != self.aux.parties.len() {
@@ -249,6 +240,26 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
         self.core.validate()?;
         self.aux.validate()?;
         self.validate_consistency()
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
+    pub fn make(core: IncompleteKeyShare<E, L>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+        let r = DirtyKeyShare {
+            core: core.0,
+            aux: aux.0,
+        };
+        r.validate_consistency()?;
+        Ok(Valid(r))
+    }
+
+    pub fn update_aux(self, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+        let r = DirtyKeyShare {
+            core: self.0.core,
+            aux: aux.0,
+        };
+        r.validate_consistency()?;
+        Ok(Valid(r))
     }
 }
 
