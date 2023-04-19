@@ -141,9 +141,16 @@ impl<L: SecurityLevel> PregeneratedPrimes<L> {
     }
 }
 
+/// A variant of [`GenericKeyRefreshBuilder`] that performs key refresh
 pub type KeyRefreshBuilder<'a, E, L, D> =
     GenericKeyRefreshBuilder<'a, E, L, D, RefreshShare<'a, E, L>>;
 
+/// A variant of [`GenericKeyRefreshBuilder`] that only generates auxiliary info
+/// and doesn't require key shares
+pub type AuxInfoGenerationBuilder<'a, E, L, D> =
+    GenericKeyRefreshBuilder<'a, E, L, D, AuxOnly>;
+
+/// Entry point for key refresh and auxiliary info generation.
 pub struct GenericKeyRefreshBuilder<'a, E, L, D, M>
 where
     E: Curve,
@@ -156,7 +163,9 @@ where
     tracer: Option<&'a mut dyn Tracer>,
 }
 
+/// A marker for [`KeyRefreshBuilder`]
 pub struct RefreshShare<'a, E: Curve, L: SecurityLevel>(&'a DirtyIncompleteKeyShare<E, L>);
+/// A marker for [`AuxInfoGenerationBuilder`]
 pub struct AuxOnly {
     i: u16,
     n: u16,
@@ -208,6 +217,9 @@ where
     L: SecurityLevel,
     D: Digest,
 {
+    /// Build key aux info generation operation. Start it with [`start`](Self::start).
+    ///
+    /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
     pub fn new_aux_gen(i: u16, n: u16, pregenerated: PregeneratedPrimes<L>) -> Self {
         Self {
             target: AuxOnly { i, n },
@@ -217,6 +229,7 @@ where
         }
     }
 
+    /// Carry out the aux info generation procedure. Takes a lot of time
     pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<AuxInfo, KeyRefreshError>
     where
         R: RngCore + CryptoRng,

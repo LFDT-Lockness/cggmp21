@@ -244,6 +244,8 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
 }
 
 impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
+    /// Make key share from valid components, only checking for consistency
+    /// between them
     pub fn make(core: IncompleteKeyShare<E, L>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
         let r = DirtyKeyShare {
             core: core.0,
@@ -253,6 +255,8 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
         Ok(Valid(r))
     }
 
+    /// Update aux info of a valid key share. Checks that the new aux info is
+    /// consistent with key share
     pub fn update_aux(self, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
         let r = DirtyKeyShare {
             core: self.0.core,
