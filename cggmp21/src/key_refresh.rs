@@ -21,7 +21,10 @@ use thiserror::Error;
 use crate::{
     errors::IoError,
     execution_id::ProtocolChoice,
-    key_share::{AuxInfo, AnyKeyShare, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux, DirtyAuxInfo},
+    key_share::{
+        AnyKeyShare, AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare,
+        PartyAux,
+    },
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -214,11 +217,7 @@ where
         }
     }
 
-    pub async fn start<R, M>(
-        self,
-        rng: &mut R,
-        party: M,
-    ) -> Result<AuxInfo, KeyRefreshError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<AuxInfo, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = aux_only::Msg<D>>,

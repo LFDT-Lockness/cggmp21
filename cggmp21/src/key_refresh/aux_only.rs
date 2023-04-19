@@ -13,14 +13,15 @@ use round_based::{
 };
 
 use crate::{
+    errors::IoError,
     execution_id::ProtocolChoice,
-    key_share::{AuxInfo, PartyAux, DirtyAuxInfo},
+    key_share::{AuxInfo, DirtyAuxInfo, PartyAux},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
     utils::{collect_blame, collect_simple_blame},
     zk::ring_pedersen_parameters as π_prm,
-    ExecutionId, errors::IoError,
+    ExecutionId,
 };
 
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
@@ -199,9 +200,7 @@ where
             .is_err()
     });
     if !blame.is_empty() {
-        return Err(
-            ProtocolAborted::invalid_decommitment(blame).into(),
-        );
+        return Err(ProtocolAborted::invalid_decommitment(blame).into());
     }
     // validate parameters and param_proofs
     tracer.stage("Validate П_prm (ψ_i)");
@@ -218,9 +217,7 @@ where
         }
     });
     if !blame.is_empty() {
-        return Err(
-            ProtocolAborted::invalid_ring_pedersen_parameters(blame).into(),
-        );
+        return Err(ProtocolAborted::invalid_ring_pedersen_parameters(blame).into());
     }
 
     // common data for messages
@@ -301,9 +298,7 @@ where
         },
     );
     if !blame.is_empty() {
-        return Err(
-            ProtocolAborted::invalid_mod_proof(blame).into(),
-        );
+        return Err(ProtocolAborted::invalid_mod_proof(blame).into());
     }
 
     tracer.stage("Validate ф_j (П_fac)");
@@ -331,9 +326,7 @@ where
         },
     );
     if !blame.is_empty() {
-        return Err(
-            ProtocolAborted::invalid_fac_proof(blame).into(),
-        );
+        return Err(ProtocolAborted::invalid_fac_proof(blame).into());
     }
 
     // verifications passed, compute final key shares

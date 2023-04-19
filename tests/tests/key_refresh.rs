@@ -126,8 +126,7 @@ mod generic {
         let refresh_execution_id: [u8; 32] = rng.gen();
         let refresh_execution_id =
             ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
-        let mut simulation =
-            Simulation::<cggmp21::key_refresh::msg::AuxOnlyMsg<Sha256>>::new();
+        let mut simulation = Simulation::<cggmp21::key_refresh::msg::AuxOnlyMsg<Sha256>>::new();
         let outputs = (0..n).map(|i| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
@@ -147,9 +146,11 @@ mod generic {
 
         // validate key shares
 
-        let key_shares = shares.into_iter().zip(aux_infos.into_iter()).map(|(share, aux)| {
-            share.update_aux(aux).unwrap()
-        }).collect::<Vec<_>>();
+        let key_shares = shares
+            .into_iter()
+            .zip(aux_infos.into_iter())
+            .map(|(share, aux)| share.update_aux(aux).unwrap())
+            .collect::<Vec<_>>();
 
         // attempt to sign with new shares and verify the signature
 
