@@ -60,7 +60,6 @@ pub struct DirtyIncompleteKeyShare<E: Curve, L: SecurityLevel> {
 }
 
 /// Dirty aux info
-#[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct DirtyAuxInfo {
@@ -77,7 +76,6 @@ pub struct DirtyAuxInfo {
 /// Dirty (unvalidated) key share
 ///
 #[doc = include_str!("../docs/key_share.md")]
-#[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct DirtyKeyShare<E: Curve, L: SecurityLevel> {
@@ -88,7 +86,6 @@ pub struct DirtyKeyShare<E: Curve, L: SecurityLevel> {
 }
 
 /// Party public auxiliary data
-#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct PartyAux {

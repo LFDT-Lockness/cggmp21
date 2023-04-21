@@ -1,8 +1,7 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
     use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
-    use rand::{seq::SliceRandom, Rng, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
+    use rand::{seq::SliceRandom, Rng};
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
     use sha2::Sha256;
@@ -31,11 +30,10 @@ mod generic {
         run_signing(&shares, &mut rng).await;
     }
 
-    async fn run_keygen<E, R>(t: u16, n: u16, rng: &mut R) -> Vec<Incomplete<E>>
+    async fn run_keygen<E>(t: u16, n: u16, rng: &mut DevRng) -> Vec<Incomplete<E>>
     where
         E: Curve,
         Scalar<E>: FromHash,
-        R: rand::RngCore,
     {
         let keygen_execution_id: [u8; 32] = rng.gen();
         let keygen_execution_id =
@@ -46,7 +44,7 @@ mod generic {
         for i in 0..n {
             let party = simulation.add_party();
             let keygen_execution_id = keygen_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
 
             outputs.push(async move {
                 cggmp21::keygen(i, n)
@@ -62,11 +60,10 @@ mod generic {
             .expect("keygen failed")
     }
 
-    async fn run_refresh<E, R>(shares: Vec<Incomplete<E>>, rng: &mut R) -> Vec<Share<E>>
+    async fn run_refresh<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
     where
         E: Curve,
         Scalar<E>: FromHash,
-        R: rand::RngCore,
     {
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
         let n = shares.len().try_into().unwrap();
@@ -79,7 +76,7 @@ mod generic {
         let outputs = (0..n).map(|i| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
                 cggmp21::aux_info_gen(i, n, pregenerated_data)
@@ -100,13 +97,14 @@ mod generic {
             .collect()
     }
 
-    async fn run_signing<E, R>(shares: &[Share<E>], rng: &mut R)
+    async fn run_signing<E>(shares: &[Share<E>], rng: &mut DevRng)
     where
         E: Curve,
         Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
-        R: rand::RngCore,
     {
+        use rand::RngCore;
+
         let t = shares[0].min_signers();
         let n = shares.len().try_into().unwrap();
 
@@ -131,7 +129,7 @@ mod generic {
         for (i, share) in (0..).zip(participants_shares) {
             let party = simulation.add_party();
             let signing_execution_id = signing_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
 
             outputs.push(async move {
                 cggmp21::signing(i, participants, share)

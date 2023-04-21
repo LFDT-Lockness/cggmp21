@@ -2,8 +2,7 @@
 mod generic {
     use generic_ec::{hash_to_curve::FromHash, Point};
     use rand::seq::SliceRandom;
-    use rand::{Rng, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
+    use rand::Rng;
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
@@ -34,7 +33,7 @@ mod generic {
         let outputs = shares.iter().map(|share| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
                 cggmp21::key_refresh(share, pregenerated_data)
@@ -87,7 +86,7 @@ mod generic {
         let outputs = key_shares.iter().map(|share| {
             let party = simulation.add_party();
             let signing_execution_id = signing_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
             async move {
                 cggmp21::signing(share.core.i, participants, share)
                     .set_execution_id(signing_execution_id)
@@ -130,7 +129,7 @@ mod generic {
         let outputs = (0..n).map(|i| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
                 cggmp21::aux_info_gen(i, n, pregenerated_data)
@@ -168,7 +167,7 @@ mod generic {
         let outputs = participants_shares.zip(0..).map(|(share, i)| {
             let party = simulation.add_party();
             let signing_execution_id = signing_execution_id.clone();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
             async move {
                 cggmp21::signing(i, participants, share)
                     .set_execution_id(signing_execution_id)
