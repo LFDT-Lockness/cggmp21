@@ -64,6 +64,7 @@ where
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
+    /// Specifies to generate key shares for a threshold scheme
     pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<E, L, D, WithThreshold> {
         GenericKeygenBuilder {
             i: self.i,

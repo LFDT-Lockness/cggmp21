@@ -9,7 +9,8 @@ use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{
     key_share::{
-        DirtyIncompleteKeyShare, DirtyKeyShare, InvalidKeyShare, KeyShare, PartyAux, VssSetup,
+        DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyShare, InvalidKeyShare, KeyShare, PartyAux,
+        VssSetup,
     },
     security_level::SecurityLevel,
     utils::sample_bigint_in_mult_group,
@@ -91,10 +92,12 @@ pub fn mock_keygen<E: Curve, L: SecurityLevel, R: RngCore + CryptoRng>(
         .zip(primes_setups)
         .map(|(core_share, primes_setup)| {
             DirtyKeyShare {
-                p: primes_setup.p,
-                q: primes_setup.q,
-                parties: parties_aux.clone(),
                 core: core_share,
+                aux: DirtyAuxInfo {
+                    p: primes_setup.p,
+                    q: primes_setup.q,
+                    parties: parties_aux.clone(),
+                },
             }
             .try_into()
         })

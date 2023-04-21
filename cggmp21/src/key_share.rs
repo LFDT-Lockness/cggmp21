@@ -28,6 +28,8 @@ pub type KeyShare<E, L> = Valid<DirtyKeyShare<E, L>>;
 #[doc = include_str!("../docs/validated_key_share_note.md")]
 pub type IncompleteKeyShare<E, L> = Valid<DirtyIncompleteKeyShare<E, L>>;
 
+pub type AuxInfo = Valid<DirtyAuxInfo>;
+
 /// Dirty (unvalidated) incomplete key share
 ///
 #[doc = include_str!("../docs/incomplete_key_share.md")]
@@ -57,15 +59,10 @@ pub struct DirtyIncompleteKeyShare<E: Curve, L: SecurityLevel> {
     pub x: SecretScalar<E>,
 }
 
-/// Dirty (unvalidated) key share
-///
-#[doc = include_str!("../docs/key_share.md")]
-#[serde_as]
+/// Dirty aux info
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyKeyShare<E: Curve, L: SecurityLevel> {
-    /// Core key share
-    pub core: DirtyIncompleteKeyShare<E, L>,
+pub struct DirtyAuxInfo {
     /// Secret prime $p$
     pub p: BigNumber,
     /// Secret prime $q$
@@ -76,8 +73,19 @@ pub struct DirtyKeyShare<E: Curve, L: SecurityLevel> {
     pub parties: Vec<PartyAux>,
 }
 
+/// Dirty (unvalidated) key share
+///
+#[doc = include_str!("../docs/key_share.md")]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct DirtyKeyShare<E: Curve, L: SecurityLevel> {
+    /// Core key share
+    pub core: DirtyIncompleteKeyShare<E, L>,
+    /// Auxiliary info
+    pub aux: DirtyAuxInfo,
+}
+
 /// Party public auxiliary data
-#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct PartyAux {
@@ -191,22 +199,10 @@ impl<E: Curve, L: SecurityLevel> DirtyIncompleteKeyShare<E, L> {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
-    /// Validates a share
-    ///
-    /// Performs consistency checks against a key share, returns `Ok(())` if share looks OK.
+impl DirtyAuxInfo {
+    /// Performs consistency checks against aux info, returns a valid share
+    /// you can use with other algorithms
     pub fn validate(&self) -> Result<(), InvalidKeyShare> {
-        self.core.validate()?;
-
-        if self.core.public_shares.len() != self.parties.len() {
-            return Err(InvalidKeyShareReason::AuxLen.into());
-        }
-
-        let N_i = &self.parties[usize::from(self.core.i)].N;
-        if *N_i != &self.p * &self.q {
-            return Err(InvalidKeyShareReason::PrimesMul.into());
-        }
-
         if self
             .parties
             .iter()
@@ -216,6 +212,55 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
         }
 
         Ok(())
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
+    /// Perform consistency check between core and aux
+    fn validate_consistency(&self) -> Result<(), InvalidKeyShare> {
+        if self.core.public_shares.len() != self.aux.parties.len() {
+            return Err(InvalidKeyShareReason::AuxLen.into());
+        }
+
+        let N_i = &self.aux.parties[usize::from(self.core.i)].N;
+        if *N_i != &self.aux.p * &self.aux.q {
+            return Err(InvalidKeyShareReason::PrimesMul.into());
+        }
+
+        Ok(())
+    }
+
+    /// Validates a share
+    ///
+    /// Performs consistency checks against a key share, returns `Ok(())` if share looks OK.
+    pub fn validate(&self) -> Result<(), InvalidKeyShare> {
+        self.core.validate()?;
+        self.aux.validate()?;
+        self.validate_consistency()
+    }
+}
+
+impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
+    /// Make key share from valid components, only checking for consistency
+    /// between them
+    pub fn make(core: IncompleteKeyShare<E, L>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+        let r = DirtyKeyShare {
+            core: core.0,
+            aux: aux.0,
+        };
+        r.validate_consistency()?;
+        Ok(Valid(r))
+    }
+
+    /// Update aux info of a valid key share. Checks that the new aux info is
+    /// consistent with key share
+    pub fn update_aux(self, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+        let r = DirtyKeyShare {
+            core: self.0.core,
+            aux: aux.0,
+        };
+        r.validate_consistency()?;
+        Ok(Valid(r))
     }
 }
 
@@ -400,6 +445,14 @@ impl<E: Curve, L: SecurityLevel> TryFrom<DirtyIncompleteKeyShare<E, L>>
     fn try_from(key_share: DirtyIncompleteKeyShare<E, L>) -> Result<Self, Self::Error> {
         key_share.validate()?;
         Ok(Self(key_share))
+    }
+}
+
+impl TryFrom<DirtyAuxInfo> for AuxInfo {
+    type Error = InvalidKeyShare;
+    fn try_from(value: DirtyAuxInfo) -> Result<Self, Self::Error> {
+        value.validate()?;
+        Ok(Self(value))
     }
 }
 
