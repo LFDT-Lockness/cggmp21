@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use cggmp21::supported_curves::{Secp256k1, Secp256r1};
-use cggmp21::{security_level::ReasonablySecure, trusted_dealer::mock_keygen};
+use cggmp21::{security_level::ReasonablySecure, trusted_dealer};
 use cggmp21_tests::{PrecomputedKeyShares, PregeneratedPrimes};
 use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
@@ -63,8 +63,10 @@ where
             .filter(|t| t.map(|t| t <= n).unwrap_or(true))
         {
             eprintln!("t={t:?},n={n},curve={}", E::CURVE_NAME);
-            let shares =
-                mock_keygen::<E, ReasonablySecure, _>(rng, t, n).context("generate shares")?;
+            let shares = trusted_dealer::builder::<E, ReasonablySecure>(n)
+                .set_threshold(t)
+                .generate_shares(rng)
+                .context("generate shares")?;
             cache.add_shares(t, n, &shares).context("add shares")?;
         }
     }

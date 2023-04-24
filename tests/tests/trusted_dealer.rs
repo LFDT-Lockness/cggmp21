@@ -5,7 +5,7 @@ mod test {
     use rand::seq::SliceRandom;
     use rand_dev::DevRng;
 
-    use cggmp21::trusted_dealer::mock_keygen;
+    use cggmp21::trusted_dealer;
 
     /// Dummy security level that enables fast key generation
     #[derive(Clone)]
@@ -29,7 +29,10 @@ mod test {
                 .iter()
                 .filter(|t| t.map(|t| t <= n).unwrap_or(true))
             {
-                let shares = mock_keygen::<E, DummyLevel, _>(&mut rng, t, n).unwrap();
+                let shares = trusted_dealer::builder::<E, DummyLevel>(n)
+                    .set_threshold(t)
+                    .generate_shares(&mut rng)
+                    .unwrap();
 
                 // Choose `t` random key shares and reconstruct a secret key
                 let t = t.unwrap_or(n);
