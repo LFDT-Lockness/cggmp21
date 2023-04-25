@@ -1,3 +1,20 @@
+//! Trusted dealer
+//!
+//! Trusted dealer can be used to generate key shares in one place. Note
+//! that in creates SPOF/T (single point of failure/trust). Trusted
+//! dealer is mainly intended to be used in tests.
+//!
+//! ## Example
+//! ```rust,no_run
+//! # use rand::rngs::OsRng;
+//! # let mut rng = OsRng;
+//! use cggmp21::{supported_curves::Secp256k1, security_level::ReasonablySecure};
+//! let key_shares = cggmp21::trusted_dealer::builder::<Secp256k1, ReasonablySecure>(5)
+//!     .set_threshold(Some(3))
+//!     .generate_shares(&mut rng)?;
+//! # Ok::<_, cggmp21::trusted_dealer::TrustedDealerError>(())
+//! ```
+
 use std::{iter, marker::PhantomData};
 
 use paillier_zk::libpaillier::unknown_order::BigNumber;
@@ -16,6 +33,11 @@ use crate::{
     utils::sample_bigint_in_mult_group,
 };
 
+/// Construct a trusted dealer builder
+///
+/// Takes amount of key shares `n` to be generated
+///
+/// Alias to [`TrustedDealerBuilder::new`]
 pub fn builder<E: Curve, L: SecurityLevel>(n: u16) -> TrustedDealerBuilder<E, L> {
     TrustedDealerBuilder {
         t: None,
@@ -25,6 +47,7 @@ pub fn builder<E: Curve, L: SecurityLevel>(n: u16) -> TrustedDealerBuilder<E, L>
     }
 }
 
+/// Trusted dealer builder
 pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
     t: Option<u16>,
     n: u16,
@@ -33,10 +56,37 @@ pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
 }
 
 impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
+    /// Construct a trusted dealer builder
+    ///
+    /// Takes amount of key shares `n` to be generated
+    pub fn new(n: u16) -> Self {
+        TrustedDealerBuilder {
+            t: None,
+            n,
+            shared_secret_key: None,
+            _ph: PhantomData,
+        }
+    }
+
+    /// Sets threshold value
+    ///
+    /// If threshold is `Some(_)`, resulting key shares will be generated
+    /// using t-out-of-n VSS scheme. If it's `None`, trusted dealer will
+    /// generate additive key shares in n-out-ouf-n scheme.
+    ///
+    /// Note that setting `t=Some(n)` is not the same as setting `t=None`.
+    /// Both produce n-out-of-n key shares, but `t=Some(n)` mocks threshold
+    /// key generation with `threshold=n`, `t=None` mock non-threshold key
+    /// generation.
+    ///
+    /// Default: `None`
     pub fn set_threshold(self, t: Option<u16>) -> Self {
         Self { t, ..self }
     }
 
+    /// Sets shared secret key to be generated
+    ///
+    /// Resulting key shares will share specified secret key.
     pub fn set_shared_secret_key(self, sk: SecretScalar<E>) -> Self {
         Self {
             shared_secret_key: Some(sk),
@@ -44,6 +94,10 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         }
     }
 
+    /// Generates [`IncompleteKeyShare`]s
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
     pub fn generate_core_shares(
         self,
         rng: &mut (impl RngCore + CryptoRng),
@@ -114,6 +168,10 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
+    /// Generates [`KeyShare`]s
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
     pub fn generate_shares(
         self,
         rng: &mut (impl RngCore + CryptoRng),
@@ -180,6 +238,7 @@ fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
     Ok(PartyPrimesSetup { p, q, N, s, t })
 }
 
+/// Error explaining why trusted dealer failed to generate shares
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct TrustedDealerError(#[from] Reason);
