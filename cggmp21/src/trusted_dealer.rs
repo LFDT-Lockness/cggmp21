@@ -30,7 +30,7 @@ use crate::{
         KeyShare, PartyAux, VssSetup,
     },
     security_level::SecurityLevel,
-    utils::sample_bigint_in_mult_group,
+    utils::{polynomial_value, sample_bigint_in_mult_group},
 };
 
 /// Construct a trusted dealer builder
@@ -113,12 +113,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             let polynomial_coef = iter::once(shared_secret_key)
                 .chain(iter::repeat_with(|| SecretScalar::<E>::random(rng)).take((t - 1).into()))
                 .collect::<Vec<_>>();
-            let f = |x: &Scalar<E>| {
-                polynomial_coef
-                    .iter()
-                    .rev()
-                    .fold(Scalar::zero(), |acc, coef_i| acc * x + coef_i)
-            };
+            let f = |x: &Scalar<E>| polynomial_value(Scalar::zero(), x, &polynomial_coef);
             let pk = Point::generator() * f(&Scalar::zero());
             let shares = key_shares_indexes
                 .iter()
