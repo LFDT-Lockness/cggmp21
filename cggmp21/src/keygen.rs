@@ -18,6 +18,8 @@ use crate::{
 
 /// Key generation entry point. You can call [`set_threshold`] to make it into a
 /// threshold DKG
+///
+/// [`set_threshold`]: GenericKeygenBuilder::set_threshold
 pub type KeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, NonThreshold>;
 
 /// Key generation entry point with choice for threshold or non-threshold
