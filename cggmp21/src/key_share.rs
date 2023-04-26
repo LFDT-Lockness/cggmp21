@@ -357,6 +357,7 @@ impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for IncompleteK
 /// Note that, normally, secret key is not supposed to be reconstructed, and key
 /// shares should never be at one place. This basically defeats purpose of MPC and
 /// creates single point of failure/trust.
+#[cfg(feature = "spof")]
 pub fn reconstruct_secret_key<E: Curve, L: SecurityLevel>(
     key_shares: &[impl AnyKeyShare<E, L>],
 ) -> Result<SecretScalar<E>, ReconstructError> {

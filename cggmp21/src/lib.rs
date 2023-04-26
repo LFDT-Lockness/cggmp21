@@ -7,6 +7,7 @@
 )]
 #![forbid(clippy::disallowed_methods)]
 #![cfg_attr(not(test), forbid(unused_crate_dependencies))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 pub use {
     paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order, round_based,
@@ -28,9 +29,11 @@ pub mod progress;
 pub mod security_level;
 pub mod signing;
 pub mod supported_curves;
-pub mod trusted_dealer;
 mod utils;
 mod zk;
+
+#[cfg(feature = "spof")]
+pub mod trusted_dealer;
 
 pub use self::execution_id::ExecutionId;
 

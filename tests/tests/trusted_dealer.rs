@@ -1,11 +1,11 @@
 #[generic_tests::define]
 mod test {
     use cggmp21::{define_security_level, key_share::reconstruct_secret_key};
-    use generic_ec::{Curve, Point};
+    use generic_ec::{Curve, Point, SecretScalar};
     use rand::seq::SliceRandom;
     use rand_dev::DevRng;
 
-    use cggmp21::trusted_dealer::mock_keygen;
+    use cggmp21::trusted_dealer;
 
     /// Dummy security level that enables fast key generation
     #[derive(Clone)]
@@ -29,7 +29,12 @@ mod test {
                 .iter()
                 .filter(|t| t.map(|t| t <= n).unwrap_or(true))
             {
-                let shares = mock_keygen::<E, DummyLevel, _>(&mut rng, t, n).unwrap();
+                let sk = SecretScalar::random(&mut rng);
+                let shares = trusted_dealer::builder::<E, DummyLevel>(n)
+                    .set_threshold(t)
+                    .set_shared_secret_key(sk.clone())
+                    .generate_shares(&mut rng)
+                    .unwrap();
 
                 // Choose `t` random key shares and reconstruct a secret key
                 let t = t.unwrap_or(n);
@@ -38,8 +43,12 @@ mod test {
                     .cloned()
                     .collect::<Vec<_>>();
 
-                let sk = reconstruct_secret_key(&t_shares).unwrap();
-                assert_eq!(Point::generator() * sk, shares[0].core.shared_public_key);
+                let sk_reconstructed = reconstruct_secret_key(&t_shares).unwrap();
+                assert_eq!(sk.as_ref(), sk_reconstructed.as_ref());
+                assert_eq!(
+                    Point::generator() * sk_reconstructed,
+                    shares[0].core.shared_public_key
+                );
             }
         }
     }
