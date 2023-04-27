@@ -27,6 +27,7 @@ pub type KeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, NonThreshold>;
 pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
     i: u16,
     n: u16,
+    reliable_broadcast_enforced: bool,
     optional_t: M,
     execution_id: ExecutionId<E, L, D>,
 }
@@ -54,6 +55,7 @@ where
             i,
             n,
             optional_t: NonThreshold,
+            reliable_broadcast_enforced: true,
             execution_id: ExecutionId::default(),
         }
     }
@@ -72,6 +74,7 @@ where
             i: self.i,
             n: self.n,
             optional_t: WithThreshold(t),
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: Default::default(),
         }
     }
@@ -87,6 +90,7 @@ where
             i: self.i,
             n: self.n,
             optional_t: self.optional_t,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: Default::default(),
         }
     }
@@ -103,6 +107,7 @@ where
             i: self.i,
             n: self.n,
             optional_t: self.optional_t,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: Default::default(),
         }
     }
@@ -111,6 +116,14 @@ where
     pub fn set_execution_id(self, id: ExecutionId<E, L, D>) -> Self {
         Self {
             execution_id: id,
+            ..self
+        }
+    }
+
+    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    pub fn enforce_reliable_broadcast(self, enforce: bool) -> Self {
+        Self {
+            reliable_broadcast_enforced: enforce,
             ..self
         }
     }
@@ -133,7 +146,15 @@ where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
     {
-        non_threshold::run_keygen(self.i, self.n, self.execution_id, rng, party).await
+        non_threshold::run_keygen(
+            self.i,
+            self.n,
+            self.reliable_broadcast_enforced,
+            self.execution_id,
+            rng,
+            party,
+        )
+        .await
     }
 }
 

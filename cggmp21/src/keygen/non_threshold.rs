@@ -29,7 +29,7 @@ use super::{Bug, KeygenAborted, KeygenError};
 #[serde(bound = "")]
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round1(MsgRound1<D>),
-    Round1Sync(MsgSyncState<D>),
+    ReliabilityCheck(MsgReliabilityCheck<D>),
     Round2(MsgRound2<E, L, D>),
     Round3(MsgRound3<E>),
 }
@@ -59,11 +59,12 @@ pub struct MsgRound3<E: Curve> {
 /// Message parties exchange to ensure reliability of broadcast channel
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct MsgSyncState<D: Digest>(pub digest::Output<D>);
+pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 pub async fn run_keygen<E, R, M, L, D>(
     i: u16,
     n: u16,
+    reliable_broadcast_enforced: bool,
     execution_id: ExecutionId<E, L, D>,
     rng: &mut R,
     party: M,
@@ -82,7 +83,7 @@ where
     // Setup networking
     let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
-    let round1_sync = rounds.add_round(RoundInput::<MsgSyncState<D>>::broadcast(i, n));
+    let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
     let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L, D>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(i, n));
     let mut rounds = rounds.listen(incomings);
@@ -123,17 +124,34 @@ where
         .await
         .map_err(IoError::receive_message)?
         .into_vec_including_me(my_commitment);
-    let commitments_hash = commitments
-        .iter()
-        .try_fold(D::new(), hash_message)
-        .map_err(Bug::HashMessage)?
-        .finalize();
-    outgoings
-        .send(Outgoing::broadcast(Msg::Round1Sync(MsgSyncState(
-            commitments_hash.clone(),
-        ))))
-        .await
-        .map_err(IoError::send_message)?;
+
+    // Optional reliability check
+    if reliable_broadcast_enforced {
+        let h_i = commitments
+            .iter()
+            .try_fold(D::new(), hash_message)
+            .map_err(Bug::HashMessage)?
+            .finalize();
+        outgoings
+            .send(Outgoing::broadcast(Msg::ReliabilityCheck(
+                MsgReliabilityCheck(h_i.clone()),
+            )))
+            .await
+            .map_err(IoError::send_message)?;
+
+        let round1_hashes = rounds
+            .complete(round1_sync)
+            .await
+            .map_err(IoError::receive_message)?;
+        let parties_have_different_hashes = round1_hashes
+            .into_iter_indexed()
+            .filter(|(_j, _msg_id, hash_j)| hash_j.0 != h_i)
+            .map(|(j, msg_id, _)| (j, msg_id))
+            .collect::<Vec<_>>();
+        if !parties_have_different_hashes.is_empty() {
+            return Err(KeygenAborted::Round1NotReliable(parties_have_different_hashes).into());
+        }
+    }
 
     let my_decommitment = MsgRound2 {
         rid,
@@ -147,20 +165,6 @@ where
         .map_err(IoError::send_message)?;
 
     // Round 3
-    {
-        let commitments_hashes = rounds
-            .complete(round1_sync)
-            .await
-            .map_err(IoError::receive_message)?;
-        let parties_have_different_hashes = commitments_hashes
-            .into_iter_indexed()
-            .filter(|(_j, _msg_id, hash)| hash.0 != commitments_hash)
-            .map(|(j, msg_id, _hash)| (j, msg_id))
-            .collect::<Vec<_>>();
-        if !parties_have_different_hashes.is_empty() {
-            return Err(KeygenAborted::Round1NotReliable(parties_have_different_hashes).into());
-        }
-    }
     let decommitments = rounds
         .complete(round2)
         .await
