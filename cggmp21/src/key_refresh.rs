@@ -71,6 +71,7 @@ where
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     tracer: Option<&'a mut dyn Tracer>,
+    enforce_reliable_broadcast: bool,
 }
 
 /// A marker for [`KeyRefreshBuilder`]
@@ -96,6 +97,7 @@ where
             execution_id: Default::default(),
             pregenerated,
             tracer: None,
+            enforce_reliable_broadcast: true,
         }
     }
 
@@ -115,13 +117,14 @@ where
             self.execution_id,
             self.pregenerated,
             self.tracer,
+            self.enforce_reliable_broadcast,
             self.target.0,
         )
         .await
     }
 }
 
-impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, L, D, AuxOnly>
+impl<'a, E, L, D> AuxInfoGenerationBuilder<'a, E, L, D>
 where
     E: Curve,
     L: SecurityLevel,
@@ -136,6 +139,7 @@ where
             execution_id: Default::default(),
             pregenerated,
             tracer: None,
+            enforce_reliable_broadcast: true,
         }
     }
 
@@ -177,7 +181,8 @@ where
             target: self.target,
             execution_id: Default::default(),
             pregenerated: self.pregenerated,
-            tracer: None,
+            tracer: self.tracer,
+            enforce_reliable_broadcast: self.enforce_reliable_broadcast,
         }
     }
 
@@ -191,6 +196,14 @@ where
     pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
         self.tracer = Some(tracer);
         self
+    }
+
+    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    pub fn enforce_reliable_broadcast(self, v: bool) -> Self {
+        Self {
+            enforce_reliable_broadcast: v,
+            ..self
+        }
     }
 }
 
@@ -240,6 +253,8 @@ enum Bug {
     PowMod,
     #[error("couldn't prove prm statement")]
     PiPrm(#[source] crate::zk::ring_pedersen_parameters::ZkError),
+    #[error("couldn't hash a message")]
+    HashMessage(#[source] crate::utils::HashMessageError),
 }
 
 /// Error indicating that protocol was aborted by malicious party
@@ -273,6 +288,8 @@ enum ProtocolAbortReason {
     InvalidDataSize,
     #[error("party message could not be decrypted")]
     PaillierDec,
+    #[error("round 1 was not reliable")]
+    Round1NotReliable,
 }
 
 macro_rules! make_factory {
@@ -298,4 +315,5 @@ impl ProtocolAborted {
     make_factory!(invalid_x_share, InvalidXShare);
     make_factory!(invalid_data_size, InvalidDataSize);
     make_factory!(paillier_dec, PaillierDec);
+    make_factory!(round1_not_reliable, Round1NotReliable);
 }
