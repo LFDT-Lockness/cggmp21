@@ -11,6 +11,7 @@ use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::IoError,
@@ -19,7 +20,7 @@ use crate::{
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
-    utils::{collect_blame, collect_simple_blame},
+    utils::{collect_blame, collect_simple_blame, hash_message, AbortBlame},
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
 };
@@ -34,10 +35,12 @@ pub enum Msg<D: Digest> {
     Round1(MsgRound1<D>),
     Round2(MsgRound2<D>),
     Round3(MsgRound3),
+    ReliabilityCheck(MsgReliabilityCheck<D>),
 }
 
 /// Message from round 1
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
     commitment: HashCommit<D>,
 }
@@ -63,6 +66,10 @@ pub struct MsgRound3 {
     fac_proof: π_fac::Proof,
 }
 
+/// Message from an optional round that enforces reliability check
+#[derive(Clone)]
+pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+
 pub async fn run_aux_gen<R, M, E, L, D>(
     i: u16,
     n: u16,
@@ -71,6 +78,7 @@ pub async fn run_aux_gen<R, M, E, L, D>(
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
+    reliable_broadcast_enforced: bool,
 ) -> Result<AuxInfo, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
@@ -89,6 +97,7 @@ where
 
     let mut rounds = RoundsRouter::<Msg<D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
+    let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
     let round2 = rounds.add_round(RoundInput::<MsgRound2<D>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
@@ -160,6 +169,45 @@ where
         .await
         .map_err(IoError::receive_message)?;
     tracer.msgs_received();
+
+    // Optional reliability check
+    if reliable_broadcast_enforced {
+        tracer.stage("Hash received msgs (reliability check)");
+        let h_i = commitments
+            .iter_including_me(&commitment)
+            .try_fold(D::new(), hash_message)
+            .map_err(Bug::HashMessage)?
+            .finalize();
+
+        tracer.send_msg();
+        outgoings
+            .send(Outgoing::broadcast(Msg::ReliabilityCheck(
+                MsgReliabilityCheck(h_i),
+            )))
+            .await
+            .map_err(IoError::send_message)?;
+        tracer.msg_sent();
+
+        tracer.round_begins();
+
+        tracer.receive_msgs();
+        let hashes = rounds
+            .complete(round1_sync)
+            .await
+            .map_err(IoError::receive_message)?;
+        tracer.msgs_received();
+
+        tracer.stage("Assert other parties hashed messages (reliability check)");
+        let parties_have_different_hashes = hashes
+            .into_iter_indexed()
+            .filter(|(_j, _msg_id, h_j)| h_i != h_j.0)
+            .map(|(j, msg_id, _)| AbortBlame::new(j, msg_id, msg_id))
+            .collect::<Vec<_>>();
+        if !parties_have_different_hashes.is_empty() {
+            return Err(ProtocolAborted::round1_not_reliable(parties_have_different_hashes).into());
+        }
+    }
+
     tracer.send_msg();
     let decommitment = MsgRound2 {
         N: N.clone(),

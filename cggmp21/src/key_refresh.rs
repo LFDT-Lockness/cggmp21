@@ -161,6 +161,7 @@ where
             self.execution_id,
             self.pregenerated,
             self.tracer,
+            self.enforce_reliable_broadcast,
         )
         .await
     }
