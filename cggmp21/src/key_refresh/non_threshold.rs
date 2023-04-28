@@ -18,6 +18,7 @@ use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing,
 };
+use serde::{Deserialize, Serialize};
 
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 use crate::{
@@ -46,12 +47,14 @@ pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
 }
 
 /// Message from round 1
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
     pub commitment: HashCommit<D>,
 }
 /// Message from round 2
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     /// **X_i** in paper
     pub Xs: Vec<Point<E>>,
@@ -65,6 +68,7 @@ pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
     /// rho_i in paper
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
+    #[serde(with = "hex")]
     pub rho_bytes: L::Rid,
     /// u_i in paper
     pub decommit: hash_commitment::DecommitNonce<D>,
