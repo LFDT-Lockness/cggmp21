@@ -12,13 +12,14 @@ mod generic {
     use cggmp21::signing::{msg::Msg, DataToSign};
     use cggmp21::{key_share::AnyKeyShare, security_level::ReasonablySecure, ExecutionId};
 
-    #[test_case::case(None, 2; "n2")]
-    #[test_case::case(Some(2), 2; "t2n2")]
-    #[test_case::case(None, 3; "n3")]
-    #[test_case::case(Some(2), 3; "t2n3")]
-    #[test_case::case(Some(3), 3; "t3n3")]
+    #[test_case::case(None, 2, false; "n2")]
+    #[test_case::case(None, 2, true; "n2-reliable")]
+    #[test_case::case(Some(2), 2, false; "t2n2")]
+    #[test_case::case(None, 3, false; "n3")]
+    #[test_case::case(Some(2), 3, false; "t2n3")]
+    #[test_case::case(Some(3), 3, false; "t3n3")]
     #[tokio::test]
-    async fn signing_works<E: Curve, V>(t: Option<u16>, n: u16)
+    async fn signing_works<E: Curve, V>(t: Option<u16>, n: u16, reliable_broadcast: bool)
     where
         Point<E>: HasAffineX<E>,
         Scalar<E>: FromHash,
@@ -56,6 +57,7 @@ mod generic {
             outputs.push(async move {
                 cggmp21::signing(i, participants, share)
                     .set_execution_id(signing_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await
             });

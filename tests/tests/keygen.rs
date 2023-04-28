@@ -12,12 +12,13 @@ mod generic {
         key_share::reconstruct_secret_key, security_level::ReasonablySecure, ExecutionId,
     };
 
-    #[test_case::case(3; "n3")]
-    #[test_case::case(5; "n5")]
-    #[test_case::case(7; "n7")]
-    #[test_case::case(10; "n10")]
+    #[test_case::case(3, false; "n3")]
+    #[test_case::case(5, false; "n5")]
+    #[test_case::case(7, false; "n7")]
+    #[test_case::case(10, false; "n10")]
+    #[test_case::case(10, true; "n10-reliable")]
     #[tokio::test]
-    async fn keygen_works<E: Curve>(n: u16)
+    async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool)
     where
         Scalar<E>: FromHash,
     {
@@ -37,6 +38,7 @@ mod generic {
             outputs.push(async move {
                 cggmp21::keygen(i, n)
                     .set_execution_id(keygen_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .start(&mut party_rng, party)
                     .await
             })
@@ -62,10 +64,11 @@ mod generic {
         );
     }
 
-    #[test_case::case(2, 3; "t2n3")]
-    #[test_case::case(5, 7; "t5n7")]
+    #[test_case::case(2, 3, false; "t2n3")]
+    #[test_case::case(5, 7, false; "t5n7")]
+    #[test_case::case(5, 7, true; "t5n7-reliable")]
     #[tokio::test]
-    async fn threshold_keygen_works<E: Curve>(t: u16, n: u16)
+    async fn threshold_keygen_works<E: Curve>(t: u16, n: u16, reliable_broadcast: bool)
     where
         Scalar<E>: FromHash,
     {
@@ -85,6 +88,7 @@ mod generic {
             outputs.push(async move {
                 cggmp21::keygen(i, n)
                     .set_execution_id(keygen_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .set_threshold(t)
                     .start(&mut party_rng, party)
                     .await
