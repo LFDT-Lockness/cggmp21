@@ -179,6 +179,7 @@ where
             self.i,
             self.optional_t.0,
             self.n,
+            self.reliable_broadcast_enforced,
             self.execution_id,
             rng,
             party,
