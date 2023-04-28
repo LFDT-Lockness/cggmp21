@@ -120,7 +120,7 @@ where
     let mut rounds = rounds.listen(incomings);
 
     tracer.stage("Precompute execution id and shared state");
-    let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
+    let execution_id = execution_id.evaluate(ProtocolChoice::KeyRefresh { threshold: false });
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(execution_id);

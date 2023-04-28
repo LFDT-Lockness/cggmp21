@@ -102,14 +102,20 @@ impl<E: Curve, L: SecurityLevel, D: Digest> Clone for ExecutionId<E, L, D> {
 }
 
 pub(crate) enum ProtocolChoice {
-    Keygen,
+    Keygen { threshold: bool },
+    KeyRefresh { threshold: bool },
+    AuxDataGen,
     Presigning3,
 }
 
 impl ProtocolChoice {
     fn as_bytes(&self) -> &'static [u8] {
         match self {
-            Self::Keygen => b"KEYGEN",
+            Self::Keygen { threshold: true } => b"THRESHOLD-KEYGEN",
+            Self::Keygen { threshold: false } => b"NONTHRESHOLD-KEYGEN",
+            Self::KeyRefresh { threshold: true } => b"THRESHOLD-KEYREFRESH",
+            Self::KeyRefresh { threshold: false } => b"NONTHRESHOLD-KEYREFRESH",
+            Self::AuxDataGen => b"AUX-DATA-GEN",
             Self::Presigning3 => b"PRESIGNING3",
         }
     }

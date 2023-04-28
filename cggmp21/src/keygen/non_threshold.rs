@@ -89,7 +89,7 @@ where
     let mut rounds = rounds.listen(incomings);
 
     // Round 1
-    let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
+    let execution_id = execution_id.evaluate(ProtocolChoice::Keygen { threshold: false });
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
 
