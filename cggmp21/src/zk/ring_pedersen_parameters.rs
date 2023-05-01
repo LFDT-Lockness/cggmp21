@@ -3,6 +3,8 @@
 use digest::{typenum::U32, Digest};
 use paillier_zk::{unknown_order::BigNumber, BigNumberExt};
 use rand_core::{RngCore, SeedableRng};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use thiserror::Error;
 
 /// A reasonable security level for proof
@@ -25,9 +27,12 @@ pub struct Data<'a> {
 /// Parameter `M` is security level. The probability of an adversary generating
 /// a correct proof for incorrect data is $2^{-M}$. You can use M defined here
 /// as [`SECURITY`]
-#[derive(Clone)]
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Proof<const M: usize> {
+    #[serde_as(as = "[_; M]")]
     pub commitment: [BigNumber; M],
+    #[serde_as(as = "[_; M]")]
     pub zs: [BigNumber; M],
 }
 

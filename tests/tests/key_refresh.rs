@@ -8,10 +8,11 @@ mod generic {
 
     use cggmp21::{security_level::ReasonablySecure, ExecutionId};
 
-    #[test_case::case(3; "n3")]
-    #[test_case::case(5; "n5")]
+    #[test_case::case(3, false; "n3")]
+    #[test_case::case(5, false; "n5")]
+    #[test_case::case(5, true; "n5-reliable")]
     #[tokio::test]
-    async fn key_refresh_works<E: generic_ec::Curve>(n: u16)
+    async fn key_refresh_works<E: generic_ec::Curve>(n: u16, reliable_broadcast: bool)
     where
         generic_ec::Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
@@ -38,6 +39,7 @@ mod generic {
             async move {
                 cggmp21::key_refresh(share, pregenerated_data)
                     .set_execution_id(refresh_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .start(&mut party_rng, party)
                     .await
             }
@@ -90,6 +92,7 @@ mod generic {
             async move {
                 cggmp21::signing(share.core.i, participants, share)
                     .set_execution_id(signing_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await
             }
@@ -105,10 +108,11 @@ mod generic {
         }
     }
 
-    #[test_case::case(2, 3; "t2n3")]
-    #[test_case::case(3, 5; "t3n5")]
+    #[test_case::case(2, 3, false; "t2n3")]
+    #[test_case::case(3, 5, false; "t3n5")]
+    #[test_case::case(3, 5, true; "t3n5-reliable")]
     #[tokio::test]
-    async fn aux_gen_works<E: generic_ec::Curve>(t: u16, n: u16)
+    async fn aux_gen_works<E: generic_ec::Curve>(t: u16, n: u16, reliable_broadcast: bool)
     where
         generic_ec::Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
@@ -134,6 +138,7 @@ mod generic {
             async move {
                 cggmp21::aux_info_gen(i, n, pregenerated_data)
                     .set_execution_id(refresh_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .start(&mut party_rng, party)
                     .await
             }
@@ -171,6 +176,7 @@ mod generic {
             async move {
                 cggmp21::signing(i, participants, share)
                     .set_execution_id(signing_execution_id)
+                    .enforce_reliable_broadcast(reliable_broadcast)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await
             }

@@ -18,6 +18,7 @@ use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing,
 };
+use serde::{Deserialize, Serialize};
 
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 use crate::{
@@ -28,8 +29,8 @@ use crate::{
     security_level::SecurityLevel,
     utils,
     utils::{
-        but_nth, collect_blame, collect_simple_blame, iter_peers, scalar_to_bignumber, xor_array,
-        AbortBlame,
+        but_nth, collect_blame, collect_simple_blame, hash_message, iter_peers,
+        scalar_to_bignumber, xor_array, AbortBlame,
     },
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
@@ -43,15 +44,18 @@ pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
     Round1(MsgRound1<D>),
     Round2(MsgRound2<E, D, L>),
     Round3(MsgRound3<E>),
+    ReliabilityCheck(MsgReliabilityCheck<D>),
 }
 
 /// Message from round 1
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
     pub commitment: HashCommit<D>,
 }
 /// Message from round 2
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     /// **X_i** in paper
     pub Xs: Vec<Point<E>>,
@@ -65,6 +69,7 @@ pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
     /// rho_i in paper
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
+    #[serde(with = "hex")]
     pub rho_bytes: L::Rid,
     /// u_i in paper
     pub decommit: hash_commitment::DecommitNonce<D>,
@@ -87,12 +92,18 @@ pub struct MsgRound3<E: Curve> {
     pub sch_proofs_x: Vec<schnorr_pok::Proof<E>>,
 }
 
+/// Message of optional round that enforces reliability check
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+
 pub async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
     execution_id: ExecutionId<E, L, D>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
+    reliable_broadcast_enforced: bool,
     core_share: &DirtyIncompleteKeyShare<E, L>,
 ) -> Result<KeyShare<E, L>, KeyRefreshError>
 where
@@ -115,12 +126,13 @@ where
 
     let mut rounds = RoundsRouter::<Msg<E, D, L>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
+    let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
     let round2 = rounds.add_round(RoundInput::<MsgRound2<E, D, L>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
 
     tracer.stage("Precompute execution id and shared state");
-    let execution_id = execution_id.evaluate(ProtocolChoice::Keygen);
+    let execution_id = execution_id.evaluate(ProtocolChoice::KeyRefresh { threshold: false });
     let sid = execution_id.as_slice();
     let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(execution_id);
@@ -219,6 +231,45 @@ where
         .await
         .map_err(IoError::receive_message)?;
     tracer.msgs_received();
+
+    // Optional reliability check
+    if reliable_broadcast_enforced {
+        tracer.stage("Hash received msgs (reliability check)");
+        let h_i = commitments
+            .iter_including_me(&commitment)
+            .try_fold(D::new(), hash_message)
+            .map_err(Bug::HashMessage)?
+            .finalize();
+
+        tracer.send_msg();
+        outgoings
+            .send(Outgoing::broadcast(Msg::ReliabilityCheck(
+                MsgReliabilityCheck(h_i),
+            )))
+            .await
+            .map_err(IoError::send_message)?;
+        tracer.msg_sent();
+
+        tracer.round_begins();
+
+        tracer.receive_msgs();
+        let hashes = rounds
+            .complete(round1_sync)
+            .await
+            .map_err(IoError::receive_message)?;
+        tracer.msgs_received();
+
+        tracer.stage("Assert other parties hashed messages (reliability check)");
+        let parties_have_different_hashes = hashes
+            .into_iter_indexed()
+            .filter(|(_j, _msg_id, h_j)| h_i != h_j.0)
+            .map(|(j, msg_id, _)| AbortBlame::new(j, msg_id, msg_id))
+            .collect::<Vec<_>>();
+        if !parties_have_different_hashes.is_empty() {
+            return Err(ProtocolAborted::round1_not_reliable(parties_have_different_hashes).into());
+        }
+    }
+
     tracer.send_msg();
     let decommitment = MsgRound2 {
         Xs: Xs.clone(),
