@@ -373,9 +373,13 @@ where
         .fold(rho_bytes, xor_array);
 
     // common data for messages
+    let my_shared_state = parties_shared_state
+        .clone()
+        .chain_update(&rho_bytes)
+        .chain_update(i.to_be_bytes());
     tracer.stage("Compute П_mod (ψ_i)");
     let psi = π_mod::non_interactive::prove(
-        parties_shared_state.clone().chain_update(i.to_be_bytes()),
+        my_shared_state.clone(),
         &π_mod::Data { n: N.clone() },
         &π_mod::PrivateData {
             p: p.clone(),
@@ -415,7 +419,7 @@ where
             .map_err(|_| Bug::PaillierEnc)?;
         tracer.stage("Compute П_fac (ф_i^j)");
         let phi = π_fac::prove(
-            parties_shared_state.clone().chain_update(i.to_be_bytes()),
+            my_shared_state.clone(),
             &π_fac::Aux {
                 s: d.s.clone(),
                 t: d.t.clone(),
@@ -538,7 +542,10 @@ where
             };
             let (comm, proof) = &proof_msg.mod_proof;
             π_mod::non_interactive::verify(
-                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+                parties_shared_state
+                    .clone()
+                    .chain_update(&rho_bytes)
+                    .chain_update(j.to_be_bytes()),
                 &data,
                 comm,
                 proof,
@@ -562,7 +569,10 @@ where
         &shares_msg_b,
         |j, decommitment, proof_msg| {
             π_fac::verify(
-                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+                parties_shared_state
+                    .clone()
+                    .chain_update(&rho_bytes)
+                    .chain_update(j.to_be_bytes()),
                 &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,

@@ -36,7 +36,11 @@ pub struct Proof<const M: usize> {
     pub zs: [BigNumber; M],
 }
 
-fn derive_challenge<const M: usize, D>(shared_state: D, data: Data, commitment: &[BigNumber; M]) -> Challenge<M>
+fn derive_challenge<const M: usize, D>(
+    shared_state: D,
+    data: Data,
+    commitment: &[BigNumber; M],
+) -> Challenge<M>
 where
     D: Digest<OutputSize = U32>,
 {
