@@ -1,5 +1,7 @@
-mod aux_only;
-mod non_threshold;
+/// Auxiliary info (re)generation protocol specific types
+pub mod aux_only;
+/// Non-threshold key refresh specific types
+pub mod non_threshold;
 
 use digest::Digest;
 use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
@@ -17,8 +19,7 @@ use crate::{
     ExecutionId,
 };
 
-pub type AuxOnlyMsg<D> = aux_only::Msg<D>;
-pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
+pub use self::{aux_only::Msg as AuxOnlyMsg, non_threshold::Msg as NonThresholdMsg};
 
 /// To speed up computations, it's possible to supply data to the algorithm
 /// generated ahead of time

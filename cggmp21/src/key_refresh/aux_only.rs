@@ -70,7 +70,7 @@ pub struct MsgRound3 {
 #[derive(Clone)]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-pub async fn run_aux_gen<R, M, E, L, D>(
+pub(super) async fn run_aux_gen<R, M, E, L, D>(
     i: u16,
     n: u16,
     mut rng: &mut R,
