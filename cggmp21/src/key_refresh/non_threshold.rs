@@ -172,7 +172,7 @@ where
 
     tracer.stage("Prove Πprm (ψˆ_i)");
     let hat_psi = π_prm::prove(
-        parties_shared_state.clone(),
+        parties_shared_state.clone().chain_update(i.to_be_bytes()),
         &mut rng,
         π_prm::Data {
             N: &N,
@@ -329,7 +329,7 @@ where
     }
     // validate parameters and param_proofs
     tracer.stage("Validate П_prm (ψ_i)");
-    let blame = collect_simple_blame(&decommitments, |d| {
+    let blame = collect_blame(&decommitments, &decommitments, |j, d, _| {
         if d.N.bit_length() < L::SECURITY_BYTES {
             true
         } else {
@@ -338,7 +338,12 @@ where
                 s: &d.s,
                 t: &d.t,
             };
-            π_prm::verify(parties_shared_state.clone(), data, &d.params_proof).is_err()
+            π_prm::verify(
+                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+                data,
+                &d.params_proof,
+            )
+            .is_err()
         }
     });
     if !blame.is_empty() {
@@ -370,7 +375,7 @@ where
     // common data for messages
     tracer.stage("Compute П_mod (ψ_i)");
     let psi = π_mod::non_interactive::prove(
-        parties_shared_state.clone(),
+        parties_shared_state.clone().chain_update(i.to_be_bytes()),
         &π_mod::Data { n: N.clone() },
         &π_mod::PrivateData {
             p: p.clone(),
@@ -410,7 +415,7 @@ where
             .map_err(|_| Bug::PaillierEnc)?;
         tracer.stage("Compute П_fac (ф_i^j)");
         let phi = π_fac::prove(
-            parties_shared_state.clone(),
+            parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &π_fac::Aux {
                 s: d.s.clone(),
                 t: d.t.clone(),
@@ -527,13 +532,18 @@ where
     let blame = collect_blame(
         &decommitments,
         &shares_msg_b,
-        |_, decommitment, proof_msg| {
+        |j, decommitment, proof_msg| {
             let data = π_mod::Data {
                 n: decommitment.N.clone(),
             };
             let (comm, proof) = &proof_msg.mod_proof;
-            π_mod::non_interactive::verify(parties_shared_state.clone(), &data, comm, proof)
-                .is_err()
+            π_mod::non_interactive::verify(
+                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+                &data,
+                comm,
+                proof,
+            )
+            .is_err()
         },
     );
     if !blame.is_empty() {
@@ -550,9 +560,9 @@ where
     let blame = collect_blame(
         &decommitments,
         &shares_msg_b,
-        |_, decommitment, proof_msg| {
+        |j, decommitment, proof_msg| {
             π_fac::verify(
-                parties_shared_state.clone(),
+                parties_shared_state.clone().chain_update(j.to_be_bytes()),
                 &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,
