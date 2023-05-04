@@ -102,3 +102,44 @@ where
 {
     SigningBuilder::new(i, parties_indexes_at_keygen, key_share)
 }
+
+#[cfg(test)]
+mod tests {
+    use digest::Digest;
+    use generic_ec::Curve;
+    use serde::{de::DeserializeOwned, Serialize};
+
+    use crate::security_level::SecurityLevel;
+
+    macro_rules! ensure_certain_types_impl_serde {
+        ($($type:ty),+,) => {
+            fn impls_serde<T: Serialize + DeserializeOwned>() {}
+
+            #[allow(dead_code)]
+            fn ensure_types_impl_serde<E: Curve, L: SecurityLevel, D: Digest>() {$(
+                impls_serde::<$type>();
+            )+}
+        }
+    }
+
+    ensure_certain_types_impl_serde! {
+        crate::key_share::KeyShare<E, L>,
+        crate::key_share::IncompleteKeyShare<E, L>,
+        crate::key_share::AuxInfo,
+
+        crate::key_share::DirtyKeyShare<E, L>,
+        crate::key_share::DirtyIncompleteKeyShare<E, L>,
+        crate::key_share::DirtyAuxInfo,
+
+        crate::keygen::non_threshold::Msg<E, L, D>,
+        crate::keygen::threshold::Msg<E, L, D>,
+
+        crate::key_refresh::aux_only::Msg<D>,
+        crate::key_refresh::non_threshold::Msg<E, D, L>,
+
+        crate::signing::msg::Msg<E, D>,
+        crate::signing::Presignature<E>,
+        crate::signing::PartialSignature<E>,
+        crate::signing::Signature<E>,
+    }
+}

@@ -28,7 +28,8 @@ use crate::{
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 
 /// Message of key refresh protocol
-#[derive(ProtocolMessage, Clone)]
+#[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
 #[allow(clippy::large_enum_variant)]
 pub enum Msg<D: Digest> {
@@ -45,7 +46,8 @@ pub struct MsgRound1<D: Digest> {
     commitment: HashCommit<D>,
 }
 /// Message from round 2
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound2<D: Digest> {
     N: BigNumber,
     s: BigNumber,
@@ -57,7 +59,7 @@ pub struct MsgRound2<D: Digest> {
     decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Unicast message of round 3, sent to each participant
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MsgRound3 {
     /// psi_i in paper
     // this should be L::M instead, but no rustc support yet
@@ -67,7 +69,8 @@ pub struct MsgRound3 {
 }
 
 /// Message from an optional round that enforces reliability check
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 pub(super) async fn run_aux_gen<R, M, E, L, D>(
