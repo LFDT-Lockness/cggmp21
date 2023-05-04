@@ -36,15 +36,18 @@ pub struct Proof<const M: usize> {
     pub zs: [BigNumber; M],
 }
 
-fn derive_challenge<const M: usize, D>(shared_state: D, data: Data) -> Challenge<M>
+fn derive_challenge<const M: usize, D>(shared_state: D, data: Data, commitment: &[BigNumber; M]) -> Challenge<M>
 where
     D: Digest<OutputSize = U32>,
 {
-    let seed = shared_state
+    let mut digest = shared_state
         .chain_update(&data.N.to_bytes())
         .chain_update(&data.s.to_bytes())
-        .chain_update(&data.t.to_bytes())
-        .finalize();
+        .chain_update(&data.t.to_bytes());
+    for a in commitment.iter() {
+        digest.update(a.to_bytes());
+    }
+    let seed = digest.finalize();
     let mut rng = rand_chacha::ChaCha20Rng::from_seed(seed.into());
 
     // generate bools by hand since we don't have rand
@@ -91,7 +94,7 @@ where
         commitment.map(Result::unwrap)
     };
 
-    let challenge: Challenge<M> = derive_challenge(shared_state, data);
+    let challenge: Challenge<M> = derive_challenge(shared_state, data, &commitment);
 
     let mut zs = private_commitment;
     for (z_ref, e) in zs.iter_mut().zip(&challenge.es) {
@@ -112,7 +115,7 @@ pub fn verify<const M: usize, D>(
 where
     D: Digest<OutputSize = U32>,
 {
-    let challenge: Challenge<M> = derive_challenge(shared_state, data);
+    let challenge: Challenge<M> = derive_challenge(shared_state, data, &proof.commitment);
     for ((z, a), e) in proof.zs.iter().zip(&proof.commitment).zip(&challenge.es) {
         let lhs = data.t.powmod(z, data.N).map_err(|_| InvalidProof)?;
         if *e {
