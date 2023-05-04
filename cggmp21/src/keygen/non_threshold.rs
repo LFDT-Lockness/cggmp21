@@ -61,7 +61,7 @@ pub struct MsgRound3<E: Curve> {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-pub async fn run_keygen<E, R, M, L, D>(
+pub(super) async fn run_keygen<E, R, M, L, D>(
     i: u16,
     n: u16,
     reliable_broadcast_enforced: bool,

@@ -1,5 +1,7 @@
-mod non_threshold;
-mod threshold;
+/// Non-threshold DKG specific types
+pub mod non_threshold;
+/// Threshold DKG specific types
+pub mod threshold;
 
 use digest::Digest;
 use generic_ec::hash_to_curve::FromHash;
@@ -15,6 +17,8 @@ use crate::{
     utils::HashMessageError,
     ExecutionId,
 };
+
+pub use self::{non_threshold::Msg as NonThresholdMsg, threshold::Msg as ThresholdMsg};
 
 /// Key generation entry point. You can call [`set_threshold`] to make it into a
 /// threshold DKG
@@ -36,9 +40,6 @@ pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
 pub struct NonThreshold;
 /// Indicates threshold DKG
 pub struct WithThreshold(u16);
-
-pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
-pub type ThresholdMsg<E, L, D> = threshold::Msg<E, L, D>;
 
 impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
 where
