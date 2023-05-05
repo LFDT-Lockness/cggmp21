@@ -295,8 +295,8 @@ where
     // common data for messages
     let my_shared_state = parties_shared_state
         .clone()
-        .chain_update(&rho_bytes)
-        .chain_update(i.to_be_bytes());
+        .chain_update(i.to_be_bytes())
+        .chain_update(&rho_bytes);
     tracer.stage("Compute П_mod (ψ_i)");
     let psi = π_mod::non_interactive::prove(
         my_shared_state.clone(),
@@ -373,8 +373,8 @@ where
             π_mod::non_interactive::verify(
                 parties_shared_state
                     .clone()
-                    .chain_update(&rho_bytes)
-                    .chain_update(j.to_be_bytes()),
+                    .chain_update(j.to_be_bytes())
+                    .chain_update(&rho_bytes),
                 &data,
                 comm,
                 proof,
@@ -400,8 +400,8 @@ where
             π_fac::verify(
                 parties_shared_state
                     .clone()
-                    .chain_update(&rho_bytes)
-                    .chain_update(j.to_be_bytes()),
+                    .chain_update(j.to_be_bytes())
+                    .chain_update(&rho_bytes),
                 &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,
