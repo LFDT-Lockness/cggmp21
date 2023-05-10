@@ -60,8 +60,11 @@ where
 /// Protocol for finalizing the keygen by generating aux info.
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
+///
+/// Index `i` of party should be the same as index inside the keyshare you are
+/// going to use this aux info with
 pub fn aux_info_gen<'a, E, L>(
-    t: u16,
+    i: u16,
     n: u16,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
 ) -> key_refresh::AuxInfoGenerationBuilder<'a, E, L, Sha256>
@@ -69,7 +72,7 @@ where
     E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::GenericKeyRefreshBuilder::new_aux_gen(t, n, pregenerated)
+    key_refresh::GenericKeyRefreshBuilder::new_aux_gen(i, n, pregenerated)
 }
 
 /// Protocol for performing key refresh. Can be used to perform initial refresh

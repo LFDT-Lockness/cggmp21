@@ -31,9 +31,9 @@ use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 #[derive(ProtocolMessage, Clone)]
 // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
 #[allow(clippy::large_enum_variant)]
-pub enum Msg<D: Digest> {
+pub enum Msg<D: Digest, L: SecurityLevel> {
     Round1(MsgRound1<D>),
-    Round2(MsgRound2<D>),
+    Round2(MsgRound2<D, L>),
     Round3(MsgRound3),
     ReliabilityCheck(MsgReliabilityCheck<D>),
 }
@@ -45,14 +45,18 @@ pub struct MsgRound1<D: Digest> {
     commitment: HashCommit<D>,
 }
 /// Message from round 2
-#[derive(Clone)]
-pub struct MsgRound2<D: Digest> {
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MsgRound2<D: Digest, L: SecurityLevel> {
     N: BigNumber,
     s: BigNumber,
     t: BigNumber,
     /// psi_circonflexe_i in paper
     // this should be L::M instead, but no rustc support yet
     params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
+    /// rho_i in paper
+    // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
+    #[serde(with = "hex")]
+    pub rho_bytes: L::Rid,
     /// u_i in paper
     decommit: hash_commitment::DecommitNonce<D>,
 }
@@ -82,7 +86,7 @@ pub async fn run_aux_gen<R, M, E, L, D>(
 ) -> Result<AuxInfo, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
-    M: Mpc<ProtocolMessage = Msg<D>>,
+    M: Mpc<ProtocolMessage = Msg<D, L>>,
     E: Curve,
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
@@ -95,10 +99,10 @@ where
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
-    let mut rounds = RoundsRouter::<Msg<D>>::builder();
+    let mut rounds = RoundsRouter::<Msg<D, L>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
-    let round2 = rounds.add_round(RoundInput::<MsgRound2<D>>::broadcast(i, n));
+    let round2 = rounds.add_round(RoundInput::<MsgRound2<D, L>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
 
@@ -136,6 +140,11 @@ where
     )
     .map_err(Bug::PiPrm)?;
 
+    tracer.stage("Sample random bytes");
+    // rho_i in paper, this signer's share of bytes
+    let mut rho_bytes = L::Rid::default();
+    rng.fill_bytes(rho_bytes.as_mut());
+
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
     // TODO: decommitment should be kappa bits
@@ -148,6 +157,7 @@ where
         .mix_bytes(&t.to_bytes())
         .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_bytes()))
         .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_bytes()))
+        .mix_bytes(&rho_bytes)
         .commit(rng);
 
     tracer.send_msg();
@@ -214,6 +224,7 @@ where
         s: s.clone(),
         t: t.clone(),
         params_proof: hat_psi,
+        rho_bytes: rho_bytes.clone(),
         decommit,
     };
     outgoings
@@ -244,6 +255,7 @@ where
             .mix_bytes(decomm.t.to_bytes())
             .mix_many_bytes(decomm.params_proof.commitment.iter().map(|x| x.to_bytes()))
             .mix_many_bytes(decomm.params_proof.zs.iter().map(|x| x.to_bytes()))
+            .mix_bytes(&decomm.rho_bytes)
             .verify(&comm.commitment, &decomm.decommit)
             .is_err()
     });
@@ -273,10 +285,21 @@ where
         return Err(ProtocolAborted::invalid_ring_pedersen_parameters(blame).into());
     }
 
+    tracer.stage("Add together shared random bytes");
+    // rho in paper, collective random bytes
+    let rho_bytes = decommitments
+        .iter()
+        .map(|d| &d.rho_bytes)
+        .fold(rho_bytes, utils::xor_array);
+
     // common data for messages
+    let my_shared_state = parties_shared_state
+        .clone()
+        .chain_update(i.to_be_bytes())
+        .chain_update(&rho_bytes);
     tracer.stage("Compute П_mod (ψ_i)");
     let psi = π_mod::non_interactive::prove(
-        parties_shared_state.clone().chain_update(i.to_be_bytes()),
+        my_shared_state.clone(),
         &π_mod::Data { n: N.clone() },
         &π_mod::PrivateData {
             p: p.clone(),
@@ -299,7 +322,7 @@ where
 
         tracer.stage("Compute П_fac (ф_i^j)");
         let phi = π_fac::prove(
-            parties_shared_state.clone().chain_update(i.to_be_bytes()),
+            my_shared_state.clone(),
             &π_fac::Aux {
                 s: d.s.clone(),
                 t: d.t.clone(),
@@ -315,6 +338,7 @@ where
         )
         .map_err(Bug::PiFac)?;
 
+        tracer.send_msg();
         let msg = MsgRound3 {
             mod_proof: psi.clone(),
             fac_proof: phi.clone(),
@@ -347,7 +371,10 @@ where
             };
             let (comm, proof) = &proof_msg.mod_proof;
             π_mod::non_interactive::verify(
-                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+                parties_shared_state
+                    .clone()
+                    .chain_update(j.to_be_bytes())
+                    .chain_update(&rho_bytes),
                 &data,
                 comm,
                 proof,
@@ -371,7 +398,10 @@ where
         &shares_msg_b,
         |j, decommitment, proof_msg| {
             π_fac::verify(
-                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+                parties_shared_state
+                    .clone()
+                    .chain_update(j.to_be_bytes())
+                    .chain_update(&rho_bytes),
                 &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,

@@ -17,7 +17,7 @@ use crate::{
     ExecutionId,
 };
 
-pub type AuxOnlyMsg<D> = aux_only::Msg<D>;
+pub type AuxOnlyMsg<D, L> = aux_only::Msg<D, L>;
 pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
 
 /// To speed up computations, it's possible to supply data to the algorithm
@@ -147,7 +147,7 @@ where
     pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<AuxInfo, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = aux_only::Msg<D>>,
+        M: Mpc<ProtocolMessage = aux_only::Msg<D, L>>,
         E: Curve,
         Scalar<E>: FromHash,
         L: SecurityLevel,
