@@ -137,7 +137,7 @@ mod tests {
         crate::keygen::non_threshold::Msg<E, L, D>,
         crate::keygen::threshold::Msg<E, L, D>,
 
-        crate::key_refresh::aux_only::Msg<D>,
+        crate::key_refresh::aux_only::Msg<D, L>,
         crate::key_refresh::non_threshold::Msg<E, D, L>,
 
         crate::signing::msg::Msg<E, D>,

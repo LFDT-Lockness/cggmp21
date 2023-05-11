@@ -48,7 +48,7 @@ pub struct MsgRound1<D: Digest> {
 /// Message from round 2
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct MsgRound2<D: Digest> {
+pub struct MsgRound2<D: Digest, L: SecurityLevel> {
     N: BigNumber,
     s: BigNumber,
     t: BigNumber,
