@@ -1,4 +1,6 @@
+/// Non-threshold DKG specific types
 mod non_threshold;
+/// Threshold DKG specific types
 mod threshold;
 
 use digest::Digest;
@@ -15,6 +17,25 @@ use crate::{
     utils::HashMessageError,
     ExecutionId,
 };
+
+#[doc(no_inline)]
+pub use self::msg::{non_threshold::Msg as NonThresholdMsg, threshold::Msg as ThresholdMsg};
+
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    /// Messages types related to non threshold DKG protocol
+    pub mod non_threshold {
+        pub use crate::keygen::non_threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3,
+        };
+    }
+    /// Messages types related to threshold DKG protocol
+    pub mod threshold {
+        pub use crate::keygen::threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
+        };
+    }
+}
 
 /// Key generation entry point. You can call [`set_threshold`] to make it into a
 /// threshold DKG
@@ -36,9 +57,6 @@ pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
 pub struct NonThreshold;
 /// Indicates threshold DKG
 pub struct WithThreshold(u16);
-
-pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
-pub type ThresholdMsg<E, L, D> = threshold::Msg<E, L, D>;
 
 impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
 where

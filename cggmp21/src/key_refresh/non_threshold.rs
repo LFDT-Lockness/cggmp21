@@ -37,7 +37,8 @@ use crate::{
 };
 
 /// Message of key refresh protocol
-#[derive(ProtocolMessage, Clone)]
+#[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
 #[allow(clippy::large_enum_variant)]
 pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
@@ -75,7 +76,8 @@ pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     pub decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Unicast message of round 3, sent to each participant
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct MsgRound3<E: Curve> {
     /// psi_i in paper
     // this should be L::M instead, but no rustc support yet

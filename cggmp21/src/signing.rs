@@ -14,6 +14,7 @@ use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex,
 };
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::errors::IoError;
@@ -73,18 +74,23 @@ impl<E: Curve> DataToSign<E> {
 /// Presignature, can be used to issue a [partial signature](PartialSignature) without interacting with other signers
 ///
 /// [Threshold](crate::key_share::AnyKeyShare::min_signers) amount of partial signatures (from different signers) can be [combined](PartialSignature::combine) into regular signature
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct Presignature<E: Curve> {
     pub R: NonZero<Point<E>>,
     pub k: SecretScalar<E>,
     pub chi: SecretScalar<E>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct PartialSignature<E: Curve> {
     pub r: Scalar<E>,
     pub sigma: Scalar<E>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct Signature<E: Curve> {
     pub r: NonZero<Scalar<E>>,
     pub s: NonZero<Scalar<E>>,
@@ -108,7 +114,8 @@ pub mod msg {
     /// Signing protocol message
     ///
     /// Enumerates messages from all rounds
-    #[derive(Clone, ProtocolMessage)]
+    #[derive(Clone, ProtocolMessage, Serialize, Deserialize)]
+    #[serde(bound = "")]
     #[allow(clippy::large_enum_variant)]
     pub enum Msg<E: Curve, D: Digest> {
         Round1a(MsgRound1a),

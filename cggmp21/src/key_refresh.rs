@@ -1,4 +1,6 @@
+/// Auxiliary info (re)generation protocol specific types
 mod aux_only;
+/// Non-threshold key refresh specific types
 mod non_threshold;
 
 use digest::Digest;
@@ -17,8 +19,24 @@ use crate::{
     ExecutionId,
 };
 
-pub type AuxOnlyMsg<D, L> = aux_only::Msg<D, L>;
-pub type NonThresholdMsg<E, L, D> = non_threshold::Msg<E, L, D>;
+#[doc(no_inline)]
+pub use self::msg::{aux_only::Msg as AuxOnlyMsg, non_threshold::Msg as NonThresholdMsg};
+
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    /// Messages types related to aux information generation protocol
+    pub mod aux_only {
+        pub use crate::key_refresh::aux_only::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3,
+        };
+    }
+    /// Messages types related to non threshold key refresh protocol
+    pub mod non_threshold {
+        pub use crate::key_refresh::non_threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3,
+        };
+    }
+}
 
 /// To speed up computations, it's possible to supply data to the algorithm
 /// generated ahead of time

@@ -477,6 +477,12 @@ impl<E: Curve, L: SecurityLevel> From<KeyShare<E, L>> for DirtyKeyShare<E, L> {
     }
 }
 
+impl From<AuxInfo> for DirtyAuxInfo {
+    fn from(x: AuxInfo) -> Self {
+        x.0
+    }
+}
+
 impl<T> ops::Deref for Valid<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
