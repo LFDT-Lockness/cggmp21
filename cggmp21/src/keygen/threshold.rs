@@ -70,7 +70,7 @@ pub struct MsgRound3<E: Curve> {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-pub(super) async fn run_threshold_keygen<E, R, M, L, D>(
+pub async fn run_threshold_keygen<E, R, M, L, D>(
     i: u16,
     t: u16,
     n: u16,

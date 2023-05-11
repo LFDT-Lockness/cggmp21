@@ -134,11 +134,11 @@ mod tests {
         crate::key_share::DirtyIncompleteKeyShare<E, L>,
         crate::key_share::DirtyAuxInfo,
 
-        crate::keygen::non_threshold::Msg<E, L, D>,
-        crate::keygen::threshold::Msg<E, L, D>,
+        crate::keygen::msg::non_threshold::Msg<E, L, D>,
+        crate::keygen::msg::threshold::Msg<E, L, D>,
 
-        crate::key_refresh::aux_only::Msg<D, L>,
-        crate::key_refresh::non_threshold::Msg<E, D, L>,
+        crate::key_refresh::msg::aux_only::Msg<D, L>,
+        crate::key_refresh::msg::non_threshold::Msg<E, D, L>,
 
         crate::signing::msg::Msg<E, D>,
         crate::signing::Presignature<E>,

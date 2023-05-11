@@ -1,7 +1,7 @@
 /// Non-threshold DKG specific types
-pub mod non_threshold;
+mod non_threshold;
 /// Threshold DKG specific types
-pub mod threshold;
+mod threshold;
 
 use digest::Digest;
 use generic_ec::hash_to_curve::FromHash;
@@ -18,7 +18,24 @@ use crate::{
     ExecutionId,
 };
 
-pub use self::{non_threshold::Msg as NonThresholdMsg, threshold::Msg as ThresholdMsg};
+#[doc(no_inline)]
+pub use self::msg::{non_threshold::Msg as NonThresholdMsg, threshold::Msg as ThresholdMsg};
+
+#[doc = include_str!("../docs/mpc_message.md")]
+pub mod msg {
+    /// Messages types related to non threshold DKG protocol
+    pub mod non_threshold {
+        pub use crate::keygen::non_threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3,
+        };
+    }
+    /// Messages types related to threshold DKG protocol
+    pub mod threshold {
+        pub use crate::keygen::threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
+        };
+    }
+}
 
 /// Key generation entry point. You can call [`set_threshold`] to make it into a
 /// threshold DKG

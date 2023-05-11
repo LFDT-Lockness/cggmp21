@@ -77,7 +77,7 @@ pub struct MsgRound3 {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-pub(super) async fn run_aux_gen<R, M, E, L, D>(
+pub async fn run_aux_gen<R, M, E, L, D>(
     i: u16,
     n: u16,
     mut rng: &mut R,
