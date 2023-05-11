@@ -129,7 +129,8 @@ mod generic {
         let refresh_execution_id: [u8; 32] = rng.gen();
         let refresh_execution_id =
             ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
-        let mut simulation = Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256>>::new();
+        let mut simulation =
+            Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, ReasonablySecure>>::new();
         let outputs = (0..n).map(|i| {
             let party = simulation.add_party();
             let refresh_execution_id = refresh_execution_id.clone();

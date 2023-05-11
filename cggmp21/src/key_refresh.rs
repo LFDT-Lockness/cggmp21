@@ -148,7 +148,7 @@ where
     pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<AuxInfo, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
-        M: Mpc<ProtocolMessage = aux_only::Msg<D>>,
+        M: Mpc<ProtocolMessage = aux_only::Msg<D, L>>,
         E: Curve,
         Scalar<E>: FromHash,
         L: SecurityLevel,
