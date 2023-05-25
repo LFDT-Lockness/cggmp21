@@ -43,6 +43,9 @@ pub mod msg {
 /// [`set_threshold`]: GenericKeygenBuilder::set_threshold
 pub type KeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, NonThreshold>;
 
+/// Threshold keygen builder
+pub type ThresholdKeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, WithThreshold>;
+
 /// Key generation entry point with choice for threshold or non-threshold
 /// variant
 pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
