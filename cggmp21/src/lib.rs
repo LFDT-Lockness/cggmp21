@@ -10,11 +10,12 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 pub use {
-    paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order, round_based,
+    generic_ec, paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order,
+    round_based,
 };
 
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
-use key_share::{AnyKeyShare, KeyShare};
+use key_share::AnyKeyShare;
 use round_based::PartyIndex;
 use security_level::SecurityLevel;
 use sha2::Sha256;
@@ -36,6 +37,12 @@ mod zk;
 pub mod trusted_dealer;
 
 pub use self::execution_id::ExecutionId;
+pub use self::{
+    key_refresh::KeyRefreshError,
+    key_share::{IncompleteKeyShare, KeyShare},
+    keygen::KeygenError,
+    signing::{DataToSign, PartialSignature, Presignature, Signature, SigningError},
+};
 
 /// Distributed key generation protocol
 ///
