@@ -8,7 +8,7 @@ mod generic {
 
     use cggmp21::keygen::ThresholdMsg;
     use cggmp21::{
-        key_share::{AnyKeyShare, IncompleteKeyShare, KeyShare},
+        key_share::{IncompleteKeyShare, KeyShare},
         security_level::ReasonablySecure,
         ExecutionId,
     };

@@ -19,14 +19,15 @@ use crate::utils::{lagrange_coefficient, subset};
 #[doc = include_str!("../docs/key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
-pub type KeyShare<E, L> = Valid<DirtyKeyShare<E, L>>;
+pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyShare<E, L>>;
 
 /// Incomplete (core) key share
 ///
 #[doc = include_str!("../docs/incomplete_key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
-pub type IncompleteKeyShare<E, L> = Valid<DirtyIncompleteKeyShare<E, L>>;
+pub type IncompleteKeyShare<E, L = crate::default_choice::SecurityLevel> =
+    Valid<DirtyIncompleteKeyShare<E, L>>;
 
 pub type AuxInfo = Valid<DirtyAuxInfo>;
 
@@ -36,7 +37,10 @@ pub type AuxInfo = Valid<DirtyAuxInfo>;
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyIncompleteKeyShare<E: Curve, L: SecurityLevel> {
+pub struct DirtyIncompleteKeyShare<
+    E: Curve,
+    L: SecurityLevel = crate::default_choice::SecurityLevel,
+> {
     pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
@@ -78,7 +82,7 @@ pub struct DirtyAuxInfo {
 #[doc = include_str!("../docs/key_share.md")]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyKeyShare<E: Curve, L: SecurityLevel> {
+pub struct DirtyKeyShare<E: Curve, L: SecurityLevel = crate::default_choice::SecurityLevel> {
     /// Core key share
     pub core: DirtyIncompleteKeyShare<E, L>,
     /// Auxiliary info

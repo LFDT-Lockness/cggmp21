@@ -41,7 +41,7 @@ pub mod msg {
 /// To speed up computations, it's possible to supply data to the algorithm
 /// generated ahead of time
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PregeneratedPrimes<L> {
+pub struct PregeneratedPrimes<L = crate::default_choice::SecurityLevel> {
     p: BigNumber,
     q: BigNumber,
     _phantom: std::marker::PhantomData<L>,
@@ -71,16 +71,30 @@ impl<L: SecurityLevel> PregeneratedPrimes<L> {
 }
 
 /// A variant of [`GenericKeyRefreshBuilder`] that performs key refresh
-pub type KeyRefreshBuilder<'a, E, L, D> =
-    GenericKeyRefreshBuilder<'a, E, L, D, RefreshShare<'a, E, L>>;
+pub type KeyRefreshBuilder<
+    'a,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeyRefreshBuilder<'a, E, RefreshShare<'a, E, L>, L, D>;
 
 /// A variant of [`GenericKeyRefreshBuilder`] that only generates auxiliary info
 /// and doesn't require key shares
-pub type AuxInfoGenerationBuilder<'a, E, L, D> = GenericKeyRefreshBuilder<'a, E, L, D, AuxOnly>;
+pub type AuxInfoGenerationBuilder<
+    'a,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeyRefreshBuilder<'a, E, AuxOnly, L, D>;
 
 /// Entry point for key refresh and auxiliary info generation.
-pub struct GenericKeyRefreshBuilder<'a, E, L, D, M>
-where
+pub struct GenericKeyRefreshBuilder<
+    'a,
+    E,
+    M,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> where
     E: Curve,
     L: SecurityLevel,
     D: Digest,
@@ -185,7 +199,7 @@ where
     }
 }
 
-impl<'a, E, L, D, T> GenericKeyRefreshBuilder<'a, E, L, D, T>
+impl<'a, E, L, D, T> GenericKeyRefreshBuilder<'a, E, T, L, D>
 where
     E: Curve,
     L: SecurityLevel,
@@ -195,7 +209,7 @@ where
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2: Digest>(self) -> GenericKeyRefreshBuilder<'a, E, L, D2, T> {
+    pub fn set_digest<D2: Digest>(self) -> GenericKeyRefreshBuilder<'a, E, T, L, D2> {
         GenericKeyRefreshBuilder {
             target: self.target,
             execution_id: Default::default(),
