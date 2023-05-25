@@ -240,6 +240,26 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
     }
 }
 
+impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
+    /// Returns amount of key co-holders
+    pub fn n(&self) -> u16 {
+        AnyKeyShare::n(self)
+    }
+
+    /// Returns threshold
+    ///
+    /// Threshold is an amount of signers required to cooperate in order to sign a message
+    /// and/or generate presignature
+    pub fn min_signers(&self) -> u16 {
+        AnyKeyShare::min_signers(self)
+    }
+
+    /// Returns public key shared by signers
+    pub fn shared_public_key(&self) -> Point<E> {
+        AnyKeyShare::shared_public_key(self)
+    }
+}
+
 impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     /// Make key share from valid components, only checking for consistency
     /// between them
@@ -261,6 +281,24 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
         };
         r.validate_consistency()?;
         Ok(Valid(r))
+    }
+
+    /// Returns amount of key co-holders
+    pub fn n(&self) -> u16 {
+        AnyKeyShare::n(self)
+    }
+
+    /// Returns threshold
+    ///
+    /// Threshold is an amount of signers required to cooperate in order to sign a message
+    /// and/or generate presignature
+    pub fn min_signers(&self) -> u16 {
+        AnyKeyShare::min_signers(self)
+    }
+
+    /// Returns public key shared by signers
+    pub fn shared_public_key(&self) -> Point<E> {
+        AnyKeyShare::shared_public_key(self)
     }
 }
 
@@ -295,6 +333,7 @@ mod sealed {
 /// Implemented for both [KeyShare] and [IncompleteKeyShare]. Used in methods
 /// that accept both types of key shares, like [reconstruct_secret_key].
 pub trait AnyKeyShare<E: Curve, L: SecurityLevel>: sealed::Sealed {
+    /// Returns "core" key share
     fn core(&self) -> &DirtyIncompleteKeyShare<E, L>;
 
     /// Returns amount of key co-holders
@@ -317,6 +356,11 @@ pub trait AnyKeyShare<E: Curve, L: SecurityLevel>: sealed::Sealed {
             .as_ref()
             .map(|s| s.min_signers)
             .unwrap_or_else(|| self.n())
+    }
+
+    /// Returns public key shared by signers
+    fn shared_public_key(&self) -> Point<E> {
+        self.core().shared_public_key
     }
 }
 
