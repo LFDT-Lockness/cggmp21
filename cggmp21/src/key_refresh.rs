@@ -88,13 +88,8 @@ pub type AuxInfoGenerationBuilder<
 > = GenericKeyRefreshBuilder<'a, E, AuxOnly, L, D>;
 
 /// Entry point for key refresh and auxiliary info generation.
-pub struct GenericKeyRefreshBuilder<
-    'a,
-    E,
-    M,
-    L = crate::default_choice::SecurityLevel,
-    D = crate::default_choice::Digest,
-> where
+pub struct GenericKeyRefreshBuilder<'a, E, M, L, D>
+where
     E: Curve,
     L: SecurityLevel,
     D: Digest,

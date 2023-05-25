@@ -56,12 +56,7 @@ pub type ThresholdKeygenBuilder<
 
 /// Key generation entry point with choice for threshold or non-threshold
 /// variant
-pub struct GenericKeygenBuilder<
-    E: Curve,
-    M,
-    L: SecurityLevel = crate::security_level::ReasonablySecure,
-    D: Digest = sha2::Sha256,
-> {
+pub struct GenericKeygenBuilder<E: Curve, M, L: SecurityLevel, D: Digest> {
     i: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
