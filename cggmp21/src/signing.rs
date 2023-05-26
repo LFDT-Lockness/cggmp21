@@ -175,8 +175,12 @@ pub mod msg {
     pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 }
 
-pub struct SigningBuilder<'r, E, L, D>
-where
+pub struct SigningBuilder<
+    'r,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> where
     E: Curve,
     L: SecurityLevel,
     D: Digest,

@@ -10,14 +10,14 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 pub use {
-    paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order, round_based,
+    generic_ec, paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order,
+    round_based,
 };
 
 use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
-use key_share::{AnyKeyShare, KeyShare};
+use key_share::AnyKeyShare;
 use round_based::PartyIndex;
 use security_level::SecurityLevel;
-use sha2::Sha256;
 use signing::SigningBuilder;
 
 mod errors;
@@ -35,7 +35,19 @@ mod zk;
 #[cfg(feature = "spof")]
 pub mod trusted_dealer;
 
+/// Defines default choice for digest and security level used across the crate
+mod default_choice {
+    pub type Digest = sha2::Sha256;
+    pub type SecurityLevel = crate::security_level::ReasonablySecure;
+}
+
 pub use self::execution_id::ExecutionId;
+pub use self::{
+    key_refresh::KeyRefreshError,
+    key_share::{IncompleteKeyShare, KeyShare},
+    keygen::KeygenError,
+    signing::{DataToSign, PartialSignature, Presignature, Signature, SigningError},
+};
 
 /// Distributed key generation protocol
 ///
@@ -46,10 +58,7 @@ pub use self::execution_id::ExecutionId;
 /// [KeygenBuilder]: keygen::KeygenBuilder
 /// [ReasonablySecure]: security_level::ReasonablySecure
 /// [`set_threshold`]: keygen::GenericKeygenBuilder::set_threshold
-pub fn keygen<E>(
-    i: u16,
-    n: u16,
-) -> keygen::KeygenBuilder<E, security_level::ReasonablySecure, sha2::Sha256>
+pub fn keygen<E>(i: u16, n: u16) -> keygen::KeygenBuilder<E>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -67,7 +76,7 @@ pub fn aux_info_gen<'a, E, L>(
     i: u16,
     n: u16,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
-) -> key_refresh::AuxInfoGenerationBuilder<'a, E, L, Sha256>
+) -> key_refresh::AuxInfoGenerationBuilder<'a, E, L>
 where
     E: Curve,
     L: SecurityLevel,
@@ -84,7 +93,7 @@ where
 pub fn key_refresh<E, L>(
     key_share: &impl AnyKeyShare<E, L>,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
-) -> key_refresh::KeyRefreshBuilder<E, L, Sha256>
+) -> key_refresh::KeyRefreshBuilder<E, L>
 where
     E: Curve,
     L: SecurityLevel,
@@ -96,7 +105,7 @@ pub fn signing<'r, E, L>(
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
     key_share: &'r KeyShare<E, L>,
-) -> SigningBuilder<'r, E, L, Sha256>
+) -> SigningBuilder<'r, E, L>
 where
     E: Curve,
     L: SecurityLevel,

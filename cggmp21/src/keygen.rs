@@ -41,11 +41,22 @@ pub mod msg {
 /// threshold DKG
 ///
 /// [`set_threshold`]: GenericKeygenBuilder::set_threshold
-pub type KeygenBuilder<E, L, D> = GenericKeygenBuilder<E, L, D, NonThreshold>;
+pub type KeygenBuilder<
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeygenBuilder<E, NonThreshold, L, D>;
+
+/// Threshold keygen builder
+pub type ThresholdKeygenBuilder<
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeygenBuilder<E, WithThreshold, L, D>;
 
 /// Key generation entry point with choice for threshold or non-threshold
 /// variant
-pub struct GenericKeygenBuilder<E: Curve, L: SecurityLevel, D: Digest, M> {
+pub struct GenericKeygenBuilder<E: Curve, M, L: SecurityLevel, D: Digest> {
     i: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
@@ -58,7 +69,7 @@ pub struct NonThreshold;
 /// Indicates threshold DKG
 pub struct WithThreshold(u16);
 
-impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
+impl<E, L, D> GenericKeygenBuilder<E, NonThreshold, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -79,7 +90,7 @@ where
     }
 }
 
-impl<E, L, D, M> GenericKeygenBuilder<E, L, D, M>
+impl<E, L, D, M> GenericKeygenBuilder<E, M, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -87,7 +98,7 @@ where
     D: Digest + Clone + 'static,
 {
     /// Specifies to generate key shares for a threshold scheme
-    pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<E, L, D, WithThreshold> {
+    pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<E, WithThreshold, L, D> {
         GenericKeygenBuilder {
             i: self.i,
             n: self.n,
@@ -100,7 +111,7 @@ where
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2>(self) -> GenericKeygenBuilder<E, L, D2, M>
+    pub fn set_digest<D2>(self) -> GenericKeygenBuilder<E, M, L, D2>
     where
         D2: Digest + Clone + 'static,
     {
@@ -117,7 +128,7 @@ where
     ///
     /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
     /// you specify execution ID **after** calling this function.
-    pub fn set_security_level<L2>(self) -> GenericKeygenBuilder<E, L2, D, M>
+    pub fn set_security_level<L2>(self) -> GenericKeygenBuilder<E, M, L2, D>
     where
         L2: SecurityLevel,
     {
@@ -147,7 +158,7 @@ where
     }
 }
 
-impl<E, L, D> GenericKeygenBuilder<E, L, D, NonThreshold>
+impl<E, L, D> GenericKeygenBuilder<E, NonThreshold, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -176,7 +187,7 @@ where
     }
 }
 
-impl<E, L, D> GenericKeygenBuilder<E, L, D, WithThreshold>
+impl<E, L, D> GenericKeygenBuilder<E, WithThreshold, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
