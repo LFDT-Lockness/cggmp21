@@ -51,7 +51,6 @@ mod generic {
         for (i, key_share) in (0u16..).zip(&key_shares) {
             assert_eq!(key_share.i, i);
             assert_eq!(key_share.shared_public_key, key_shares[0].shared_public_key);
-            assert_eq!(key_share.rid.as_ref(), key_shares[0].rid.as_ref());
             assert_eq!(key_share.public_shares, key_shares[0].public_shares);
             assert_eq!(
                 Point::<E>::generator() * &key_share.x,
@@ -102,7 +101,6 @@ mod generic {
         for (i, key_share) in (0u16..).zip(&key_shares) {
             assert_eq!(key_share.i, i);
             assert_eq!(key_share.shared_public_key, key_shares[0].shared_public_key);
-            assert_eq!(key_share.rid.as_ref(), key_shares[0].rid.as_ref());
             assert_eq!(key_share.public_shares, key_shares[0].public_shares);
             assert_eq!(
                 Point::<E>::generator() * &key_share.x,

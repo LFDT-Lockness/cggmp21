@@ -58,7 +58,6 @@ mod generic {
                 key_share.core.shared_public_key,
                 key_shares[0].core.shared_public_key
             );
-            assert_eq!(key_share.core.rid.as_ref(), key_shares[0].core.rid.as_ref());
             assert_eq!(
                 key_share.core.public_shares,
                 key_shares[0].core.public_shares

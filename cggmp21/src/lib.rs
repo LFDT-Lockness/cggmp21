@@ -91,7 +91,7 @@ where
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 pub fn key_refresh<E, L>(
-    key_share: &impl AnyKeyShare<E, L>,
+    key_share: &impl AnyKeyShare<E>,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
 ) -> key_refresh::KeyRefreshBuilder<E, L>
 where
@@ -104,7 +104,7 @@ where
 pub fn signing<'r, E, L>(
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r KeyShare<E, L>,
+    key_share: &'r KeyShare<E>,
 ) -> SigningBuilder<'r, E, L>
 where
     E: Curve,
@@ -135,12 +135,12 @@ mod tests {
     }
 
     ensure_certain_types_impl_serde! {
-        crate::key_share::KeyShare<E, L>,
-        crate::key_share::IncompleteKeyShare<E, L>,
+        crate::key_share::KeyShare<E>,
+        crate::key_share::IncompleteKeyShare<E>,
         crate::key_share::AuxInfo,
 
-        crate::key_share::DirtyKeyShare<E, L>,
-        crate::key_share::DirtyIncompleteKeyShare<E, L>,
+        crate::key_share::DirtyKeyShare<E>,
+        crate::key_share::DirtyIncompleteKeyShare<E>,
         crate::key_share::DirtyAuxInfo,
 
         crate::keygen::msg::non_threshold::Msg<E, L, D>,

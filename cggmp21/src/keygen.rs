@@ -170,7 +170,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
+    ) -> Result<IncompleteKeyShare<E>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
@@ -199,7 +199,7 @@ where
         self,
         rng: &mut R,
         party: M,
-    ) -> Result<IncompleteKeyShare<E, L>, KeygenError>
+    ) -> Result<IncompleteKeyShare<E>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,

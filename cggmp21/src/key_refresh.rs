@@ -76,7 +76,7 @@ pub type KeyRefreshBuilder<
     E,
     L = crate::default_choice::SecurityLevel,
     D = crate::default_choice::Digest,
-> = GenericKeyRefreshBuilder<'a, E, RefreshShare<'a, E, L>, L, D>;
+> = GenericKeyRefreshBuilder<'a, E, RefreshShare<'a, E>, L, D>;
 
 /// A variant of [`GenericKeyRefreshBuilder`] that only generates auxiliary info
 /// and doesn't require key shares
@@ -102,7 +102,7 @@ where
 }
 
 /// A marker for [`KeyRefreshBuilder`]
-pub struct RefreshShare<'a, E: Curve, L: SecurityLevel>(&'a DirtyIncompleteKeyShare<E, L>);
+pub struct RefreshShare<'a, E: Curve>(&'a DirtyIncompleteKeyShare<E>);
 /// A marker for [`AuxInfoGenerationBuilder`]
 pub struct AuxOnly {
     i: u16,
@@ -118,7 +118,7 @@ where
     /// Build key refresh operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new(key_share: &'a impl AnyKeyShare<E, L>, pregenerated: PregeneratedPrimes<L>) -> Self {
+    pub fn new(key_share: &'a impl AnyKeyShare<E>, pregenerated: PregeneratedPrimes<L>) -> Self {
         Self {
             target: RefreshShare(key_share.core()),
             execution_id: Default::default(),
@@ -129,7 +129,7 @@ where
     }
 
     /// Carry out the refresh procedure. Takes a lot of time
-    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E, L>, KeyRefreshError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E>, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = NonThresholdMsg<E, D, L>>,

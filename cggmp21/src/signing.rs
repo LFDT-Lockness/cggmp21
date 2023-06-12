@@ -187,7 +187,7 @@ pub struct SigningBuilder<
 {
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r KeyShare<E, L>,
+    key_share: &'r KeyShare<E>,
     execution_id: ExecutionId<E, L, D>,
     tracer: Option<&'r mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
@@ -204,7 +204,7 @@ where
     pub fn new(
         i: PartyIndex,
         parties_indexes_at_keygen: &'r [PartyIndex],
-        secret_key_share: &'r KeyShare<E, L>,
+        secret_key_share: &'r KeyShare<E>,
     ) -> Self {
         Self {
             i,
@@ -318,7 +318,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     party: M,
     sid: ExecutionId<E, L, D>,
     i: PartyIndex,
-    key_share: &KeyShare<E, L>,
+    key_share: &KeyShare<E>,
     S: &[PartyIndex],
     message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,

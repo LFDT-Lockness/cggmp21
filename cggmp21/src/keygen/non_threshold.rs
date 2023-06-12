@@ -68,7 +68,7 @@ pub async fn run_keygen<E, R, M, L, D>(
     execution_id: ExecutionId<E, L, D>,
     rng: &mut R,
     party: M,
-) -> Result<IncompleteKeyShare<E, L>, KeygenError>
+) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -238,7 +238,6 @@ where
         curve: Default::default(),
         i,
         shared_public_key: decommitments.iter().map(|d| d.X).sum(),
-        rid,
         public_shares: decommitments.iter().map(|d| d.X).collect(),
         x: x_i,
         vss_setup: None,

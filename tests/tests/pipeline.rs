@@ -13,8 +13,8 @@ mod generic {
         ExecutionId,
     };
 
-    type Share<E> = KeyShare<E, ReasonablySecure>;
-    type Incomplete<E> = IncompleteKeyShare<E, ReasonablySecure>;
+    type Share<E> = KeyShare<E>;
+    type Incomplete<E> = IncompleteKeyShare<E>;
 
     #[test_case::case(2, 3; "t2n3")]
     #[test_case::case(4, 7; "t4n7")]
