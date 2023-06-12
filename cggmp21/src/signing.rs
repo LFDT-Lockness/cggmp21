@@ -230,6 +230,17 @@ where
         }
     }
 
+    pub fn set_security_level<L2: SecurityLevel>(self) -> SigningBuilder<'r, E, L2, D> {
+        SigningBuilder {
+            i: self.i,
+            parties_indexes_at_keygen: self.parties_indexes_at_keygen,
+            key_share: self.key_share,
+            execution_id: Default::default(),
+            tracer: self.tracer,
+            enforce_reliable_broadcast: self.enforce_reliable_broadcast,
+        }
+    }
+
     pub fn set_progress_tracer(mut self, tracer: &'r mut dyn Tracer) -> Self {
         self.tracer = Some(tracer);
         self

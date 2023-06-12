@@ -101,14 +101,13 @@ where
     key_refresh::KeyRefreshBuilder::new(key_share, pregenerated)
 }
 
-pub fn signing<'r, E, L>(
+pub fn signing<'r, E>(
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
     key_share: &'r KeyShare<E>,
-) -> SigningBuilder<'r, E, L>
+) -> SigningBuilder<'r, E>
 where
     E: Curve,
-    L: SecurityLevel,
     Point<E>: HasAffineX<E>,
     Scalar<E>: FromHash,
 {
