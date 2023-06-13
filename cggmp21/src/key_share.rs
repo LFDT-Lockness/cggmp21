@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
 
-use crate::security_level::SecurityLevel;
 use crate::utils::{lagrange_coefficient, subset};
 
 /// Key share
@@ -19,15 +18,14 @@ use crate::utils::{lagrange_coefficient, subset};
 #[doc = include_str!("../docs/key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
-pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyShare<E, L>>;
+pub type KeyShare<E> = Valid<DirtyKeyShare<E>>;
 
 /// Incomplete (core) key share
 ///
 #[doc = include_str!("../docs/incomplete_key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
-pub type IncompleteKeyShare<E, L = crate::default_choice::SecurityLevel> =
-    Valid<DirtyIncompleteKeyShare<E, L>>;
+pub type IncompleteKeyShare<E> = Valid<DirtyIncompleteKeyShare<E>>;
 
 pub type AuxInfo = Valid<DirtyAuxInfo>;
 
@@ -37,19 +35,13 @@ pub type AuxInfo = Valid<DirtyAuxInfo>;
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyIncompleteKeyShare<
-    E: Curve,
-    L: SecurityLevel = crate::default_choice::SecurityLevel,
-> {
+pub struct DirtyIncompleteKeyShare<E: Curve> {
     pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[serde_as(as = "Compact")]
     pub shared_public_key: Point<E>,
-    /// Randomness derived at key generation
-    #[serde(with = "hex")]
-    pub rid: L::Rid,
     /// Public shares of all parties sharing the key
     ///
     /// `public_shares[i]` corresponds to public share of $\ith$ party.
@@ -82,9 +74,9 @@ pub struct DirtyAuxInfo {
 #[doc = include_str!("../docs/key_share.md")]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyKeyShare<E: Curve, L: SecurityLevel = crate::default_choice::SecurityLevel> {
+pub struct DirtyKeyShare<E: Curve> {
     /// Core key share
-    pub core: DirtyIncompleteKeyShare<E, L>,
+    pub core: DirtyIncompleteKeyShare<E>,
     /// Auxiliary info
     pub aux: DirtyAuxInfo,
 }
@@ -115,7 +107,7 @@ pub struct VssSetup<E: Curve> {
     pub I: Vec<NonZero<Scalar<E>>>,
 }
 
-impl<E: Curve, L: SecurityLevel> DirtyIncompleteKeyShare<E, L> {
+impl<E: Curve> DirtyIncompleteKeyShare<E> {
     /// Validates a share
     ///
     /// Performs consistency checks against a key share, returns `Ok(())` if share looks OK.
@@ -219,7 +211,7 @@ impl DirtyAuxInfo {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
+impl<E: Curve> DirtyKeyShare<E> {
     /// Perform consistency check between core and aux
     fn validate_consistency(&self) -> Result<(), InvalidKeyShare> {
         if self.core.public_shares.len() != self.aux.parties.len() {
@@ -244,7 +236,7 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
+impl<E: Curve> IncompleteKeyShare<E> {
     /// Returns amount of key co-holders
     pub fn n(&self) -> u16 {
         AnyKeyShare::n(self)
@@ -264,10 +256,10 @@ impl<E: Curve, L: SecurityLevel> IncompleteKeyShare<E, L> {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
+impl<E: Curve> KeyShare<E> {
     /// Make key share from valid components, only checking for consistency
     /// between them
-    pub fn make(core: IncompleteKeyShare<E, L>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+    pub fn make(core: IncompleteKeyShare<E>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
         let r = DirtyKeyShare {
             core: core.0,
             aux: aux.0,
@@ -306,22 +298,20 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> AsRef<DirtyIncompleteKeyShare<E, L>> for DirtyKeyShare<E, L> {
-    fn as_ref(&self) -> &DirtyIncompleteKeyShare<E, L> {
+impl<E: Curve> AsRef<DirtyIncompleteKeyShare<E>> for DirtyKeyShare<E> {
+    fn as_ref(&self) -> &DirtyIncompleteKeyShare<E> {
         &self.core
     }
 }
 
-impl<E: Curve, L: SecurityLevel> AsRef<DirtyIncompleteKeyShare<E, L>>
-    for DirtyIncompleteKeyShare<E, L>
-{
-    fn as_ref(&self) -> &DirtyIncompleteKeyShare<E, L> {
+impl<E: Curve> AsRef<DirtyIncompleteKeyShare<E>> for DirtyIncompleteKeyShare<E> {
+    fn as_ref(&self) -> &DirtyIncompleteKeyShare<E> {
         self
     }
 }
 
-impl<E: Curve, L: SecurityLevel> ops::Deref for DirtyKeyShare<E, L> {
-    type Target = DirtyIncompleteKeyShare<E, L>;
+impl<E: Curve> ops::Deref for DirtyKeyShare<E> {
+    type Target = DirtyIncompleteKeyShare<E>;
 
     fn deref(&self) -> &Self::Target {
         &self.core
@@ -336,9 +326,9 @@ mod sealed {
 ///
 /// Implemented for both [KeyShare] and [IncompleteKeyShare]. Used in methods
 /// that accept both types of key shares, like [reconstruct_secret_key].
-pub trait AnyKeyShare<E: Curve, L: SecurityLevel>: sealed::Sealed {
+pub trait AnyKeyShare<E: Curve>: sealed::Sealed {
     /// Returns "core" key share
-    fn core(&self) -> &DirtyIncompleteKeyShare<E, L>;
+    fn core(&self) -> &DirtyIncompleteKeyShare<E>;
 
     /// Returns amount of key co-holders
     fn n(&self) -> u16 {
@@ -368,30 +358,30 @@ pub trait AnyKeyShare<E: Curve, L: SecurityLevel>: sealed::Sealed {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> sealed::Sealed for KeyShare<E, L> {}
-impl<E: Curve, L: SecurityLevel> AnyKeyShare<E, L> for KeyShare<E, L> {
-    fn core(&self) -> &DirtyIncompleteKeyShare<E, L> {
+impl<E: Curve> sealed::Sealed for KeyShare<E> {}
+impl<E: Curve> AnyKeyShare<E> for KeyShare<E> {
+    fn core(&self) -> &DirtyIncompleteKeyShare<E> {
         &self.core
     }
 }
-impl<E: Curve, L: SecurityLevel> sealed::Sealed for IncompleteKeyShare<E, L> {}
-impl<E: Curve, L: SecurityLevel> AnyKeyShare<E, L> for IncompleteKeyShare<E, L> {
-    fn core(&self) -> &DirtyIncompleteKeyShare<E, L> {
+impl<E: Curve> sealed::Sealed for IncompleteKeyShare<E> {}
+impl<E: Curve> AnyKeyShare<E> for IncompleteKeyShare<E> {
+    fn core(&self) -> &DirtyIncompleteKeyShare<E> {
         self
     }
 }
 impl<T> sealed::Sealed for &T where T: sealed::Sealed {}
-impl<E: Curve, L: SecurityLevel, T> AnyKeyShare<E, L> for &T
+impl<E: Curve, T> AnyKeyShare<E> for &T
 where
-    T: AnyKeyShare<E, L>,
+    T: AnyKeyShare<E>,
 {
-    fn core(&self) -> &DirtyIncompleteKeyShare<E, L> {
-        <T as AnyKeyShare<E, L>>::core(self)
+    fn core(&self) -> &DirtyIncompleteKeyShare<E> {
+        <T as AnyKeyShare<E>>::core(self)
     }
 }
 
-impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for IncompleteKeyShare<E, L> {
-    fn as_ref(&self) -> &IncompleteKeyShare<E, L> {
+impl<E: Curve> AsRef<IncompleteKeyShare<E>> for IncompleteKeyShare<E> {
+    fn as_ref(&self) -> &IncompleteKeyShare<E> {
         self
     }
 }
@@ -406,8 +396,8 @@ impl<E: Curve, L: SecurityLevel> AsRef<IncompleteKeyShare<E, L>> for IncompleteK
 /// shares should never be at one place. This basically defeats purpose of MPC and
 /// creates single point of failure/trust.
 #[cfg(feature = "spof")]
-pub fn reconstruct_secret_key<E: Curve, L: SecurityLevel>(
-    key_shares: &[impl AnyKeyShare<E, L>],
+pub fn reconstruct_secret_key<E: Curve>(
+    key_shares: &[impl AnyKeyShare<E>],
 ) -> Result<SecretScalar<E>, ReconstructError> {
     if key_shares.is_empty() {
         return Err(ReconstructErrorReason::NoKeyShares.into());
@@ -487,11 +477,9 @@ impl<T> AsRef<T> for Valid<T> {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> TryFrom<DirtyIncompleteKeyShare<E, L>>
-    for IncompleteKeyShare<E, L>
-{
+impl<E: Curve> TryFrom<DirtyIncompleteKeyShare<E>> for IncompleteKeyShare<E> {
     type Error = InvalidKeyShare;
-    fn try_from(key_share: DirtyIncompleteKeyShare<E, L>) -> Result<Self, Self::Error> {
+    fn try_from(key_share: DirtyIncompleteKeyShare<E>) -> Result<Self, Self::Error> {
         key_share.validate()?;
         Ok(Self(key_share))
     }
@@ -505,22 +493,22 @@ impl TryFrom<DirtyAuxInfo> for AuxInfo {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> TryFrom<DirtyKeyShare<E, L>> for KeyShare<E, L> {
+impl<E: Curve> TryFrom<DirtyKeyShare<E>> for KeyShare<E> {
     type Error = InvalidKeyShare;
-    fn try_from(key_share: DirtyKeyShare<E, L>) -> Result<Self, Self::Error> {
+    fn try_from(key_share: DirtyKeyShare<E>) -> Result<Self, Self::Error> {
         key_share.validate()?;
         Ok(Self(key_share))
     }
 }
 
-impl<E: Curve, L: SecurityLevel> From<IncompleteKeyShare<E, L>> for DirtyIncompleteKeyShare<E, L> {
-    fn from(x: IncompleteKeyShare<E, L>) -> Self {
+impl<E: Curve> From<IncompleteKeyShare<E>> for DirtyIncompleteKeyShare<E> {
+    fn from(x: IncompleteKeyShare<E>) -> Self {
         x.0
     }
 }
 
-impl<E: Curve, L: SecurityLevel> From<KeyShare<E, L>> for DirtyKeyShare<E, L> {
-    fn from(x: KeyShare<E, L>) -> Self {
+impl<E: Curve> From<KeyShare<E>> for DirtyKeyShare<E> {
+    fn from(x: KeyShare<E>) -> Self {
         x.0
     }
 }

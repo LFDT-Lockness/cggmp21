@@ -78,7 +78,7 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
     execution_id: ExecutionId<E, L, D>,
     rng: &mut R,
     party: M,
-) -> Result<IncompleteKeyShare<E, L>, KeygenError>
+) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -344,7 +344,6 @@ where
         curve: Default::default(),
         i,
         shared_public_key: y,
-        rid,
         public_shares: ys,
         vss_setup: Some(VssSetup {
             min_signers: t,

@@ -106,8 +106,8 @@ pub async fn run_refresh<R, M, E, L, D>(
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
-    core_share: &DirtyIncompleteKeyShare<E, L>,
-) -> Result<KeyShare<E, L>, KeyRefreshError>
+    core_share: &DirtyIncompleteKeyShare<E>,
+) -> Result<KeyShare<E>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D, L>>,

@@ -3,6 +3,10 @@ name: Deps tracker
 on:
   pull_request:
     branches: [ "*" ]
+    paths:
+    - '**/Cargo.toml'
+    - '**/Cargo.lock'
+    - '.github/workflows/deps.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,7 +31,7 @@ jobs:
     - name: Retrieve base branch deps
       run: |
         cd base_branch
-        cargo tree -p cggmp21 -e no-build -e no-dev --depth 1 --prefix none | sed 's/ (\*)$//' | sort -u > ../direct-deps-base
+        cargo tree -p cggmp21 -e no-build -e no-dev --depth 1 --prefix none | tail -n +2 | sed 's/ (\*)$//' | sort -u > ../direct-deps-base
         cargo tree -p cggmp21 -e no-build -e no-dev --prefix none | tail -n +2 | sed 's/ (\*)$//' | sort -u > ../all-deps-base
     - name: Retrieve PR brach deps
       run: |

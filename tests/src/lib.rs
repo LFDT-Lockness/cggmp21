@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cggmp21::{key_share::KeyShare, security_level::ReasonablySecure, unknown_order::BigNumber};
+use cggmp21::{key_share::KeyShare, unknown_order::BigNumber};
 use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};
@@ -37,11 +37,7 @@ impl PrecomputedKeyShares {
         serde_json::to_string_pretty(&self.shares).context("serialize shares")
     }
 
-    pub fn get_shares<E: Curve>(
-        &self,
-        t: Option<u16>,
-        n: u16,
-    ) -> Result<Vec<KeyShare<E, ReasonablySecure>>> {
+    pub fn get_shares<E: Curve>(&self, t: Option<u16>, n: u16) -> Result<Vec<KeyShare<E>>> {
         let key_shares = self
             .shares
             .get(&format!("t={t:?},n={n},curve={}", E::CURVE_NAME))
@@ -53,7 +49,7 @@ impl PrecomputedKeyShares {
         &mut self,
         t: Option<u16>,
         n: u16,
-        shares: &[KeyShare<E, ReasonablySecure>],
+        shares: &[KeyShare<E>],
     ) -> Result<()> {
         if usize::from(n) != shares.len() {
             bail!("expected {n} key shares, only {} provided", shares.len());

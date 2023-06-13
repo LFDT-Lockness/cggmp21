@@ -101,7 +101,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     pub fn generate_core_shares(
         self,
         rng: &mut (impl RngCore + CryptoRng),
-    ) -> Result<Vec<IncompleteKeyShare<E, L>>, TrustedDealerError> {
+    ) -> Result<Vec<IncompleteKeyShare<E>>, TrustedDealerError> {
         let shared_secret_key = self
             .shared_secret_key
             .unwrap_or_else(|| SecretScalar::random(rng));
@@ -148,11 +148,10 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         Ok((0u16..)
             .zip(secret_shares)
             .map(|(i, x_i)| {
-                DirtyIncompleteKeyShare::<E, L> {
+                DirtyIncompleteKeyShare::<E> {
                     curve: Default::default(),
                     i,
                     shared_public_key,
-                    rid: rid.clone(),
                     public_shares: public_shares.clone(),
                     x: x_i,
                     vss_setup: vss_setup.clone(),
@@ -170,7 +169,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     pub fn generate_shares(
         self,
         rng: &mut (impl RngCore + CryptoRng),
-    ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
+    ) -> Result<Vec<KeyShare<E>>, TrustedDealerError> {
         let n = self.n;
 
         let core_key_shares = self.generate_core_shares(rng)?;
