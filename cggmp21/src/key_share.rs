@@ -12,7 +12,7 @@ use serde_with::serde_as;
 use thiserror::Error;
 
 use crate::security_level::SecurityLevel;
-use crate::utils::{lagrange_coefficient, subset};
+use crate::utils::lagrange_coefficient;
 
 /// Key share
 ///
@@ -419,6 +419,8 @@ impl<E: Curve> AsRef<IncompleteKeyShare<E>> for IncompleteKeyShare<E> {
 pub fn reconstruct_secret_key<E: Curve>(
     key_shares: &[impl AnyKeyShare<E>],
 ) -> Result<SecretScalar<E>, ReconstructError> {
+    use crate::utils::subset;
+
     if key_shares.is_empty() {
         return Err(ReconstructErrorReason::NoKeyShares.into());
     }
@@ -583,6 +585,7 @@ enum InvalidKeyShareReason {
     PaillierPkTooSmall { required: usize, actual: usize },
 }
 
+#[cfg(feature = "spof")]
 #[derive(Debug, Error)]
 #[error("secret key reconstruction error")]
 pub struct ReconstructError(
@@ -591,6 +594,7 @@ pub struct ReconstructError(
     ReconstructErrorReason,
 );
 
+#[cfg(feature = "spof")]
 #[derive(Debug, Error)]
 enum ReconstructErrorReason {
     #[error("no key shares provided")]
