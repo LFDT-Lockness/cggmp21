@@ -23,7 +23,6 @@ use serde::{Deserialize, Serialize};
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 use crate::{
     errors::IoError,
-    execution_id::ProtocolChoice,
     key_share::{DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux},
     progress::Tracer,
     security_level::SecurityLevel,
@@ -102,12 +101,12 @@ pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 pub async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
-    execution_id: ExecutionId<E, L, D>,
+    execution_id: ExecutionId<'_>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
     core_share: &DirtyIncompleteKeyShare<E>,
-) -> Result<KeyShare<E>, KeyRefreshError>
+) -> Result<KeyShare<E, L>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D, L>>,
@@ -134,10 +133,9 @@ where
     let mut rounds = rounds.listen(incomings);
 
     tracer.stage("Precompute execution id and shared state");
-    let execution_id = execution_id.evaluate(ProtocolChoice::KeyRefresh { threshold: false });
-    let sid = execution_id.as_slice();
-    let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
-    let parties_shared_state = D::new_with_prefix(execution_id);
+    let sid = execution_id.as_bytes();
+    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
+    let parties_shared_state = D::new_with_prefix(D::digest(sid));
 
     // Round 1
     tracer.round_begins();
@@ -332,7 +330,7 @@ where
     // validate parameters and param_proofs
     tracer.stage("Validate П_prm (ψ_i)");
     let blame = collect_blame(&decommitments, &decommitments, |j, d, _| {
-        if d.N.bit_length() < L::SECURITY_BYTES {
+        if !crate::security_level::validate_public_paillier_key_size::<L>(&d.N) {
             true
         } else {
             let data = π_prm::Data {
@@ -630,6 +628,7 @@ where
         p,
         q,
         parties: party_auxes,
+        security_level: std::marker::PhantomData,
     };
     let key_share = DirtyKeyShare {
         core: new_core_share,

@@ -1,6 +1,5 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::Curve;
 use generic_ec_zkp::hash_commitment::{self, HashCommit};
 use paillier_zk::{
     no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
@@ -15,7 +14,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::IoError,
-    execution_id::ProtocolChoice,
     key_share::{AuxInfo, DirtyAuxInfo, PartyAux},
     progress::Tracer,
     security_level::SecurityLevel,
@@ -77,20 +75,19 @@ pub struct MsgRound3 {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-pub async fn run_aux_gen<R, M, E, L, D>(
+pub async fn run_aux_gen<R, M, L, D>(
     i: u16,
     n: u16,
     mut rng: &mut R,
     party: M,
-    execution_id: ExecutionId<E, L, D>,
+    execution_id: ExecutionId<'_>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
-) -> Result<AuxInfo, KeyRefreshError>
+) -> Result<AuxInfo<L>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<D, L>>,
-    E: Curve,
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
@@ -110,9 +107,8 @@ where
     let mut rounds = rounds.listen(incomings);
 
     tracer.stage("Precompute execution id and shared state");
-    let execution_id = execution_id.evaluate(ProtocolChoice::AuxDataGen);
-    let sid = execution_id.as_slice();
-    let parties_shared_state = D::new_with_prefix(execution_id);
+    let sid = execution_id.as_bytes();
+    let parties_shared_state = D::new_with_prefix(D::digest(sid));
 
     // Round 1
     tracer.round_begins();
@@ -268,7 +264,7 @@ where
     // validate parameters and param_proofs
     tracer.stage("Validate П_prm (ψ_i)");
     let blame = collect_blame(&decommitments, &decommitments, |j, d, _| {
-        if d.N.bit_length() < L::SECURITY_BYTES {
+        if !crate::security_level::validate_public_paillier_key_size::<L>(&d.N) {
             true
         } else {
             let data = π_prm::Data {
@@ -435,6 +431,7 @@ where
         p,
         q,
         parties: party_auxes,
+        security_level: std::marker::PhantomData,
     };
 
     tracer.protocol_ends();

@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cggmp21::{key_share::KeyShare, unknown_order::BigNumber};
+use cggmp21::{key_share::KeyShare, security_level::SecurityLevel, unknown_order::BigNumber};
 use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};
@@ -37,7 +37,11 @@ impl PrecomputedKeyShares {
         serde_json::to_string_pretty(&self.shares).context("serialize shares")
     }
 
-    pub fn get_shares<E: Curve>(&self, t: Option<u16>, n: u16) -> Result<Vec<KeyShare<E>>> {
+    pub fn get_shares<E: Curve, L: SecurityLevel>(
+        &self,
+        t: Option<u16>,
+        n: u16,
+    ) -> Result<Vec<KeyShare<E, L>>> {
         let key_shares = self
             .shares
             .get(&format!("t={t:?},n={n},curve={}", E::CURVE_NAME))
@@ -45,11 +49,11 @@ impl PrecomputedKeyShares {
         serde_json::from_value(key_shares.clone()).context("parse key shares")
     }
 
-    pub fn add_shares<E: Curve>(
+    pub fn add_shares<E: Curve, L: SecurityLevel>(
         &mut self,
         t: Option<u16>,
         n: u16,
-        shares: &[KeyShare<E>],
+        shares: &[KeyShare<E, L>],
     ) -> Result<()> {
         if usize::from(n) != shares.len() {
             bail!("expected {n} key shares, only {} provided", shares.len());
@@ -90,6 +94,7 @@ impl PregeneratedPrimes {
             let p = &s[0];
             let q = &s[1];
             cggmp21::key_refresh::PregeneratedPrimes::new(p.clone(), q.clone())
+                .expect("primes have wrong bit size")
         })
     }
 

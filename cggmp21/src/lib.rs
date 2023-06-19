@@ -58,12 +58,12 @@ pub use self::{
 /// [KeygenBuilder]: keygen::KeygenBuilder
 /// [ReasonablySecure]: security_level::ReasonablySecure
 /// [`set_threshold`]: keygen::GenericKeygenBuilder::set_threshold
-pub fn keygen<E>(i: u16, n: u16) -> keygen::KeygenBuilder<E>
+pub fn keygen<E>(eid: ExecutionId, i: u16, n: u16) -> keygen::KeygenBuilder<E>
 where
     E: Curve,
     Scalar<E>: FromHash,
 {
-    keygen::KeygenBuilder::new(i, n)
+    keygen::KeygenBuilder::new(eid, i, n)
 }
 
 /// Protocol for finalizing the keygen by generating aux info.
@@ -72,16 +72,16 @@ where
 ///
 /// Index `i` of party should be the same as index inside the keyshare you are
 /// going to use this aux info with
-pub fn aux_info_gen<'a, E, L>(
+pub fn aux_info_gen<'a, L>(
+    eid: ExecutionId,
     i: u16,
     n: u16,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
-) -> key_refresh::AuxInfoGenerationBuilder<'a, E, L>
+) -> key_refresh::AuxInfoGenerationBuilder<L>
 where
-    E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::GenericKeyRefreshBuilder::new_aux_gen(i, n, pregenerated)
+    key_refresh::GenericKeyRefreshBuilder::new_aux_gen(eid, i, n, pregenerated)
 }
 
 /// Protocol for performing key refresh. Can be used to perform initial refresh
@@ -90,28 +90,31 @@ where
 /// Doesn't work with threshold key shares at this point.
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
-pub fn key_refresh<E, L>(
-    key_share: &impl AnyKeyShare<E>,
+pub fn key_refresh<'a, E, L>(
+    eid: ExecutionId<'a>,
+    key_share: &'a impl AnyKeyShare<E>,
     pregenerated: key_refresh::PregeneratedPrimes<L>,
-) -> key_refresh::KeyRefreshBuilder<E, L>
+) -> key_refresh::KeyRefreshBuilder<'a, E, L>
 where
     E: Curve,
     L: SecurityLevel,
 {
-    key_refresh::KeyRefreshBuilder::new(key_share, pregenerated)
+    key_refresh::KeyRefreshBuilder::new(eid, key_share, pregenerated)
 }
 
-pub fn signing<'r, E>(
+pub fn signing<'r, E, L>(
+    eid: ExecutionId<'r>,
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r KeyShare<E>,
-) -> SigningBuilder<'r, E>
+    key_share: &'r KeyShare<E, L>,
+) -> SigningBuilder<'r, E, L>
 where
     E: Curve,
     Point<E>: HasAffineX<E>,
     Scalar<E>: FromHash,
+    L: SecurityLevel,
 {
-    SigningBuilder::new(i, parties_indexes_at_keygen, key_share)
+    SigningBuilder::new(eid, i, parties_indexes_at_keygen, key_share)
 }
 
 #[cfg(test)]
@@ -134,13 +137,13 @@ mod tests {
     }
 
     ensure_certain_types_impl_serde! {
-        crate::key_share::KeyShare<E>,
+        crate::key_share::KeyShare<E, L>,
         crate::key_share::IncompleteKeyShare<E>,
-        crate::key_share::AuxInfo,
+        crate::key_share::AuxInfo<L>,
 
-        crate::key_share::DirtyKeyShare<E>,
+        crate::key_share::DirtyKeyShare<E, L>,
         crate::key_share::DirtyIncompleteKeyShare<E>,
-        crate::key_share::DirtyAuxInfo,
+        crate::key_share::DirtyAuxInfo<L>,
 
         crate::keygen::msg::non_threshold::Msg<E, L, D>,
         crate::keygen::msg::threshold::Msg<E, L, D>,

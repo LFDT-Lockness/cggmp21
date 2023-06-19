@@ -42,26 +42,29 @@ pub mod msg {
 ///
 /// [`set_threshold`]: GenericKeygenBuilder::set_threshold
 pub type KeygenBuilder<
+    'a,
     E,
     L = crate::default_choice::SecurityLevel,
     D = crate::default_choice::Digest,
-> = GenericKeygenBuilder<E, NonThreshold, L, D>;
+> = GenericKeygenBuilder<'a, E, NonThreshold, L, D>;
 
 /// Threshold keygen builder
 pub type ThresholdKeygenBuilder<
+    'a,
     E,
     L = crate::default_choice::SecurityLevel,
     D = crate::default_choice::Digest,
-> = GenericKeygenBuilder<E, WithThreshold, L, D>;
+> = GenericKeygenBuilder<'a, E, WithThreshold, L, D>;
 
 /// Key generation entry point with choice for threshold or non-threshold
 /// variant
-pub struct GenericKeygenBuilder<E: Curve, M, L: SecurityLevel, D: Digest> {
+pub struct GenericKeygenBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
     i: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
     optional_t: M,
-    execution_id: ExecutionId<E, L, D>,
+    execution_id: ExecutionId<'a>,
+    _params: std::marker::PhantomData<(E, L, D)>,
 }
 
 /// Indicates non-threshold DKG
@@ -69,7 +72,7 @@ pub struct NonThreshold;
 /// Indicates threshold DKG
 pub struct WithThreshold(u16);
 
-impl<E, L, D> GenericKeygenBuilder<E, NonThreshold, L, D>
+impl<'a, E, L, D> GenericKeygenBuilder<'a, E, NonThreshold, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -79,18 +82,19 @@ where
     /// Constructs [KeygenBuilder]
     ///
     /// Takes local party index $i$ and number of parties $n$
-    pub fn new(i: u16, n: u16) -> Self {
+    pub fn new(eid: ExecutionId<'a>, i: u16, n: u16) -> Self {
         Self {
             i,
             n,
             optional_t: NonThreshold,
             reliable_broadcast_enforced: true,
-            execution_id: ExecutionId::default(),
+            execution_id: eid,
+            _params: std::marker::PhantomData,
         }
     }
 }
 
-impl<E, L, D, M> GenericKeygenBuilder<E, M, L, D>
+impl<'a, E, L, D, M> GenericKeygenBuilder<'a, E, M, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -98,20 +102,18 @@ where
     D: Digest + Clone + 'static,
 {
     /// Specifies to generate key shares for a threshold scheme
-    pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<E, WithThreshold, L, D> {
+    pub fn set_threshold(self, t: u16) -> GenericKeygenBuilder<'a, E, WithThreshold, L, D> {
         GenericKeygenBuilder {
             i: self.i,
             n: self.n,
             optional_t: WithThreshold(t),
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
-            execution_id: Default::default(),
+            execution_id: self.execution_id,
+            _params: std::marker::PhantomData,
         }
     }
     /// Specifies another hash function to use
-    ///
-    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
-    /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2>(self) -> GenericKeygenBuilder<E, M, L, D2>
+    pub fn set_digest<D2>(self) -> GenericKeygenBuilder<'a, E, M, L, D2>
     where
         D2: Digest + Clone + 'static,
     {
@@ -120,15 +122,13 @@ where
             n: self.n,
             optional_t: self.optional_t,
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
-            execution_id: Default::default(),
+            execution_id: self.execution_id,
+            _params: std::marker::PhantomData,
         }
     }
 
     /// Specifies [security level](crate::security_level)
-    ///
-    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
-    /// you specify execution ID **after** calling this function.
-    pub fn set_security_level<L2>(self) -> GenericKeygenBuilder<E, M, L2, D>
+    pub fn set_security_level<L2>(self) -> GenericKeygenBuilder<'a, E, M, L2, D>
     where
         L2: SecurityLevel,
     {
@@ -137,15 +137,8 @@ where
             n: self.n,
             optional_t: self.optional_t,
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
-            execution_id: Default::default(),
-        }
-    }
-
-    /// Specifies [execution ID](ExecutionId)
-    pub fn set_execution_id(self, id: ExecutionId<E, L, D>) -> Self {
-        Self {
-            execution_id: id,
-            ..self
+            execution_id: self.execution_id,
+            _params: std::marker::PhantomData,
         }
     }
 
@@ -158,7 +151,7 @@ where
     }
 }
 
-impl<E, L, D> GenericKeygenBuilder<E, NonThreshold, L, D>
+impl<'a, E, L, D> GenericKeygenBuilder<'a, E, NonThreshold, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,
@@ -187,7 +180,7 @@ where
     }
 }
 
-impl<E, L, D> GenericKeygenBuilder<E, WithThreshold, L, D>
+impl<'a, E, L, D> GenericKeygenBuilder<'a, E, WithThreshold, L, D>
 where
     E: Curve,
     Scalar<E>: FromHash,

@@ -35,20 +35,18 @@ mod generic {
         E: Curve,
         Scalar<E>: FromHash,
     {
-        let keygen_execution_id: [u8; 32] = rng.gen();
-        let keygen_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&keygen_execution_id);
         let mut simulation = Simulation::<ThresholdMsg<E, ReasonablySecure, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
 
         let mut outputs = vec![];
         for i in 0..n {
             let party = simulation.add_party();
-            let keygen_execution_id = keygen_execution_id.clone();
             let mut party_rng = rng.fork();
 
             outputs.push(async move {
-                cggmp21::keygen(i, n)
-                    .set_execution_id(keygen_execution_id)
+                cggmp21::keygen(eid, i, n)
                     .set_threshold(t)
                     .start(&mut party_rng, party)
                     .await
@@ -68,20 +66,18 @@ mod generic {
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
         let n = shares.len().try_into().unwrap();
 
-        let refresh_execution_id: [u8; 32] = rng.gen();
-        let refresh_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
         let mut simulation =
             Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, ReasonablySecure>>::new();
 
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
+
         let outputs = (0..n).map(|i| {
             let party = simulation.add_party();
-            let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = rng.fork();
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
-                cggmp21::aux_info_gen(i, n, pregenerated_data)
-                    .set_execution_id(refresh_execution_id)
+                cggmp21::aux_info_gen(eid, i, n, pregenerated_data)
                     .start(&mut party_rng, party)
                     .await
             }
@@ -109,10 +105,10 @@ mod generic {
         let t = shares[0].min_signers();
         let n = shares.len().try_into().unwrap();
 
-        let signing_execution_id: [u8; 32] = rng.gen();
-        let signing_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&signing_execution_id);
         let mut simulation = Simulation::<cggmp21::signing::msg::Msg<E, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
 
         let mut original_message_to_sign = [0u8; 100];
         rng.fill_bytes(&mut original_message_to_sign);
@@ -129,12 +125,10 @@ mod generic {
         let mut outputs = vec![];
         for (i, share) in (0..).zip(participants_shares) {
             let party = simulation.add_party();
-            let signing_execution_id = signing_execution_id.clone();
             let mut party_rng = rng.fork();
 
             outputs.push(async move {
-                cggmp21::signing(i, participants, share)
-                    .set_execution_id(signing_execution_id)
+                cggmp21::signing(eid, i, participants, share)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await
             });

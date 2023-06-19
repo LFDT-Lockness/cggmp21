@@ -24,20 +24,18 @@ mod generic {
     {
         let mut rng = DevRng::new();
 
-        let keygen_execution_id: [u8; 32] = rng.gen();
-        let keygen_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&keygen_execution_id);
         let mut simulation = Simulation::<NonThresholdMsg<E, ReasonablySecure, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
 
         let mut outputs = vec![];
         for i in 0..n {
             let party = simulation.add_party();
-            let keygen_execution_id = keygen_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
 
             outputs.push(async move {
-                cggmp21::keygen(i, n)
-                    .set_execution_id(keygen_execution_id)
+                cggmp21::keygen(eid, i, n)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .start(&mut party_rng, party)
                     .await
@@ -73,20 +71,18 @@ mod generic {
     {
         let mut rng = DevRng::new();
 
-        let keygen_execution_id: [u8; 32] = rng.gen();
-        let keygen_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&keygen_execution_id);
         let mut simulation = Simulation::<ThresholdMsg<E, ReasonablySecure, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
 
         let mut outputs = vec![];
         for i in 0..n {
             let party = simulation.add_party();
-            let keygen_execution_id = keygen_execution_id.clone();
             let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
 
             outputs.push(async move {
-                cggmp21::keygen(i, n)
-                    .set_execution_id(keygen_execution_id)
+                cggmp21::keygen(eid, i, n)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .set_threshold(t)
                     .start(&mut party_rng, party)

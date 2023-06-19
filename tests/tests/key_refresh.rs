@@ -20,25 +20,22 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E>(None, n)
+            .get_shares::<E, ReasonablySecure>(None, n)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
         // Perform refresh
 
-        let refresh_execution_id: [u8; 32] = rng.gen();
-        let refresh_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
         let mut simulation =
             Simulation::<cggmp21::key_refresh::NonThresholdMsg<E, Sha256, ReasonablySecure>>::new();
         let outputs = shares.iter().map(|share| {
             let party = simulation.add_party();
-            let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = rng.fork();
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
-                cggmp21::key_refresh(share, pregenerated_data)
-                    .set_execution_id(refresh_execution_id)
+                cggmp21::key_refresh(eid, share, pregenerated_data)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .start(&mut party_rng, party)
                     .await
@@ -80,17 +77,18 @@ mod generic {
 
         // attempt to sign with new shares and verify the signature
 
-        let signing_execution_id = ExecutionId::<E, ReasonablySecure>::from_bytes(&[228; 32]);
         let mut simulation = Simulation::<cggmp21::signing::msg::Msg<E, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
+
         let message_to_sign = cggmp21::signing::DataToSign::digest::<Sha256>(&[42; 100]);
         let participants = &(0..n).collect::<Vec<_>>();
         let outputs = key_shares.iter().map(|share| {
             let party = simulation.add_party();
-            let signing_execution_id = signing_execution_id.clone();
             let mut party_rng = rng.fork();
             async move {
-                cggmp21::signing(share.core.i, participants, share)
-                    .set_execution_id(signing_execution_id)
+                cggmp21::signing(eid, share.core.i, participants, share)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await
@@ -119,25 +117,24 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E>(Some(t), n)
+            .get_shares::<E, ReasonablySecure>(Some(t), n)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
         // Perform refresh
 
-        let refresh_execution_id: [u8; 32] = rng.gen();
-        let refresh_execution_id =
-            ExecutionId::<E, ReasonablySecure>::from_bytes(&refresh_execution_id);
         let mut simulation =
             Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, ReasonablySecure>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
+
         let outputs = (0..n).map(|i| {
             let party = simulation.add_party();
-            let refresh_execution_id = refresh_execution_id.clone();
             let mut party_rng = rng.fork();
             let pregenerated_data = primes.next().expect("Can't fetch primes");
             async move {
-                cggmp21::aux_info_gen(i, n, pregenerated_data)
-                    .set_execution_id(refresh_execution_id)
+                cggmp21::aux_info_gen(eid, i, n, pregenerated_data)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .start(&mut party_rng, party)
                     .await
@@ -158,8 +155,11 @@ mod generic {
 
         // attempt to sign with new shares and verify the signature
 
-        let signing_execution_id = ExecutionId::<E, ReasonablySecure>::from_bytes(&[228; 32]);
         let mut simulation = Simulation::<cggmp21::signing::msg::Msg<E, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
+
         let message_to_sign = cggmp21::signing::DataToSign::digest::<Sha256>(&[42; 100]);
 
         // choose t participants
@@ -171,11 +171,9 @@ mod generic {
 
         let outputs = participants_shares.zip(0..).map(|(share, i)| {
             let party = simulation.add_party();
-            let signing_execution_id = signing_execution_id.clone();
             let mut party_rng = rng.fork();
             async move {
-                cggmp21::signing(i, participants, share)
-                    .set_execution_id(signing_execution_id)
+                cggmp21::signing(eid, i, participants, share)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .sign(&mut party_rng, party, message_to_sign)
                     .await

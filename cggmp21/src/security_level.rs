@@ -149,3 +149,16 @@ define_security_level!(ReasonablySecure{
     m = 30,
     q = (BigNumber::one() << 256) - 1,
 });
+
+/// Checks that public paillier key meets security level constraints
+pub(crate) fn validate_public_paillier_key_size<L: SecurityLevel>(N: &BigNumber) -> bool {
+    N.bit_length() >= 8 * L::SECURITY_BITS - 1
+}
+
+/// Checks that secret paillier key meets security level constraints
+pub(crate) fn validate_secret_paillier_key_size<L: SecurityLevel>(
+    p: &BigNumber,
+    q: &BigNumber,
+) -> bool {
+    p.bit_length() >= 4 * L::SECURITY_BITS && q.bit_length() >= 4 * L::SECURITY_BITS
+}
