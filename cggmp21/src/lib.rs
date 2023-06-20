@@ -72,7 +72,7 @@ where
 ///
 /// Index `i` of party should be the same as index inside the keyshare you are
 /// going to use this aux info with
-pub fn aux_info_gen<'a, L>(
+pub fn aux_info_gen<L>(
     eid: ExecutionId,
     i: u16,
     n: u16,
