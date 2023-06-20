@@ -10,6 +10,7 @@ use rand_core::{CryptoRng, RngCore};
 use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
 
+use crate::progress::Tracer;
 use crate::{
     errors::IoError,
     key_share::{IncompleteKeyShare, InvalidKeyShare},
@@ -64,6 +65,7 @@ pub struct GenericKeygenBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
     reliable_broadcast_enforced: bool,
     optional_t: M,
     execution_id: ExecutionId<'a>,
+    tracer: Option<&'a mut dyn Tracer>,
     _params: std::marker::PhantomData<(E, L, D)>,
 }
 
@@ -89,6 +91,7 @@ where
             optional_t: NonThreshold,
             reliable_broadcast_enforced: true,
             execution_id: eid,
+            tracer: None,
             _params: std::marker::PhantomData,
         }
     }
@@ -109,6 +112,7 @@ where
             optional_t: WithThreshold(t),
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
+            tracer: self.tracer,
             _params: std::marker::PhantomData,
         }
     }
@@ -123,6 +127,7 @@ where
             optional_t: self.optional_t,
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
+            tracer: self.tracer,
             _params: std::marker::PhantomData,
         }
     }
@@ -138,8 +143,15 @@ where
             optional_t: self.optional_t,
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
+            tracer: self.tracer,
             _params: std::marker::PhantomData,
         }
+    }
+
+    /// Sets a tracer that tracks progress of protocol execution
+    pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
+        self.tracer = Some(tracer);
+        self
     }
 
     #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
@@ -169,6 +181,7 @@ where
         M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
     {
         non_threshold::run_keygen(
+            self.tracer,
             self.i,
             self.n,
             self.reliable_broadcast_enforced,
@@ -198,6 +211,7 @@ where
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
     {
         threshold::run_threshold_keygen(
+            self.tracer,
             self.i,
             self.optional_t.0,
             self.n,

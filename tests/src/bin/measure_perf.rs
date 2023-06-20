@@ -1,17 +1,18 @@
 use anyhow::Context;
 use cggmp21::{progress::PerfProfiler, signing::DataToSign, ExecutionId};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand::Rng;
 use rand_dev::DevRng;
 use round_based::simulation::Simulation;
 use sha2::Sha256;
 
-type E = generic_ec::curves::Secp256r1;
+type E = generic_ec::curves::Secp256k1;
 type L = cggmp21::security_level::ReasonablySecure;
 type D = sha2::Sha256;
 
 struct Args {
     n: Vec<u16>,
+    bench_non_threshold_keygen: bool,
+    bench_threshold_keygen: bool,
     bench_refresh: bool,
     bench_signing: bool,
 }
@@ -23,11 +24,17 @@ fn args() -> Args {
         .argument::<String>("N")
         .parse(|s| s.split(',').map(std::str::FromStr::from_str).collect())
         .fallback(vec![3, 5, 7, 10]);
+    let bench_non_threshold_keygen = bpaf::long("no-bench-non-threshold-keygen")
+        .switch()
+        .map(|b| !b);
+    let bench_threshold_keygen = bpaf::long("no-bench-threshold-keygen").switch().map(|b| !b);
     let bench_refresh = bpaf::long("no-bench-refresh").switch().map(|b| !b);
     let bench_signing = bpaf::long("no-bench-signing").switch().map(|b| !b);
 
     bpaf::construct!(Args {
         n,
+        bench_non_threshold_keygen,
+        bench_threshold_keygen,
         bench_refresh,
         bench_signing
     })
@@ -44,6 +51,74 @@ async fn main() {
     // since performance of t-out-of-n protocol should be roughly the same as t-out-of-t
     for n in args.n {
         println!("n = {n}");
+        println!();
+
+        if args.bench_non_threshold_keygen {
+            let eid: [u8; 32] = rng.gen();
+            let eid = ExecutionId::new(&eid);
+
+            let mut simulation =
+                Simulation::<cggmp21::keygen::msg::non_threshold::Msg<E, L, D>>::new();
+
+            let outputs = (0..n).map(|i| {
+                let party = simulation.add_party();
+                let mut party_rng = rng.fork();
+
+                let mut profiler = PerfProfiler::new();
+
+                async move {
+                    let _key_share = cggmp21::keygen(eid, i, n)
+                        .set_progress_tracer(&mut profiler)
+                        .start(&mut party_rng, party)
+                        .await
+                        .context("keygen failed")?;
+                    profiler.get_report().context("get perf report")
+                }
+            });
+
+            let perf_reports = futures::future::try_join_all(outputs)
+                .await
+                .expect("non-threshold keygen failed");
+
+            println!("Non-threshold DKG");
+            println!("{}", perf_reports[0].clone().display_io(false));
+            println!();
+        }
+
+        if args.bench_threshold_keygen && n > 2 {
+            let t = n - 1;
+
+            let eid: [u8; 32] = rng.gen();
+            let eid = ExecutionId::new(&eid);
+
+            let mut simulation = Simulation::<cggmp21::keygen::msg::threshold::Msg<E, L, D>>::new();
+
+            let outputs = (0..n).map(|i| {
+                let party = simulation.add_party();
+                let mut party_rng = rng.fork();
+
+                let mut profiler = PerfProfiler::new();
+
+                async move {
+                    let _key_share = cggmp21::keygen(eid, i, n)
+                        .set_threshold(t)
+                        .set_progress_tracer(&mut profiler)
+                        .start(&mut party_rng, party)
+                        .await
+                        .context("keygen failed")?;
+                    profiler.get_report().context("get perf report")
+                }
+            });
+
+            let perf_reports = futures::future::try_join_all(outputs)
+                .await
+                .expect("threshold keygen failed");
+
+            println!("Threshold DKG");
+            println!("{}", perf_reports[0].clone().display_io(false));
+            println!();
+        }
+
         let shares = cggmp21_tests::CACHED_SHARES
             .get_shares::<E, L>(None, n)
             .expect("retrieve key shares from cache");
@@ -59,7 +134,7 @@ async fn main() {
 
             let outputs = shares.iter().map(|share| {
                 let party = simulation.add_party();
-                let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+                let mut party_rng = rng.fork();
                 let pregen = primes.next().expect("Can't get pregenerated prime");
 
                 let mut profiler = PerfProfiler::new();
@@ -76,10 +151,11 @@ async fn main() {
 
             let perf_reports = futures::future::try_join_all(outputs)
                 .await
-                .expect("signing failed");
+                .expect("key refresh failed");
 
             println!("Key refresh protocol");
             println!("{}", perf_reports[0].clone().display_io(false));
+            println!();
         }
 
         if args.bench_signing {
@@ -97,7 +173,7 @@ async fn main() {
             let mut outputs = vec![];
             for (i, share) in (0..).zip(&shares) {
                 let party = simulation.add_party();
-                let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+                let mut party_rng = rng.fork();
 
                 let mut profiler = PerfProfiler::new();
 
@@ -117,6 +193,7 @@ async fn main() {
 
             println!("Signing protocol");
             println!("{}", perf_reports[0].clone().display_io(false));
+            println!();
         }
     }
 }

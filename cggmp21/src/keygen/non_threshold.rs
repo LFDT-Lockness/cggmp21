@@ -13,6 +13,7 @@ use round_based::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::progress::Tracer;
 use crate::{
     errors::IoError,
     key_share::{DirtyIncompleteKeyShare, IncompleteKeyShare},
@@ -61,6 +62,7 @@ pub struct MsgRound3<E: Curve> {
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 pub async fn run_keygen<E, R, M, L, D>(
+    mut tracer: Option<&mut dyn Tracer>,
     i: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
@@ -76,10 +78,12 @@ where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, L, D>>,
 {
+    tracer.protocol_begins();
+
+    tracer.stage("Setup networking");
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
-    // Setup networking
     let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
@@ -88,17 +92,23 @@ where
     let mut rounds = rounds.listen(incomings);
 
     // Round 1
+    tracer.round_begins();
+
+    tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
     let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
 
+    tracer.stage("Sample x_i, rid_i");
     let x_i = SecretScalar::<E>::random(rng);
     let X_i = Point::generator() * &x_i;
 
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
 
+    tracer.stage("Sample schnorr commitment");
     let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
+    tracer.stage("Commit to public data");
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
         .mix(n)
@@ -111,36 +121,53 @@ where
     let my_commitment = MsgRound1 {
         commitment: hash_commit,
     };
+
+    tracer.send_msg();
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
         .await
         .map_err(IoError::send_message)?;
+    tracer.msg_sent();
 
     // Round 2
+    tracer.round_begins();
+
+    tracer.receive_msgs();
     let commitments = rounds
         .complete(round1)
         .await
         .map_err(IoError::receive_message)?
         .into_vec_including_me(my_commitment);
+    tracer.msgs_received();
 
     // Optional reliability check
     if reliable_broadcast_enforced {
+        tracer.stage("Hash received msgs (reliability check)");
         let h_i = commitments
             .iter()
             .try_fold(D::new(), hash_message)
             .map_err(Bug::HashMessage)?
             .finalize();
+
+        tracer.send_msg();
         outgoings
             .send(Outgoing::broadcast(Msg::ReliabilityCheck(
                 MsgReliabilityCheck(h_i.clone()),
             )))
             .await
             .map_err(IoError::send_message)?;
+        tracer.msg_sent();
 
+        tracer.round_begins();
+
+        tracer.receive_msgs();
         let round1_hashes = rounds
             .complete(round1_sync)
             .await
             .map_err(IoError::receive_message)?;
+        tracer.msgs_received();
+
+        tracer.stage("Assert other parties hashed messages (reliability check)");
         let parties_have_different_hashes = round1_hashes
             .into_iter_indexed()
             .filter(|(_j, _msg_id, hash_j)| hash_j.0 != h_i)
@@ -157,19 +184,25 @@ where
         sch_commit,
         decommit,
     };
+    tracer.send_msg();
     outgoings
         .send(Outgoing::broadcast(Msg::Round2(my_decommitment.clone())))
         .await
         .map_err(IoError::send_message)?;
+    tracer.msg_sent();
 
     // Round 3
+    tracer.round_begins();
+
+    tracer.receive_msgs();
     let decommitments = rounds
         .complete(round2)
         .await
         .map_err(IoError::receive_message)?
         .into_vec_including_me(my_decommitment);
+    tracer.msgs_received();
 
-    // Validate decommitments
+    tracer.stage("Validate decommitments");
     let blame = (0u16..)
         .zip(&commitments)
         .zip(&decommitments)
@@ -190,7 +223,7 @@ where
         return Err(KeygenAborted::InvalidDecommitment { parties: blame }.into());
     }
 
-    // Calculate challenge
+    tracer.stage("Calculate challege rid");
     let rid = decommitments
         .iter()
         .map(|d| &d.rid)
@@ -199,22 +232,29 @@ where
         .map_err(Bug::HashToScalarError)?;
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
-    // Prove knowledge of `x_i`
+    tracer.stage("Prove knowledge of `x_i`");
     let sch_proof = schnorr_pok::prove(&sch_secret, &challenge, &x_i);
 
+    tracer.send_msg();
     let my_sch_proof = MsgRound3 { sch_proof };
     outgoings
         .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
         .await
         .map_err(IoError::send_message)?;
+    tracer.msg_sent();
 
     // Round 4
+    tracer.round_begins();
+
+    tracer.receive_msgs();
     let sch_proofs = rounds
         .complete(round3)
         .await
         .map_err(IoError::receive_message)?
         .into_vec_including_me(my_sch_proof);
+    tracer.msgs_received();
 
+    tracer.stage("Validate schnorr proofs");
     let mut blame = vec![];
     for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
         let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
@@ -231,6 +271,8 @@ where
     if !blame.is_empty() {
         return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
     }
+
+    tracer.protocol_ends();
 
     Ok(DirtyIncompleteKeyShare {
         curve: Default::default(),
