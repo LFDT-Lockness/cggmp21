@@ -221,7 +221,7 @@ impl<L: SecurityLevel> DirtyAuxInfo<L> {
             .find(|p| !crate::security_level::validate_public_paillier_key_size::<L>(&p.N))
         {
             return Err(InvalidKeyShareReason::PaillierPkTooSmall {
-                required: 8 * L::SECURITY_BITS,
+                required: 8 * L::SECURITY_BITS - 1,
                 actual: invalid_aux.N.bit_length(),
             }
             .into());
