@@ -282,11 +282,12 @@ where
         return Err(KeygenAborted::FeldmanVerificationFailed { parties: blame }.into());
     }
 
-    tracer.stage("Compute key data");
+    tracer.stage("Compute rid");
     let rid = decommitments
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), xor_array);
+    tracer.stage("Compute Ys");
     let ys = (0..n)
         .map(|l| {
             decommitments
@@ -295,6 +296,7 @@ where
                 .sum()
         })
         .collect::<Vec<_>>();
+    tracer.stage("Compute sigma");
     let sigma: Scalar<E> = sigmas_msg.iter().map(|msg| msg.sigma).sum();
     let mut sigma = sigma + sigmas[usize::from(i)];
     let sigma = SecretScalar::new(&mut sigma);

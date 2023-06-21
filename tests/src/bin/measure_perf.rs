@@ -119,11 +119,11 @@ async fn main() {
             println!();
         }
 
-        let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E, L>(None, n)
-            .expect("retrieve key shares from cache");
-
         if args.bench_refresh {
+            let shares = cggmp21_tests::CACHED_SHARES
+                .get_shares::<E, L>(None, n)
+                .expect("retrieve key shares from cache");
+
             let eid: [u8; 32] = rng.gen();
             let eid = ExecutionId::new(&eid);
 
@@ -159,6 +159,10 @@ async fn main() {
         }
 
         if args.bench_signing {
+            let shares = cggmp21_tests::CACHED_SHARES
+                .get_shares::<E, L>(None, n)
+                .expect("retrieve key shares from cache");
+
             let eid: [u8; 32] = rng.gen();
             let eid = ExecutionId::new(&eid);
 
