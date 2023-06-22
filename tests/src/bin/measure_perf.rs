@@ -47,8 +47,6 @@ async fn main() {
     let args = args();
     let mut rng = DevRng::new();
 
-    // Note that we don't parametrize performance tests by `t` as it doesn't make much sense
-    // since performance of t-out-of-n protocol should be roughly the same as t-out-of-t
     for n in args.n {
         println!("n = {n}");
         println!();
@@ -159,6 +157,8 @@ async fn main() {
         }
 
         if args.bench_signing {
+            // Note that we don't parametrize signing performance tests by `t` as it doesn't make much sense
+            // since performance of t-out-of-n protocol should be roughly the same as t-out-of-t
             let shares = cggmp21_tests::CACHED_SHARES
                 .get_shares::<E, L>(None, n)
                 .expect("retrieve key shares from cache");
