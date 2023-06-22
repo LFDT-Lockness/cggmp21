@@ -169,7 +169,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     pub fn generate_shares(
         self,
         rng: &mut (impl RngCore + CryptoRng),
-    ) -> Result<Vec<KeyShare<E>>, TrustedDealerError> {
+    ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
         let n = self.n;
 
         let core_key_shares = self.generate_core_shares(rng)?;
@@ -196,6 +196,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
                         p: primes_setup.p,
                         q: primes_setup.q,
                         parties: parties_pubic_aux.clone(),
+                        security_level: std::marker::PhantomData,
                     },
                 }
                 .try_into()

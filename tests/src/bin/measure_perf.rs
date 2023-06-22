@@ -45,12 +45,12 @@ async fn main() {
     for n in args.n {
         println!("n = {n}");
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E>(None, n)
+            .get_shares::<E, L>(None, n)
             .expect("retrieve key shares from cache");
 
         if args.bench_refresh {
-            let refresh_execution_id: [u8; 32] = rng.gen();
-            let refresh_execution_id = ExecutionId::<E, L>::from_bytes(&refresh_execution_id);
+            let eid: [u8; 32] = rng.gen();
+            let eid = ExecutionId::new(&eid);
 
             let mut simulation =
                 Simulation::<cggmp21::key_refresh::NonThresholdMsg<E, D, L>>::new();
@@ -59,15 +59,13 @@ async fn main() {
 
             let outputs = shares.iter().map(|share| {
                 let party = simulation.add_party();
-                let refresh_execution_id = refresh_execution_id.clone();
                 let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
                 let pregen = primes.next().expect("Can't get pregenerated prime");
 
                 let mut profiler = PerfProfiler::new();
 
                 async move {
-                    let _new_share = cggmp21::key_refresh(share, pregen)
-                        .set_execution_id(refresh_execution_id)
+                    let _new_share = cggmp21::key_refresh(eid, share, pregen)
                         .set_progress_tracer(&mut profiler)
                         .start(&mut party_rng, party)
                         .await
@@ -85,8 +83,8 @@ async fn main() {
         }
 
         if args.bench_signing {
-            let signing_execution_id: [u8; 32] = rng.gen();
-            let signing_execution_id = ExecutionId::<E, L>::from_bytes(&signing_execution_id);
+            let eid: [u8; 32] = rng.gen();
+            let eid = ExecutionId::new(&eid);
 
             let signers_indexes_at_keygen = &(0..n).collect::<Vec<_>>();
 
@@ -99,14 +97,12 @@ async fn main() {
             let mut outputs = vec![];
             for (i, share) in (0..).zip(&shares) {
                 let party = simulation.add_party();
-                let signing_execution_id = signing_execution_id.clone();
                 let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
 
                 let mut profiler = PerfProfiler::new();
 
                 outputs.push(async move {
-                    let _signature = cggmp21::signing(i, signers_indexes_at_keygen, share)
-                        .set_execution_id(signing_execution_id)
+                    let _signature = cggmp21::signing(eid, i, signers_indexes_at_keygen, share)
                         .set_progress_tracer(&mut profiler)
                         .sign(&mut party_rng, party, message_to_sign)
                         .await

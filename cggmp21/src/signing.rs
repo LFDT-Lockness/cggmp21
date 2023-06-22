@@ -22,7 +22,6 @@ use crate::key_share::{KeyShare, PartyAux, VssSetup};
 use crate::progress::Tracer;
 use crate::utils::{hash_message, iter_peers, lagrange_coefficient, subset, HashMessageError};
 use crate::{
-    execution_id::ProtocolChoice,
     key_share::InvalidKeyShare,
     security_level::SecurityLevel,
     utils::{encryption_key_from_n, scalar_to_bignumber},
@@ -187,10 +186,11 @@ pub struct SigningBuilder<
 {
     i: PartyIndex,
     parties_indexes_at_keygen: &'r [PartyIndex],
-    key_share: &'r KeyShare<E>,
-    execution_id: ExecutionId<E, L, D>,
+    key_share: &'r KeyShare<E, L>,
+    execution_id: ExecutionId<'r>,
     tracer: Option<&'r mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
+    _digest: std::marker::PhantomData<D>,
 }
 
 impl<'r, E, L, D> SigningBuilder<'r, E, L, D>
@@ -202,17 +202,19 @@ where
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
     pub fn new(
+        eid: ExecutionId<'r>,
         i: PartyIndex,
         parties_indexes_at_keygen: &'r [PartyIndex],
-        secret_key_share: &'r KeyShare<E>,
+        secret_key_share: &'r KeyShare<E, L>,
     ) -> Self {
         Self {
             i,
             parties_indexes_at_keygen,
             key_share: secret_key_share,
-            execution_id: Default::default(),
+            execution_id: eid,
             tracer: None,
             enforce_reliable_broadcast: true,
+            _digest: std::marker::PhantomData,
         }
     }
 
@@ -226,31 +228,14 @@ where
             key_share: self.key_share,
             tracer: self.tracer,
             enforce_reliable_broadcast: self.enforce_reliable_broadcast,
-            execution_id: Default::default(),
-        }
-    }
-
-    pub fn set_security_level<L2: SecurityLevel>(self) -> SigningBuilder<'r, E, L2, D> {
-        SigningBuilder {
-            i: self.i,
-            parties_indexes_at_keygen: self.parties_indexes_at_keygen,
-            key_share: self.key_share,
-            execution_id: Default::default(),
-            tracer: self.tracer,
-            enforce_reliable_broadcast: self.enforce_reliable_broadcast,
+            execution_id: self.execution_id,
+            _digest: std::marker::PhantomData,
         }
     }
 
     pub fn set_progress_tracer(mut self, tracer: &'r mut dyn Tracer) -> Self {
         self.tracer = Some(tracer);
         self
-    }
-
-    pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
-        Self {
-            execution_id,
-            ..self
-        }
     }
 
     #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
@@ -327,9 +312,9 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     mut tracer: Option<&mut dyn Tracer>,
     rng: &mut R,
     party: M,
-    sid: ExecutionId<E, L, D>,
+    sid: ExecutionId<'_>,
     i: PartyIndex,
-    key_share: &KeyShare<E>,
+    key_share: &KeyShare<E, L>,
     S: &[PartyIndex],
     message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
@@ -400,7 +385,7 @@ where
     let R = subset(S, &key_share.aux.parties).ok_or(Bug::Subset)?;
 
     // t-out-of-t signing
-    signing_n_out_of_n(
+    signing_n_out_of_n::<_, _, L, _, _>(
         tracer,
         rng,
         party,
@@ -427,7 +412,7 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     mut tracer: Option<&mut dyn Tracer>,
     rng: &mut R,
     party: M,
-    sid: ExecutionId<E, L, D>,
+    sid: ExecutionId<'_>,
     i: PartyIndex,
     n: u16,
     x_i: &SecretScalar<E>,
@@ -458,7 +443,7 @@ where
     let dec_i = DecryptionKey::with_primes(p_i, q_i).ok_or(Bug::InvalidOwnPaillierKey)?;
 
     tracer.stage("Precompute execution id and security params");
-    let sid = sid.evaluate(ProtocolChoice::Presigning3);
+    let sid = sid.as_bytes();
     let security_params = crate::utils::SecurityParams::new::<L>();
 
     tracer.stage("Setup networking");
@@ -499,7 +484,7 @@ where
         .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
-    let parties_shared_state = D::new_with_prefix(sid);
+    let parties_shared_state = D::new_with_prefix(D::digest(sid));
     for j in iter_peers(i, n) {
         tracer.stage("Prove ψ0_j");
         let R_j = &R[usize::from(j)];

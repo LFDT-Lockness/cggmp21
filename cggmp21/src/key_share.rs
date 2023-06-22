@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
 
+use crate::security_level::SecurityLevel;
 use crate::utils::lagrange_coefficient;
 
 /// Key share
@@ -18,7 +19,7 @@ use crate::utils::lagrange_coefficient;
 #[doc = include_str!("../docs/key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
-pub type KeyShare<E> = Valid<DirtyKeyShare<E>>;
+pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyShare<E, L>>;
 
 /// Incomplete (core) key share
 ///
@@ -27,7 +28,7 @@ pub type KeyShare<E> = Valid<DirtyKeyShare<E>>;
 #[doc = include_str!("../docs/validated_key_share_note.md")]
 pub type IncompleteKeyShare<E> = Valid<DirtyIncompleteKeyShare<E>>;
 
-pub type AuxInfo = Valid<DirtyAuxInfo>;
+pub type AuxInfo<L = crate::default_choice::SecurityLevel> = Valid<DirtyAuxInfo<L>>;
 
 /// Dirty (unvalidated) incomplete key share
 ///
@@ -58,7 +59,7 @@ pub struct DirtyIncompleteKeyShare<E: Curve> {
 /// Dirty aux info
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyAuxInfo {
+pub struct DirtyAuxInfo<L: SecurityLevel = crate::default_choice::SecurityLevel> {
     /// Secret prime $p$
     pub p: BigNumber,
     /// Secret prime $q$
@@ -67,6 +68,9 @@ pub struct DirtyAuxInfo {
     ///
     /// `parties[i]` corresponds to public auxiliary data of $\ith$ party
     pub parties: Vec<PartyAux>,
+    /// Security level that was used to generate aux info
+    #[serde(skip)]
+    pub security_level: std::marker::PhantomData<L>,
 }
 
 /// Dirty (unvalidated) key share
@@ -74,11 +78,11 @@ pub struct DirtyAuxInfo {
 #[doc = include_str!("../docs/key_share.md")]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct DirtyKeyShare<E: Curve> {
+pub struct DirtyKeyShare<E: Curve, L: SecurityLevel = crate::default_choice::SecurityLevel> {
     /// Core key share
     pub core: DirtyIncompleteKeyShare<E>,
     /// Auxiliary info
-    pub aux: DirtyAuxInfo,
+    pub aux: DirtyAuxInfo<L>,
 }
 
 /// Party public auxiliary data
@@ -195,7 +199,7 @@ impl<E: Curve> DirtyIncompleteKeyShare<E> {
     }
 }
 
-impl DirtyAuxInfo {
+impl<L: SecurityLevel> DirtyAuxInfo<L> {
     /// Performs consistency checks against aux info, returns a valid share
     /// you can use with other algorithms
     pub fn validate(&self) -> Result<(), InvalidKeyShare> {
@@ -207,11 +211,27 @@ impl DirtyAuxInfo {
             return Err(InvalidKeyShareReason::StGcdN.into());
         }
 
+        if !crate::security_level::validate_secret_paillier_key_size::<L>(&self.p, &self.q) {
+            return Err(InvalidKeyShareReason::PaillierSkTooSmall.into());
+        }
+
+        if let Some(invalid_aux) = self
+            .parties
+            .iter()
+            .find(|p| !crate::security_level::validate_public_paillier_key_size::<L>(&p.N))
+        {
+            return Err(InvalidKeyShareReason::PaillierPkTooSmall {
+                required: 8 * L::SECURITY_BITS - 1,
+                actual: invalid_aux.N.bit_length(),
+            }
+            .into());
+        }
+
         Ok(())
     }
 }
 
-impl<E: Curve> DirtyKeyShare<E> {
+impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
     /// Perform consistency check between core and aux
     fn validate_consistency(&self) -> Result<(), InvalidKeyShare> {
         if self.core.public_shares.len() != self.aux.parties.len() {
@@ -256,10 +276,10 @@ impl<E: Curve> IncompleteKeyShare<E> {
     }
 }
 
-impl<E: Curve> KeyShare<E> {
+impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     /// Make key share from valid components, only checking for consistency
     /// between them
-    pub fn make(core: IncompleteKeyShare<E>, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+    pub fn make(core: IncompleteKeyShare<E>, aux: AuxInfo<L>) -> Result<Self, InvalidKeyShare> {
         let r = DirtyKeyShare {
             core: core.0,
             aux: aux.0,
@@ -270,7 +290,7 @@ impl<E: Curve> KeyShare<E> {
 
     /// Update aux info of a valid key share. Checks that the new aux info is
     /// consistent with key share
-    pub fn update_aux(self, aux: AuxInfo) -> Result<Self, InvalidKeyShare> {
+    pub fn update_aux(self, aux: AuxInfo<L>) -> Result<Self, InvalidKeyShare> {
         let r = DirtyKeyShare {
             core: self.0.core,
             aux: aux.0,
@@ -298,7 +318,7 @@ impl<E: Curve> KeyShare<E> {
     }
 }
 
-impl<E: Curve> AsRef<DirtyIncompleteKeyShare<E>> for DirtyKeyShare<E> {
+impl<E: Curve, L: SecurityLevel> AsRef<DirtyIncompleteKeyShare<E>> for DirtyKeyShare<E, L> {
     fn as_ref(&self) -> &DirtyIncompleteKeyShare<E> {
         &self.core
     }
@@ -310,7 +330,7 @@ impl<E: Curve> AsRef<DirtyIncompleteKeyShare<E>> for DirtyIncompleteKeyShare<E> 
     }
 }
 
-impl<E: Curve> ops::Deref for DirtyKeyShare<E> {
+impl<E: Curve, L: SecurityLevel> ops::Deref for DirtyKeyShare<E, L> {
     type Target = DirtyIncompleteKeyShare<E>;
 
     fn deref(&self) -> &Self::Target {
@@ -358,8 +378,8 @@ pub trait AnyKeyShare<E: Curve>: sealed::Sealed {
     }
 }
 
-impl<E: Curve> sealed::Sealed for KeyShare<E> {}
-impl<E: Curve> AnyKeyShare<E> for KeyShare<E> {
+impl<E: Curve, L: SecurityLevel> sealed::Sealed for KeyShare<E, L> {}
+impl<E: Curve, L: SecurityLevel> AnyKeyShare<E> for KeyShare<E, L> {
     fn core(&self) -> &DirtyIncompleteKeyShare<E> {
         &self.core
     }
@@ -487,17 +507,17 @@ impl<E: Curve> TryFrom<DirtyIncompleteKeyShare<E>> for IncompleteKeyShare<E> {
     }
 }
 
-impl TryFrom<DirtyAuxInfo> for AuxInfo {
+impl<L: SecurityLevel> TryFrom<DirtyAuxInfo<L>> for AuxInfo<L> {
     type Error = InvalidKeyShare;
-    fn try_from(value: DirtyAuxInfo) -> Result<Self, Self::Error> {
+    fn try_from(value: DirtyAuxInfo<L>) -> Result<Self, Self::Error> {
         value.validate()?;
         Ok(Self(value))
     }
 }
 
-impl<E: Curve> TryFrom<DirtyKeyShare<E>> for KeyShare<E> {
+impl<E: Curve, L: SecurityLevel> TryFrom<DirtyKeyShare<E, L>> for KeyShare<E, L> {
     type Error = InvalidKeyShare;
-    fn try_from(key_share: DirtyKeyShare<E>) -> Result<Self, Self::Error> {
+    fn try_from(key_share: DirtyKeyShare<E, L>) -> Result<Self, Self::Error> {
         key_share.validate()?;
         Ok(Self(key_share))
     }
@@ -509,14 +529,14 @@ impl<E: Curve> From<IncompleteKeyShare<E>> for DirtyIncompleteKeyShare<E> {
     }
 }
 
-impl<E: Curve> From<KeyShare<E>> for DirtyKeyShare<E> {
-    fn from(x: KeyShare<E>) -> Self {
+impl<E: Curve, L: SecurityLevel> From<KeyShare<E, L>> for DirtyKeyShare<E, L> {
+    fn from(x: KeyShare<E, L>) -> Self {
         x.0
     }
 }
 
-impl From<AuxInfo> for DirtyAuxInfo {
-    fn from(x: AuxInfo) -> Self {
+impl<L: SecurityLevel> From<AuxInfo<L>> for DirtyAuxInfo<L> {
+    fn from(x: AuxInfo<L>) -> Self {
         x.0
     }
 }
@@ -559,6 +579,10 @@ enum InvalidKeyShareReason {
     ILen,
     #[error("indexes of shares in I are not pairwise distinct")]
     INotPairwiseDistinct,
+    #[error("paillier secret key doesn't match security level (primes are too small)")]
+    PaillierSkTooSmall,
+    #[error("paillier public key of one of the signers doesn't match security level: required bit length = {required}, actual = {actual}")]
+    PaillierPkTooSmall { required: usize, actual: usize },
 }
 
 #[cfg(feature = "spof")]

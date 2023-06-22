@@ -48,19 +48,30 @@ pub struct PregeneratedPrimes<L = crate::default_choice::SecurityLevel> {
 }
 
 impl<L: SecurityLevel> PregeneratedPrimes<L> {
-    pub fn new(p: BigNumber, q: BigNumber) -> Self {
-        Self {
-            p,
-            q,
-            _phantom: std::marker::PhantomData,
+    /// Constructs pregenerated primes from two big numbers
+    ///
+    /// Returns `None` if big numbers are smaller than 4 * [L::SECURITY_BITS](SecurityLevel::SECURITY_BITS)
+    ///
+    /// Function doesn't validate that provided numbers are primes. If they're not,
+    /// key refresh protocol should fail with some ZK proof error.
+    pub fn new(p: BigNumber, q: BigNumber) -> Option<Self> {
+        if !crate::security_level::validate_secret_paillier_key_size::<L>(&p, &q) {
+            None
+        } else {
+            Some(Self {
+                p,
+                q,
+                _phantom: std::marker::PhantomData,
+            })
         }
     }
 
+    /// Returns `p, q`
     pub fn split(self) -> (BigNumber, BigNumber) {
         (self.p, self.q)
     }
 
-    /// Generate the structure. Takes some time.
+    /// Generates primes. Takes some time.
     pub fn generate<R: RngCore>(rng: &mut R) -> Self {
         Self {
             p: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
@@ -76,29 +87,28 @@ pub type KeyRefreshBuilder<
     E,
     L = crate::default_choice::SecurityLevel,
     D = crate::default_choice::Digest,
-> = GenericKeyRefreshBuilder<'a, E, RefreshShare<'a, E>, L, D>;
+> = GenericKeyRefreshBuilder<'a, RefreshShare<'a, E>, L, D>;
 
 /// A variant of [`GenericKeyRefreshBuilder`] that only generates auxiliary info
 /// and doesn't require key shares
 pub type AuxInfoGenerationBuilder<
     'a,
-    E,
     L = crate::default_choice::SecurityLevel,
     D = crate::default_choice::Digest,
-> = GenericKeyRefreshBuilder<'a, E, AuxOnly, L, D>;
+> = GenericKeyRefreshBuilder<'a, AuxOnly, L, D>;
 
 /// Entry point for key refresh and auxiliary info generation.
-pub struct GenericKeyRefreshBuilder<'a, E, M, L, D>
+pub struct GenericKeyRefreshBuilder<'a, M, L, D>
 where
-    E: Curve,
     L: SecurityLevel,
     D: Digest,
 {
     target: M,
-    execution_id: ExecutionId<E, L, D>,
+    execution_id: ExecutionId<'a>,
     pregenerated: PregeneratedPrimes<L>,
     tracer: Option<&'a mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
+    _digest: std::marker::PhantomData<D>,
 }
 
 /// A marker for [`KeyRefreshBuilder`]
@@ -118,18 +128,23 @@ where
     /// Build key refresh operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new(key_share: &'a impl AnyKeyShare<E>, pregenerated: PregeneratedPrimes<L>) -> Self {
+    pub fn new(
+        eid: ExecutionId<'a>,
+        key_share: &'a impl AnyKeyShare<E>,
+        pregenerated: PregeneratedPrimes<L>,
+    ) -> Self {
         Self {
             target: RefreshShare(key_share.core()),
-            execution_id: Default::default(),
+            execution_id: eid,
             pregenerated,
             tracer: None,
             enforce_reliable_broadcast: true,
+            _digest: std::marker::PhantomData,
         }
     }
 
     /// Carry out the refresh procedure. Takes a lot of time
-    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E>, KeyRefreshError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<KeyShare<E, L>, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = NonThresholdMsg<E, D, L>>,
@@ -151,32 +166,35 @@ where
     }
 }
 
-impl<'a, E, L, D> AuxInfoGenerationBuilder<'a, E, L, D>
+impl<'a, L, D> AuxInfoGenerationBuilder<'a, L, D>
 where
-    E: Curve,
     L: SecurityLevel,
     D: Digest,
 {
     /// Build key aux info generation operation. Start it with [`start`](Self::start).
     ///
     /// PregeneratedPrimes can be obtained with [`PregeneratedPrimes::generate`]
-    pub fn new_aux_gen(i: u16, n: u16, pregenerated: PregeneratedPrimes<L>) -> Self {
+    pub fn new_aux_gen(
+        eid: ExecutionId<'a>,
+        i: u16,
+        n: u16,
+        pregenerated: PregeneratedPrimes<L>,
+    ) -> Self {
         Self {
             target: AuxOnly { i, n },
-            execution_id: Default::default(),
+            execution_id: eid,
             pregenerated,
             tracer: None,
             enforce_reliable_broadcast: true,
+            _digest: std::marker::PhantomData,
         }
     }
 
     /// Carry out the aux info generation procedure. Takes a lot of time
-    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<AuxInfo, KeyRefreshError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<AuxInfo<L>, KeyRefreshError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = aux_only::Msg<D, L>>,
-        E: Curve,
-        Scalar<E>: FromHash,
         L: SecurityLevel,
         D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
     {
@@ -194,30 +212,20 @@ where
     }
 }
 
-impl<'a, E, L, D, T> GenericKeyRefreshBuilder<'a, E, T, L, D>
+impl<'a, L, D, T> GenericKeyRefreshBuilder<'a, T, L, D>
 where
-    E: Curve,
     L: SecurityLevel,
     D: Digest,
 {
     /// Specifies another hash function to use
-    ///
-    /// _Caution_: this function overwrites [execution ID](Self::set_execution_id). Make sure
-    /// you specify execution ID **after** calling this function.
-    pub fn set_digest<D2: Digest>(self) -> GenericKeyRefreshBuilder<'a, E, T, L, D2> {
+    pub fn set_digest<D2: Digest>(self) -> GenericKeyRefreshBuilder<'a, T, L, D2> {
         GenericKeyRefreshBuilder {
             target: self.target,
-            execution_id: Default::default(),
+            execution_id: self.execution_id,
             pregenerated: self.pregenerated,
             tracer: self.tracer,
             enforce_reliable_broadcast: self.enforce_reliable_broadcast,
-        }
-    }
-
-    pub fn set_execution_id(self, execution_id: ExecutionId<E, L, D>) -> Self {
-        Self {
-            execution_id,
-            ..self
+            _digest: std::marker::PhantomData,
         }
     }
 

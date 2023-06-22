@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use crate::key_share::DirtyIncompleteKeyShare;
 use crate::{
     errors::IoError,
-    execution_id::ProtocolChoice,
     key_share::{IncompleteKeyShare, VssSetup},
     security_level::SecurityLevel,
     utils,
@@ -75,7 +74,7 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
     t: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
-    execution_id: ExecutionId<E, L, D>,
+    execution_id: ExecutionId<'_>,
     rng: &mut R,
     party: M,
 ) -> Result<IncompleteKeyShare<E>, KeygenError>
@@ -101,9 +100,8 @@ where
 
     // Round 1
 
-    let execution_id = execution_id.evaluate(ProtocolChoice::Keygen { threshold: true });
-    let sid = execution_id.as_slice();
-    let tag_htc = hash_to_curve::Tag::new(&execution_id).ok_or(Bug::InvalidHashToCurveTag)?;
+    let sid = execution_id.as_bytes();
+    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
 
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
