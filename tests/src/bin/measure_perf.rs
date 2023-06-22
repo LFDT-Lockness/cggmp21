@@ -89,7 +89,10 @@ async fn main() {
             let eid: [u8; 32] = rng.gen();
             let eid = ExecutionId::new(&eid);
 
-            let mut simulation = Simulation::<cggmp21::keygen::msg::threshold::Msg<E, L, D>>::new();
+            let mut simulation =
+                Simulation::<cggmp21::keygen::msg::threshold::Msg<E, L, D>>::with_capacity(
+                    (2 * n * n).into(),
+                );
 
             let outputs = (0..n).map(|i| {
                 let party = simulation.add_party();

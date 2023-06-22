@@ -290,10 +290,12 @@ where
     tracer.stage("Compute Ys");
     let ys = (0..n)
         .map(|l| {
-            decommitments
-                .iter_including_me(&my_decommitment)
-                .map(|d| utils::polynomial_value(Point::zero(), &Scalar::from(l + 1), &d.Ss))
-                .sum()
+            let polynomial_sum = utils::polynomials_sum(
+                decommitments
+                    .iter_including_me(&my_decommitment)
+                    .map(|d| d.Ss.as_slice()),
+            );
+            utils::polynomial_value(Point::zero(), &Scalar::from(l + 1), &polynomial_sum)
         })
         .collect::<Vec<_>>();
     tracer.stage("Compute sigma");
