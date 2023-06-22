@@ -445,7 +445,7 @@ mod generic_test {
         let value_actual = super::polynomial_value(Scalar::zero(), &point, &polynomials_sum);
         let value_exected: Scalar<E> = polynomials
             .iter()
-            .map(|coefs| super::polynomial_value(Scalar::zero(), &point, &coefs))
+            .map(|coefs| super::polynomial_value(Scalar::zero(), &point, coefs))
             .sum();
 
         assert_eq!(value_exected, value_actual);
