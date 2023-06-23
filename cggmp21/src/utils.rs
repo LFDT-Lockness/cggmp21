@@ -306,6 +306,31 @@ where
     coefs.iter().rev().fold(zero, |r, c| r * point + c)
 }
 
+/// Returns sum of polynomials
+///
+/// `polynomials_coefs` are polynomial coefficients, `polynomials_coefs[i][j]` corresponds to i-th
+/// polyinomial coef of `x^j`
+pub fn polynomials_sum<'c, C: 'c>(polynomials_coefs: impl IntoIterator<Item = &'c [C]>) -> Vec<C>
+where
+    for<'r> &'r C: core::ops::Add<&'r C, Output = C>,
+    C: Clone,
+{
+    let mut polynomials = polynomials_coefs.into_iter();
+    let Some(mut sum) = polynomials.next().map(|c| c.to_vec()) else { return vec![] };
+
+    for coefs in polynomials {
+        sum.iter_mut()
+            .zip(coefs)
+            .for_each(|(s, coef_i)| *s = &*s + coef_i);
+        if coefs.len() > sum.len() {
+            let sum_len = sum.len();
+            sum.extend_from_slice(&coefs[sum_len..])
+        }
+    }
+
+    sum
+}
+
 pub fn sample_polynomial<E, R>(t: usize, rng: &mut R) -> Vec<SecretScalar<E>>
 where
     E: Curve,
@@ -349,7 +374,10 @@ mod test {
 #[cfg(test)]
 #[generic_tests::define]
 mod generic_test {
+    use std::iter;
+
     use generic_ec::{Curve, NonZero, Scalar};
+    use rand::Rng;
     use rand_dev::DevRng;
 
     use super::{lagrange_coefficient, polynomial_value};
@@ -391,6 +419,36 @@ mod generic_test {
 
         let reconstructed_x_1 = x_0 * lambda_0 + x_2 * lambda_2;
         assert_eq!(x_1, reconstructed_x_1);
+    }
+
+    #[test]
+    fn polynomials_sum<E: Curve>() {
+        let mut rng = DevRng::new();
+
+        // Sample 10 polynomials of different size
+        let polynomials: Vec<Vec<Scalar<E>>> = iter::repeat_with(|| {
+            let len = rng.gen_range(5..15);
+            iter::repeat_with(|| Scalar::random(&mut rng))
+                .take(len)
+                .collect()
+        })
+        .take(10)
+        .collect();
+
+        // Calculate sum of polynomials
+        let polynomials_sum =
+            super::polynomials_sum(polynomials.iter().map(|coefs| coefs.as_slice()));
+
+        // Sample a random point and evaluate polynomial value at this point
+        let point = Scalar::random(&mut rng);
+
+        let value_actual = super::polynomial_value(Scalar::zero(), &point, &polynomials_sum);
+        let value_exected: Scalar<E> = polynomials
+            .iter()
+            .map(|coefs| super::polynomial_value(Scalar::zero(), &point, coefs))
+            .sum();
+
+        assert_eq!(value_exected, value_actual);
     }
 
     #[instantiate_tests(<generic_ec::curves::Secp256k1>)]
