@@ -4,3 +4,5 @@ members = [
     "tests",
 ]
 
+[patch."https://github.com/dfns-labs/paillier-zk"]
+paillier-zk = { path = "../paillier-zk" }

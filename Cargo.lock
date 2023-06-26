@@ -128,7 +128,7 @@ version = "0.0.0"
 dependencies = [
  "digest 0.10.6",
  "futures",
- "generic-ec",
+ "generic-ec 0.0.0 (git+https://github.com/dfns-labs/generic-ec?branch=m)",
  "generic-ec-zkp",
  "generic-tests",
  "hex",
@@ -153,7 +153,7 @@ dependencies = [
  "bpaf",
  "cggmp21",
  "futures",
- "generic-ec",
+ "generic-ec 0.0.0 (git+https://github.com/dfns-labs/generic-ec?branch=d)",
  "generic-tests",
  "lazy_static",
  "rand",
@@ -557,8 +557,24 @@ name = "generic-ec"
 version = "0.0.0"
 source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
 dependencies = [
- "generic-ec-core",
- "generic-ec-curves",
+ "generic-ec-core 0.1.0 (git+https://github.com/dfns-labs/generic-ec?branch=d)",
+ "generic-ec-curves 0.1.0 (git+https://github.com/dfns-labs/generic-ec?branch=d)",
+ "hex",
+ "phantom-type 0.4.2",
+ "rand_core",
+ "serde",
+ "serde_with 2.0.1",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "generic-ec"
+version = "0.0.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#c418c93b19fced622382d3df34368911b6b99731"
+dependencies = [
+ "generic-ec-core 0.1.0 (git+https://github.com/dfns-labs/generic-ec?branch=m)",
+ "generic-ec-curves 0.1.0 (git+https://github.com/dfns-labs/generic-ec?branch=m)",
  "hex",
  "phantom-type 0.4.2",
  "rand_core",
@@ -581,12 +597,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic-ec-core"
+version = "0.1.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#c418c93b19fced622382d3df34368911b6b99731"
+dependencies = [
+ "generic-array",
+ "rand_core",
+ "serde",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
 source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
 dependencies = [
  "elliptic-curve",
- "generic-ec-core",
+ "generic-ec-core 0.1.0 (git+https://github.com/dfns-labs/generic-ec?branch=d)",
+ "k256",
+ "p256",
+ "rand_core",
+ "sha2",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "generic-ec-curves"
+version = "0.1.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#c418c93b19fced622382d3df34368911b6b99731"
+dependencies = [
+ "elliptic-curve",
+ "generic-ec-core 0.1.0 (git+https://github.com/dfns-labs/generic-ec?branch=m)",
  "k256",
  "p256",
  "rand_core",
@@ -598,11 +641,11 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=d#a65125aff588964ba52736ed977d86034674e470"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#c418c93b19fced622382d3df34368911b6b99731"
 dependencies = [
  "digest 0.10.6",
  "generic-array",
- "generic-ec",
+ "generic-ec 0.0.0 (git+https://github.com/dfns-labs/generic-ec?branch=m)",
  "rand_core",
  "serde",
  "subtle",
@@ -851,10 +894,8 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#caa26aecb57f5667c268454e6a9a3b1d1c936444"
 dependencies = [
- "generic-ec",
- "generic-ec-core",
+ "generic-ec 0.0.0 (git+https://github.com/dfns-labs/generic-ec?branch=m)",
  "libpaillier",
  "rand_chacha",
  "rand_core",
