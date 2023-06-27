@@ -17,12 +17,12 @@
 
 use std::{iter, marker::PhantomData};
 
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
+use generic_ec_zkp::polynomial::Polynomial;
 use paillier_zk::libpaillier::unknown_order::BigNumber;
 use paillier_zk::BigNumberExt;
 use rand_core::{CryptoRng, RngCore};
 use thiserror::Error;
-
-use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{
     key_share::{
@@ -30,7 +30,7 @@ use crate::{
         KeyShare, PartyAux, VssSetup,
     },
     security_level::SecurityLevel,
-    utils::{polynomial_value, sample_bigint_in_mult_group},
+    utils::sample_bigint_in_mult_group,
 };
 
 /// Construct a trusted dealer builder
@@ -110,14 +110,11 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             .collect::<Option<Vec<_>>>()
             .ok_or(Reason::DeriveKeyShareIndex)?;
         let (shared_public_key, secret_shares) = if let Some(t) = self.t {
-            let polynomial_coef = iter::once(shared_secret_key)
-                .chain(iter::repeat_with(|| SecretScalar::<E>::random(rng)).take((t - 1).into()))
-                .collect::<Vec<_>>();
-            let f = |x: &Scalar<E>| polynomial_value(Scalar::zero(), x, &polynomial_coef);
-            let pk = Point::generator() * f(&Scalar::zero());
+            let f = Polynomial::sample_with_const_term(rng, usize::from(t) - 1, shared_secret_key);
+            let pk = Point::generator() * f.value::<_, Scalar<_>>(&Scalar::zero());
             let shares = key_shares_indexes
                 .iter()
-                .map(|I_i| f(I_i))
+                .map(|I_i| f.value(I_i))
                 .map(|mut x_i| SecretScalar::new(&mut x_i))
                 .collect::<Vec<_>>();
             (pk, shares)

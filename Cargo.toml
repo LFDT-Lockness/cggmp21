@@ -4,3 +4,8 @@ members = [
     "tests",
 ]
 
+[patch."https://github.com/dfns-labs/generic-ec".generic-ec]
+path = "../generic-ec/generic-ec"
+
+[patch."https://github.com/dfns-labs/generic-ec".generic-ec-zkp]
+path = "../generic-ec/generic-ec-zkp"

@@ -5,6 +5,7 @@ use std::{fmt, ops};
 
 use generic_ec::serde::{Compact, CurveName};
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
+use generic_ec_zkp::polynomial::lagrange_coefficient;
 use paillier_zk::libpaillier::unknown_order::BigNumber;
 use paillier_zk::paillier_encryption_in_range as π_enc;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,6 @@ use serde_with::serde_as;
 use thiserror::Error;
 
 use crate::security_level::SecurityLevel;
-use crate::utils::lagrange_coefficient;
 
 /// Key share
 ///
@@ -169,7 +169,8 @@ impl<E: Curve> DirtyIncompleteKeyShare<E> {
         let first_t_shares = &self.public_shares[0..usize::from(t)];
         let indexes = &vss_setup.I[0..usize::from(t)];
         let interpolation = |x: Scalar<E>| {
-            let lagrange_coefficients = (0..t).map(|j| lagrange_coefficient(x, j, indexes));
+            let lagrange_coefficients =
+                (0..usize::from(t)).map(|j| lagrange_coefficient(x, j, indexes));
             lagrange_coefficients
                 .zip(first_t_shares)
                 .try_fold(Point::zero(), |acc, (lambda_j, X_j)| {
@@ -450,7 +451,8 @@ pub fn reconstruct_secret_key<E: Curve>(
     if let Some(VssSetup { I, .. }) = vss {
         let S = key_shares.iter().map(|s| s.core().i).collect::<Vec<_>>();
         let I = subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
-        let lagrange_coefficients = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
+        let lagrange_coefficients =
+            (0..usize::from(t)).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
         let mut sk = lagrange_coefficients
             .zip(key_shares)
             .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
