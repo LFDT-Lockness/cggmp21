@@ -28,6 +28,7 @@ pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyS
 #[doc = include_str!("../docs/validated_key_share_note.md")]
 pub type IncompleteKeyShare<E> = Valid<DirtyIncompleteKeyShare<E>>;
 
+/// Auxiliary information
 pub type AuxInfo<L = crate::default_choice::SecurityLevel> = Valid<DirtyAuxInfo<L>>;
 
 /// Dirty (unvalidated) incomplete key share
@@ -37,6 +38,7 @@ pub type AuxInfo<L = crate::default_choice::SecurityLevel> = Valid<DirtyAuxInfo<
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct DirtyIncompleteKeyShare<E: Curve> {
+    /// Guard that ensures curve consistency for deseraization
     pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
@@ -479,7 +481,13 @@ impl From<&PartyAux> for π_enc::Aux {
     }
 }
 
-/// Valid key share
+/// Validated key share or aux data
+///
+/// `Valid<T>` wraps a key share or aux data `T` (can be [`DirtyKeyShare`], [`DirtyAuxInfo`], etc.) making sure
+/// it was validated. Library only works with validated data.
+///
+/// `Valid<T>` provides only immutable access to `T`. For instance, if you want to change content of `T`, you
+/// need to [unwrap](Valid::into_inner) it, do necessary modifications, and then validate it again using `TryFrom`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(into = "T", try_from = "T")]
 #[serde(bound(
@@ -489,7 +497,7 @@ impl From<&PartyAux> for π_enc::Aux {
 pub struct Valid<T>(T);
 
 impl<T> Valid<T> {
-    /// Returns a dirty key share
+    /// Returns a dirty key share or aux data
     pub fn into_inner(self) -> T {
         self.0
     }
@@ -587,6 +595,7 @@ enum InvalidKeyShareReason {
     PaillierPkTooSmall { required: usize, actual: usize },
 }
 
+/// Error indicating that [key reconstruction](reconstruct_secret_key) failed
 #[cfg(feature = "spof")]
 #[derive(Debug, Error)]
 #[error("secret key reconstruction error")]

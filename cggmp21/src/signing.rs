@@ -1,3 +1,5 @@
+//! Signing protocol
+
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{
@@ -77,22 +79,35 @@ impl<E: Curve> DataToSign<E> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct Presignature<E: Curve> {
+    /// $R$ component of presignature
     pub R: NonZero<Point<E>>,
+    /// $k$ component of presignaure
     pub k: SecretScalar<E>,
+    /// $\chi$ component of presignature
     pub chi: SecretScalar<E>,
 }
 
+/// Partial signature issued by signer for given message
+///
+/// Can be obtained using [`Presignature::issue_partial_signature`]. Partial signature doesn't carry any sensitive inforamtion.
+///
+/// Threshold amount of partial signatures can be combined into a regular signature using [`PartialSignature::combine`]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct PartialSignature<E: Curve> {
+    /// $r$ component of partial signature
     pub r: Scalar<E>,
+    /// $\sigma$ component of partial signature
     pub sigma: Scalar<E>,
 }
 
+/// ECDSA signature
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct Signature<E: Curve> {
+    /// $r$ component of signature
     pub r: NonZero<Scalar<E>>,
+    /// $s$ component of signature
     pub s: NonZero<Scalar<E>>,
 }
 
@@ -118,24 +133,33 @@ pub mod msg {
     #[serde(bound = "")]
     #[allow(clippy::large_enum_variant)]
     pub enum Msg<E: Curve, D: Digest> {
+        /// Round 1a message
         Round1a(MsgRound1a),
+        /// Round 1b message
         Round1b(MsgRound1b),
+        /// Round 2 message
         Round2(MsgRound2<E>),
+        /// Round 3 message
         Round3(MsgRound3<E>),
+        /// Round 4 message
         Round4(MsgRound4<E>),
+        /// Reliability check message (optional additional round)
         ReliabilityCheck(MsgReliabilityCheck<D>),
     }
 
     /// Message from round 1a
     #[derive(Clone, Serialize, Deserialize)]
     pub struct MsgRound1a {
+        /// $K_i$
         pub K: libpaillier::Ciphertext,
+        /// $G_i$
         pub G: libpaillier::Ciphertext,
     }
 
     /// Message from round 1b
     #[derive(Clone, Serialize, Deserialize)]
     pub struct MsgRound1b {
+        /// $\psi^0_{j,i}$
         pub psi0: (pi_enc::Commitment, pi_enc::Proof),
     }
 
@@ -143,13 +167,21 @@ pub mod msg {
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(bound = "")]
     pub struct MsgRound2<E: Curve> {
+        /// $\Gamma_i$
         pub Gamma: Point<E>,
+        /// $D_{j,i}$
         pub D: Ciphertext,
+        /// $F_{j,i}$
         pub F: Ciphertext,
+        /// $\hat D_{j,i}$
         pub hat_D: Ciphertext,
+        /// $\hat F_{j,i}$
         pub hat_F: Ciphertext,
+        /// $\psi_{j,i}$
         pub psi: (pi_aff::Commitment<E>, pi_aff::Proof),
+        /// $\hat \psi_{j,i}$
         pub hat_psi: (pi_aff::Commitment<E>, pi_aff::Proof),
+        /// $\psi'_{j,i}$
         pub psi_prime: (pi_log::Commitment<E>, pi_log::Proof),
     }
 
@@ -157,8 +189,11 @@ pub mod msg {
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(bound = "")]
     pub struct MsgRound3<E: Curve> {
+        /// $\delta_i$
         pub delta: Scalar<E>,
+        /// $\Delta_i$
         pub Delta: Point<E>,
+        /// $\psi''_{j,i}$
         pub psi_prime_prime: (pi_log::Commitment<E>, pi_log::Proof),
     }
 
@@ -166,6 +201,7 @@ pub mod msg {
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(bound = "")]
     pub struct MsgRound4<E: Curve> {
+        /// $\sigma_i$
         pub sigma: Scalar<E>,
     }
 
@@ -175,6 +211,7 @@ pub mod msg {
     pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 }
 
+/// Signing entry point
 pub struct SigningBuilder<
     'r,
     E,
@@ -202,6 +239,7 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
+    /// Construct a signing builder
     pub fn new(
         eid: ExecutionId<'r>,
         i: PartyIndex,
@@ -219,6 +257,7 @@ where
         }
     }
 
+    /// Specifies another hash function to use
     pub fn set_digest<D2>(self) -> SigningBuilder<'r, E, L, D2>
     where
         D2: Digest,
@@ -234,6 +273,7 @@ where
         }
     }
 
+    /// Specifies a tracer that tracks progress of protocol execution
     pub fn set_progress_tracer(mut self, tracer: &'r mut dyn Tracer) -> Self {
         self.tracer = Some(tracer);
         self
@@ -247,6 +287,7 @@ where
         }
     }
 
+    /// Starts presignature generation protocol
     pub async fn generate_presignature<R, M>(
         self,
         rng: &mut R,
@@ -274,6 +315,7 @@ where
         }
     }
 
+    /// Starts signing protocol
     pub async fn sign<R, M>(
         self,
         rng: &mut R,
@@ -1041,6 +1083,10 @@ where
     E: Curve,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
+    /// Issues partial signature for given message
+    ///
+    /// **Never reuse presignatures!** If you use the same presignatures to sign two different
+    /// messages, it leaks the private key!
     pub fn issue_partial_signature(self, message_to_sign: DataToSign<E>) -> PartialSignature<E> {
         let r = self.R.x().to_scalar();
         let m = message_to_sign.to_scalar();
@@ -1050,6 +1096,13 @@ where
 }
 
 impl<E: Curve> PartialSignature<E> {
+    /// Combines threshold amount of partial signatures into regular signature
+    ///
+    /// Returns `None` if input is malformed.
+    ///
+    /// `combine` may return a signature that's invalid for public key and message it was issued for.
+    /// This would mean that some of signers cheated and aborted the protocol. You need to validate
+    /// resulting signature to be sure that no one aborted the protocol.
     pub fn combine(partial_signatures: &[PartialSignature<E>]) -> Option<Signature<E>> {
         if partial_signatures.is_empty() {
             None

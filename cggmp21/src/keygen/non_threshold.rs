@@ -28,9 +28,13 @@ use super::{Bug, KeygenAborted, KeygenError};
 #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
+    /// Round 1 message
     Round1(MsgRound1<D>),
+    /// Reliability check message (optional additional round)
     ReliabilityCheck(MsgReliabilityCheck<D>),
+    /// Round 2 message
     Round2(MsgRound2<E, L, D>),
+    /// Round 3 message
     Round3(MsgRound3<E>),
 }
 
@@ -38,22 +42,28 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
+    /// $V_i$
     pub commitment: HashCommit<D>,
 }
 /// Message from round 2
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
+    /// `rid_i`
     #[serde(with = "hex::serde")]
     pub rid: L::Rid,
+    /// $X_i$
     pub X: Point<E>,
+    /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
+    /// $u_i$
     pub decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Message from round 3
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound3<E: Curve> {
+    /// $\psi_i$
     pub sch_proof: schnorr_pok::Proof<E>,
 }
 /// Message parties exchange to ensure reliability of broadcast channel

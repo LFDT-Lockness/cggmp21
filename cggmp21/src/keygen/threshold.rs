@@ -31,10 +31,15 @@ use super::{Bug, KeygenAborted, KeygenError};
 #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
+    /// Round 1 message
     Round1(MsgRound1<D>),
+    /// Round 2a message
     Round2Broad(MsgRound2Broad<E, L, D>),
+    /// Round 2b message
     Round2Uni(MsgRound2Uni<E>),
+    /// Round 3 message
     Round3(MsgRound3<E>),
+    /// Reliability check message (optional additional round)
     ReliabilityCheck(MsgReliabilityCheck<D>),
 }
 
@@ -42,28 +47,35 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
+    /// $V_i$
     pub commitment: HashCommit<D>,
 }
 /// Message from round 2 broadcasted to everyone
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound2Broad<E: Curve, L: SecurityLevel, D: Digest> {
+    /// `rid_i`
     #[serde(with = "hex::serde")]
     pub rid: L::Rid,
+    /// $\vec S_i$
     pub F: Polynomial<Point<E>>,
+    /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
+    /// $u_i$
     pub decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Message from round 2 unicasted to each party
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound2Uni<E: Curve> {
-    sigma: Scalar<E>,
+    /// $\sigma_{i,j}$
+    pub sigma: Scalar<E>,
 }
 /// Message from round 3
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound3<E: Curve> {
+    /// $\psi_i$
     pub sch_proof: schnorr_pok::Proof<E>,
 }
 /// Message parties exchange to ensure reliability of broadcast channel

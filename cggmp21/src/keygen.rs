@@ -1,3 +1,5 @@
+//! Threshold and non-threshold DKG
+
 /// Non-threshold DKG specific types
 mod non_threshold;
 /// Threshold DKG specific types
@@ -224,6 +226,7 @@ where
     }
 }
 
+/// Keygen protocol error
 #[derive(Debug, Error)]
 #[error("keygen protocol is failed to complete")]
 pub struct KeygenError(#[source] Reason);

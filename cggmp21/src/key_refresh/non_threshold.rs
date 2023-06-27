@@ -41,9 +41,13 @@ use crate::{
 // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
 #[allow(clippy::large_enum_variant)]
 pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
+    /// Round 1 message
     Round1(MsgRound1<D>),
+    /// Round 2 message
     Round2(MsgRound2<E, D, L>),
+    /// Round 3 message
     Round3(MsgRound3<E>),
+    /// Reliability check message (optional additional round)
     ReliabilityCheck(MsgReliabilityCheck<D>),
 }
 
@@ -51,41 +55,45 @@ pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
+    /// $V_i$
     pub commitment: HashCommit<D>,
 }
 /// Message from round 2
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
-    /// **X_i** in paper
+    /// $\vec X_i$
     pub Xs: Vec<Point<E>>,
-    /// **A_i** in paper
+    /// $\vec A_i$
     pub sch_commits_a: Vec<schnorr_pok::Commit<E>>,
+    /// $N_i$
     pub N: BigNumber,
+    /// $s_i$
     pub s: BigNumber,
+    /// $t_i$
     pub t: BigNumber,
-    /// psi_circonflexe_i in paper
+    /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
     pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
-    /// rho_i in paper
+    /// $\rho_i$
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
     #[serde(with = "hex")]
     pub rho_bytes: L::Rid,
-    /// u_i in paper
+    /// $u_i$
     pub decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Unicast message of round 3, sent to each participant
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound3<E: Curve> {
-    /// psi_i in paper
+    /// $\psi_i$
     // this should be L::M instead, but no rustc support yet
     pub mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
-    /// phi_i^j in paper
+    /// $\phi_i^j$
     pub fac_proof: π_fac::Proof,
-    /// C_i^j in paper
+    /// $C_i^j$
     pub C: BigNumber,
-    /// psi_i_j in paper
+    /// $\psi_i^k$
     ///
     /// Here in the paper you only send one proof, but later they require you to
     /// verify by all the other proofs, that are never sent. We fix this here
