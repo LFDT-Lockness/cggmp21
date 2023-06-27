@@ -8,8 +8,8 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["serde"] }
-generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["serde"] }
+generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "m", features = ["serde"] }
+generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "m", features = ["serde"] }
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
 
 paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "m", default-features = false, features = ["serde"] }

@@ -20,7 +20,7 @@ rand_chacha = "0.3"
 sha2 = "0.10"
 
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive", "dev"] }
-generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "d", features = ["serde", "all-curves"] }
+generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "m", features = ["serde", "all-curves"] }
 
 tokio = { version = "1", features = ["macros"] }
 futures = "0.3"
