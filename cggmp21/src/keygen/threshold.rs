@@ -285,14 +285,12 @@ where
         .map(|d| &d.rid)
         .fold(L::Rid::default(), xor_array);
     tracer.stage("Compute Ys");
+    let polynomial_sum = decommitments
+        .iter_including_me(&my_decommitment)
+        .map(|d| &d.F)
+        .sum::<Polynomial<_>>();
     let ys = (0..n)
-        .map(|l| {
-            let polynomial_sum = decommitments
-                .iter_including_me(&my_decommitment)
-                .map(|d| &d.F)
-                .sum::<Polynomial<_>>();
-            polynomial_sum.value(&Scalar::from(l + 1))
-        })
+        .map(|l| polynomial_sum.value(&Scalar::from(l + 1)))
         .collect::<Vec<_>>();
     tracer.stage("Compute sigma");
     let sigma: Scalar<E> = sigmas_msg.iter().map(|msg| msg.sigma).sum();
