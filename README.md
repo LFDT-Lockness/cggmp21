@@ -32,8 +32,8 @@ let outgoing: impl Sink<Outgoing<Msg>>;
 ```
 
 where:
-* `Msg` is protocol message (e.g. `signing::msg::Msg`)
-* `round_based::Incoming` and `round_based::Outgoing` wrap `Msg` and provide additional data (e.g. sender/recepient)
+* `Msg` is protocol message (e.g., `signing::msg::Msg`)
+* `round_based::Incoming` and `round_based::Outgoing` wrap `Msg` and provide additional data (e.g., sender/recepient)
 * `futures::Stream` and `futures::Sink` are well-known async primitives.
 
 Then, construct a `round_based::MpcParty`:
@@ -62,7 +62,7 @@ let incomplete_key_share = cggmp21::keygen::<Secp256k1>(eid, i, n)
     .start(&mut OsRng, party)
     .await?;
 ```
-This code outputs `IncompleteKeyShare`. Note that this key share is not ready yet to do signing. You need to "complete" it
+This code outputs `IncompleteKeyShare`. Note that this key share is not ready yet to do signing. You need to “complete” it
 by generating auxiliary info (see below).
 
 ### Auxiliary info generation
@@ -81,7 +81,7 @@ let aux_info = cggmp21::aux_info_gen(eid, i, n, pregenerated_primes)
     .await?;
 ```
 
-After keygen and aux info gen are done, you can make a "complete" key share that can be used for signing:
+After keygen and aux info gen are done, you can make a “complete” key share that can be used for signing:
 ```rust
 let key_share = cggmp21::KeyShare::make(incomplete_key_share, aux_info)?;
 ```

@@ -32,8 +32,8 @@
 //! ```
 //!
 //! where:
-//! * `Msg` is protocol message (e.g. [`signing::msg::Msg`])
-//! * [`round_based::Incoming`] and [`round_based::Outgoing`] wrap `Msg` and provide additional data (e.g. sender/recepient)
+//! * `Msg` is protocol message (e.g., [`signing::msg::Msg`])
+//! * [`round_based::Incoming`] and [`round_based::Outgoing`] wrap `Msg` and provide additional data (e.g., sender/recepient)
 //! * [`futures::Stream`] and [`futures::Sink`] are well-known async primitives.
 //!
 //! Then, construct a [`round_based::MpcParty`]:
@@ -77,7 +77,7 @@
 //!     .await?;
 //! # Ok(()) }
 //! ```
-//! This code outputs [`IncompleteKeyShare`]. Note that this key share is not ready yet to do signing. You need to "complete" it
+//! This code outputs [`IncompleteKeyShare`]. Note that this key share is not ready yet to do signing. You need to “complete” it
 //! by generating auxiliary info (see below).
 //!
 //! ### Auxiliary info generation
@@ -107,7 +107,7 @@
 //! # Ok(()) }
 //! ```
 //!
-//! After keygen and aux info gen are done, you can make a "complete" key share that can be used for signing:
+//! After keygen and aux info gen are done, you can make a “complete” key share that can be used for signing:
 //! ```rust,no_run
 //! # fn main() -> Result<(), cggmp21::key_share::InvalidKeyShare> {
 //! # let (incomplete_key_share, aux_info): (cggmp21::IncompleteKeyShare<cggmp21::supported_curves::Secp256k1>, cggmp21::key_share::AuxInfo) = unimplemented!();
@@ -231,6 +231,8 @@ pub use self::{
 /// and sha2-256 digest. You can switch to threshold DKG by using
 /// [`set_threshold`]
 ///
+/// This is an mistake
+///
 /// [KeygenBuilder]: keygen::KeygenBuilder
 /// [ReasonablySecure]: security_level::ReasonablySecure
 /// [`set_threshold`]: keygen::GenericKeygenBuilder::set_threshold
@@ -246,7 +248,7 @@ where
 ///
 /// PregeneratedPrimes can be obtained with [`key_refresh::PregeneratedPrimes::generate`]
 ///
-/// Index `i` of party should be the same as index inside the keyshare you are
+/// Index `i` of party should be the same as index inside the key share you are
 /// going to use this aux info with
 pub fn aux_info_gen<L>(
     eid: ExecutionId,
@@ -261,7 +263,7 @@ where
 }
 
 /// Protocol for performing key refresh. Can be used to perform initial refresh
-/// with aux info generation, or for a refersh of a complete keyshare.
+/// with aux info generation, or for a refresh of a complete key share.
 ///
 /// Doesn't work with threshold key shares at this point.
 ///

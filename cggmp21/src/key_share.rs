@@ -31,7 +31,7 @@ pub type IncompleteKeyShare<E> = Valid<DirtyIncompleteKeyShare<E>>;
 /// Auxiliary information
 pub type AuxInfo<L = crate::default_choice::SecurityLevel> = Valid<DirtyAuxInfo<L>>;
 
-/// Dirty (unvalidated) incomplete key share
+/// Dirty (invalidated) incomplete key share
 ///
 #[doc = include_str!("../docs/incomplete_key_share.md")]
 #[serde_as]
@@ -48,7 +48,7 @@ pub struct DirtyIncompleteKeyShare<E: Curve> {
     /// Public shares of all parties sharing the key
     ///
     /// `public_shares[i]` corresponds to public share of $\ith$ party.
-    /// Corresponds to **X** = $(X_i)_i$ in paper
+    /// Corresponds to **X** = $(X_i)_i$ in paper.
     #[serde_as(as = "Vec<Compact>")]
     pub public_shares: Vec<Point<E>>,
     /// Verifiable secret sharing setup, present if key was generated using VSS scheme
@@ -75,7 +75,7 @@ pub struct DirtyAuxInfo<L: SecurityLevel = crate::default_choice::SecurityLevel>
     pub security_level: std::marker::PhantomData<L>,
 }
 
-/// Dirty (unvalidated) key share
+/// Dirty (invalidated) key share
 ///
 #[doc = include_str!("../docs/key_share.md")]
 #[derive(Clone, Serialize, Deserialize)]
@@ -292,7 +292,7 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     }
 
     /// Update aux info of a valid key share. Checks that the new aux info is
-    /// consistent with key share
+    /// consistent with key share.
     pub fn update_aux(self, aux: AuxInfo<L>) -> Result<Self, InvalidKeyShare> {
         let r = DirtyKeyShare {
             core: self.0.core,
@@ -310,7 +310,7 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     /// Returns threshold
     ///
     /// Threshold is an amount of signers required to cooperate in order to sign a message
-    /// and/or generate presignature
+    /// and/or generate presignature.
     pub fn min_signers(&self) -> u16 {
         AnyKeyShare::min_signers(self)
     }
@@ -350,7 +350,7 @@ mod sealed {
 /// Implemented for both [KeyShare] and [IncompleteKeyShare]. Used in methods
 /// that accept both types of key shares, like [reconstruct_secret_key].
 pub trait AnyKeyShare<E: Curve>: sealed::Sealed {
-    /// Returns "core" key share
+    /// Returns “core” key share
     fn core(&self) -> &DirtyIncompleteKeyShare<E>;
 
     /// Returns amount of key co-holders
