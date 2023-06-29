@@ -52,10 +52,10 @@ Now you're ready to generate a key!
 ```rust
 use cggmp21::supported_curves::Secp256k1;
 
+let eid = cggmp21::ExecutionId::new(b"execution id, unique per protocol execution");
 let i = /* signer index (0 <= i < n) */;
 let n = /* amount of signers taking part in key generation */;
 let t = /* threshold */;
-let eid = /* execution id, unique per protocol execution */;
 
 let incomplete_key_share = cggmp21::keygen::<Secp256k1>(eid, i, n)
     .set_threshold(t)
@@ -72,9 +72,9 @@ the same indexes as at keygen.
 // Primes generation can take a while
 let pregenerated_primes = cggmp21::PregeneratedPrimes::generate(&mut OsRng);
 
+let eid = cggmp21::ExecutionId::new(b"execution id, unique per protocol execution");
 let i = /* signer index, same as at keygen */;
 let n = /* amount of signers */;
-let eid = /* execution id, unique per protocol execution */;
 
 let aux_info = cggmp21::aux_info_gen(eid, i, n, pregenerated_primes)
     .start(&mut OsRng, party)

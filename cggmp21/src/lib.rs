@@ -63,14 +63,13 @@
 //! use cggmp21::supported_curves::Secp256k1;
 //! # use rand_core::OsRng;
 //!
+//! let eid = cggmp21::ExecutionId::new(b"execution id, unique per protocol execution");
 //! let i = /* signer index (0 <= i < n) */
 //! # 0;
 //! let n = /* amount of signers taking part in key generation */
 //! # 3;
 //! let t = /* threshold */
 //! # 2;
-//! let eid = /* execution id, unique per protocol execution */
-//! # cggmp21::ExecutionId::new(b"some id");
 //!
 //! let incomplete_key_share = cggmp21::keygen::<Secp256k1>(eid, i, n)
 //!     .set_threshold(t)
@@ -96,12 +95,11 @@
 //! // Primes generation can take a while
 //! let pregenerated_primes = cggmp21::PregeneratedPrimes::generate(&mut OsRng);
 //!
+//! let eid = cggmp21::ExecutionId::new(b"execution id, unique per protocol execution");
 //! let i = /* signer index, same as at keygen */
 //! # 0;
 //! let n = /* amount of signers */
 //! # 3;
-//! let eid = /* execution id, unique per protocol execution */
-//! # cggmp21::ExecutionId::new(b"some id");
 //!
 //! let aux_info = cggmp21::aux_info_gen(eid, i, n, pregenerated_primes)
 //!     .start(&mut OsRng, party)
