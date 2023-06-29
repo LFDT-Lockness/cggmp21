@@ -53,10 +53,12 @@ impl SecurityParams {
                 l_x: L::ELL,
                 l_y: L::ELL_PRIME,
                 epsilon: L::EPSILON,
+                q: L::q(),
             },
             pi_log: pi_log::SecurityParams {
                 l: L::ELL,
                 epsilon: L::EPSILON,
+                q: L::q(),
             },
             pi_enc: pi_enc::SecurityParams {
                 l: L::ELL,
