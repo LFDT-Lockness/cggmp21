@@ -42,11 +42,32 @@ let delivery = (incoming, outgoing);
 let party = round_based::MpcParty::connected(delivery);
 ```
 
+#### Signers indexes
+Each signer in protocol execution (keygen/signing/etc.) occupies a unique index $i$ ($0 \le i < n$,
+where $n$ is amount of parties in the protocol). For instance, if Signer A occupies index `2`, then all
+other signers must acknowledge that `i=2` corresponds to Signer A.
+
+Assuming you have some sort of PKI (which you need to comply with [security requirements]) and each signer
+has a public key which uniqely idenitifies that signer, you can easily assign unique indexes to the signers:
+1. Make a list of signers public keys
+2. Sort the list of public keys
+3. Assign each signer index `i` such that `i` corresponds to position of signer public key in sorted list of
+   public keys
+
+[security requirements]: #security
+
+#### Security
 Make sure that communication layer complies with security requirements:
 * All messages sent between parties must be authenticated
 * All p2p messages must be encrypted
 
-Now you're ready to generate a key!
+### Execution ID
+Final step of preparation, all the signers need to agree on unique identifier of protocol execution `ExecutionId`.
+Execution ID needs to be unique per protocol execution (keygen/signing/etc.), otherwise it may compromise security.
+Execution ID needs to be the same for all signers taking part in the protocol, otherwise protocol will abort.
+Execution ID **doesn't** need to be secret.
+
+Now that signers can talk to each other and they have an execution ID, they're ready to generate a key!
 
 ### Distributed Key Generation
 ```rust
