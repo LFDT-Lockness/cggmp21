@@ -3,6 +3,7 @@ use futures::SinkExt;
 use generic_ec::{
     coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar, SecretScalar,
 };
+use generic_ec_zkp::polynomial::lagrange_coefficient;
 use paillier_zk::libpaillier::{unknown_order::BigNumber, DecryptionKey};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as pi_log,
@@ -20,7 +21,7 @@ use thiserror::Error;
 use crate::errors::IoError;
 use crate::key_share::{KeyShare, PartyAux, VssSetup};
 use crate::progress::Tracer;
-use crate::utils::{hash_message, iter_peers, lagrange_coefficient, subset, HashMessageError};
+use crate::utils::{hash_message, iter_peers, subset, HashMessageError};
 use crate::{
     key_share::InvalidKeyShare,
     security_level::SecurityLevel,
@@ -362,10 +363,11 @@ where
         let I = subset(S, I).ok_or(Bug::Subset)?;
         let X = subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
 
-        let lambda_i = lagrange_coefficient(Scalar::zero(), i, &I).ok_or(Bug::LagrangeCoef)?;
+        let lambda_i =
+            lagrange_coefficient(Scalar::zero(), usize::from(i), &I).ok_or(Bug::LagrangeCoef)?;
         let x_i = SecretScalar::new(&mut (lambda_i * &key_share.core.x));
 
-        let lambda = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
+        let lambda = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), usize::from(j), &I));
         let X = lambda
             .zip(&X)
             .map(|(lambda_j, X_j)| Some(lambda_j? * X_j))

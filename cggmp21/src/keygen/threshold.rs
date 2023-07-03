@@ -4,6 +4,7 @@ use generic_ec::hash_to_curve::{self, FromHash};
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
+    polynomial::Polynomial,
     schnorr_pok,
 };
 use rand_core::{CryptoRng, RngCore};
@@ -49,7 +50,7 @@ pub struct MsgRound1<D: Digest> {
 pub struct MsgRound2Broad<E: Curve, L: SecurityLevel, D: Digest> {
     #[serde(with = "hex::serde")]
     pub rid: L::Rid,
-    pub Ss: Vec<Point<E>>,
+    pub F: Polynomial<Point<E>>,
     pub sch_commit: schnorr_pok::Commit<E>,
     pub decommit: hash_commitment::DecommitNonce<D>,
 }
@@ -115,15 +116,12 @@ where
 
     let (r, h) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
-    let ss = utils::sample_polynomial(usize::from(t), rng);
-    let Ss = ss
-        .iter()
-        .map(|s| Point::generator() * s)
-        .collect::<Vec<_>>();
+    let f = Polynomial::<SecretScalar<E>>::sample(rng, usize::from(t) - 1);
+    let F = &f * &Point::generator();
     let sigmas = (0..n)
         .map(|j| {
             let x = Scalar::from(j + 1);
-            utils::polynomial_value(Scalar::zero(), &x, &ss)
+            f.value(&x)
         })
         .collect::<Vec<_>>();
     debug_assert_eq!(sigmas.len(), usize::from(n));
@@ -135,7 +133,7 @@ where
         .mix(i)
         .mix(t)
         .mix_bytes(&rid)
-        .mix_many(Ss.iter())
+        .mix_many(F.coefs())
         .mix(h.0)
         .commit(rng);
 
@@ -200,7 +198,7 @@ where
     tracer.send_msg();
     let my_decommitment = MsgRound2Broad {
         rid,
-        Ss: Ss.clone(),
+        F: F.clone(),
         sch_commit: h,
         decommit,
     };
@@ -247,7 +245,7 @@ where
                 .mix(j)
                 .mix(t)
                 .mix_bytes(&decommitment.rid)
-                .mix_many(decommitment.Ss.iter())
+                .mix_many(decommitment.F.coefs())
                 .mix(decommitment.sch_commit.0)
                 .verify(&commitment.commitment, &decommitment.decommit)
                 .is_err()
@@ -261,7 +259,7 @@ where
     tracer.stage("Validate data size");
     let blame = decommitments
         .iter_indexed()
-        .filter(|(_, _, d)| d.Ss.len() != usize::from(t))
+        .filter(|(_, _, d)| d.F.degree() + 1 != usize::from(t))
         .map(|t| t.0)
         .collect::<Vec<_>>();
     if !blame.is_empty() {
@@ -273,8 +271,7 @@ where
         .iter_indexed()
         .zip(sigmas_msg.iter())
         .filter(|((_, _, d), s)| {
-            utils::polynomial_value(Point::zero(), &Scalar::from(i + 1), &d.Ss)
-                != Point::generator() * s.sigma
+            d.F.value::<_, Point<_>>(&Scalar::from(i + 1)) != Point::generator() * s.sigma
         })
         .map(|t| t.0 .0)
         .collect::<Vec<_>>();
@@ -288,15 +285,12 @@ where
         .map(|d| &d.rid)
         .fold(L::Rid::default(), xor_array);
     tracer.stage("Compute Ys");
+    let polynomial_sum = decommitments
+        .iter_including_me(&my_decommitment)
+        .map(|d| &d.F)
+        .sum::<Polynomial<_>>();
     let ys = (0..n)
-        .map(|l| {
-            let polynomial_sum = utils::polynomials_sum(
-                decommitments
-                    .iter_including_me(&my_decommitment)
-                    .map(|d| d.Ss.as_slice()),
-            );
-            utils::polynomial_value(Point::zero(), &Scalar::from(l + 1), &polynomial_sum)
-        })
+        .map(|l| polynomial_sum.value(&Scalar::from(l + 1)))
         .collect::<Vec<_>>();
     tracer.stage("Compute sigma");
     let sigma: Scalar<E> = sigmas_msg.iter().map(|msg| msg.sigma).sum();
@@ -370,7 +364,7 @@ where
     tracer.stage("Derive resulting public key and other data");
     let y: Point<E> = decommitments
         .iter_including_me(&my_decommitment)
-        .map(|d| d.Ss[0])
+        .map(|d| d.F.coefs()[0])
         .sum();
     let key_shares_indexes = (1..=n)
         .map(|i| NonZero::from_scalar(Scalar::from(i)))
