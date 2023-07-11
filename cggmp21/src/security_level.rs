@@ -112,7 +112,8 @@ pub mod _internal {
 /// ```
 ///
 /// **Note:** currently, security parameter $m$ is hardcoded into the library. Changing $m$ in security level
-/// doesn't change $m$ library uses.
+/// doesn't change $m$ library uses due to compiler limitations. We're going to fix that once `feature(generic_const_exprs)`
+/// is stable.
 #[macro_export]
 macro_rules! define_security_level {
     ($struct_name:ident {

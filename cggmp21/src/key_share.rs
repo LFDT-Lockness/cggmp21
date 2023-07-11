@@ -31,7 +31,7 @@ pub type IncompleteKeyShare<E> = Valid<DirtyIncompleteKeyShare<E>>;
 /// Auxiliary information
 pub type AuxInfo<L = crate::default_choice::SecurityLevel> = Valid<DirtyAuxInfo<L>>;
 
-/// Dirty (invalidated) incomplete key share
+/// Dirty (unvalidated) incomplete key share
 ///
 #[doc = include_str!("../docs/incomplete_key_share.md")]
 #[serde_as]
@@ -75,7 +75,7 @@ pub struct DirtyAuxInfo<L: SecurityLevel = crate::default_choice::SecurityLevel>
     pub security_level: std::marker::PhantomData<L>,
 }
 
-/// Dirty (invalidated) key share
+/// Dirty (unvalidated) key share
 ///
 #[doc = include_str!("../docs/key_share.md")]
 #[derive(Clone, Serialize, Deserialize)]
@@ -487,7 +487,7 @@ impl From<&PartyAux> for π_enc::Aux {
 /// it was validated. Library only works with validated data.
 ///
 /// `Valid<T>` provides only immutable access to `T`. For instance, if you want to change content of `T`, you
-/// need to [unwrap](Valid::into_inner) it, do necessary modifications, and then validate it again using `TryFrom`.
+/// need to [deconstruct](Valid::into_inner) it, do necessary modifications, and then validate it again using `TryFrom`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(into = "T", try_from = "T")]
 #[serde(bound(
