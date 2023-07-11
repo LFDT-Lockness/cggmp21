@@ -1,3 +1,5 @@
+//! Key refresh & aux info generation protocols
+
 /// Auxiliary info (re)generation protocol specific types
 mod aux_only;
 /// Non-threshold key refresh specific types
@@ -229,6 +231,7 @@ where
         }
     }
 
+    /// Sets a tracer that tracks progress of protocol execution
     pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
         self.tracer = Some(tracer);
         self
@@ -243,6 +246,7 @@ where
     }
 }
 
+/// Error of key refresh and aux info generation protocols
 #[derive(Debug, Error)]
 #[error("key refresh protocol failed to complete")]
 pub struct KeyRefreshError(#[source] Reason);

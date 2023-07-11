@@ -31,9 +31,13 @@ use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 // 3 kilobytes for the largest option, and 2.5 kilobytes for second largest
 #[allow(clippy::large_enum_variant)]
 pub enum Msg<D: Digest, L: SecurityLevel> {
+    /// Round 1 message
     Round1(MsgRound1<D>),
+    /// Round 2 message
     Round2(MsgRound2<D, L>),
+    /// Round 3 message
     Round3(MsgRound3),
+    /// Reliability check message (optional additional round)
     ReliabilityCheck(MsgReliabilityCheck<D>),
 }
 
@@ -41,33 +45,37 @@ pub enum Msg<D: Digest, L: SecurityLevel> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
-    commitment: HashCommit<D>,
+    /// $V_i$
+    pub commitment: HashCommit<D>,
 }
 /// Message from round 2
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound2<D: Digest, L: SecurityLevel> {
-    N: BigNumber,
-    s: BigNumber,
-    t: BigNumber,
-    /// psi_circonflexe_i in paper
+    /// $N_i$
+    pub N: BigNumber,
+    /// $s_i$
+    pub s: BigNumber,
+    /// $t_i$
+    pub t: BigNumber,
+    /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
-    params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
-    /// rho_i in paper
+    pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
+    /// $\rho_i$
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
     #[serde(with = "hex")]
     pub rho_bytes: L::Rid,
-    /// u_i in paper
-    decommit: hash_commitment::DecommitNonce<D>,
+    /// $u_i$
+    pub decommit: hash_commitment::DecommitNonce<D>,
 }
 /// Unicast message of round 3, sent to each participant
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MsgRound3 {
-    /// psi_i in paper
+    /// $\psi_i$
     // this should be L::M instead, but no rustc support yet
-    mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
-    /// phi_i^j in paper
-    fac_proof: π_fac::Proof,
+    pub mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
+    /// $\phi_i^j$
+    pub fac_proof: π_fac::Proof,
 }
 
 /// Message from an optional round that enforces reliability check

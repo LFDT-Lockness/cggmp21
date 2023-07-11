@@ -2,15 +2,22 @@
 //!
 //! Trusted dealer can be used to generate key shares in one place. Note
 //! that in creates SPOF/T (single point of failure/trust). Trusted
-//! dealer is mainly intended to be used in tests.
+//! dealer is mainly intended to be used in tests, or it can be used to
+//! import key into TSS.
 //!
 //! ## Example
+//! Import a key into 3-out-of-5 TSS:
 //! ```rust,no_run
 //! # use rand::rngs::OsRng;
 //! # let mut rng = OsRng;
 //! use cggmp21::{supported_curves::Secp256k1, security_level::ReasonablySecure};
+//! use cggmp21::generic_ec::SecretScalar;
+//!
+//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut OsRng);
+//!
 //! let key_shares = cggmp21::trusted_dealer::builder::<Secp256k1, ReasonablySecure>(5)
 //!     .set_threshold(Some(3))
+//!     .set_shared_secret_key(secret_key_to_be_imported)
 //!     .generate_shares(&mut rng)?;
 //! # Ok::<_, cggmp21::trusted_dealer::TrustedDealerError>(())
 //! ```

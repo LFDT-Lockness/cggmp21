@@ -1017,7 +1017,7 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#16bb42a435fc00197bdce55b667d975b4775f547"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#46bdc24d29377b862efed738c0008000adc673e8"
 dependencies = [
  "async-stream",
  "bincode",
@@ -1035,7 +1035,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.1.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#16bb42a435fc00197bdce55b667d975b4775f547"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#46bdc24d29377b862efed738c0008000adc673e8"
 dependencies = [
  "proc-macro2",
  "quote",

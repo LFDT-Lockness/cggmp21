@@ -29,6 +29,9 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
     const ELL_PRIME: usize;
 
     /// $m$ parameter
+    ///
+    /// **Note:** currently, this parameter is hardcoded into the library. Changing $m$ in security level
+    /// doesn't change $m$ library uses.
     const M: usize;
 
     /// Static array of $\kappa/8$ bytes
@@ -41,10 +44,10 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
         + Sync
         + 'static;
 
-    /// $\q$ parameter
+    /// $q$ parameter
     ///
-    /// Note that it's not a prime or curve order, it's another security parameter that's
-    /// determines security level.
+    /// Note that it's not curve order, and it doesn't need to be a prime, it's another security parameter
+    /// that determines security level.
     fn q() -> BigNumber;
 }
 
@@ -107,6 +110,10 @@ pub mod _internal {
 ///     q = (BigNumber::one() << 48) - 1,
 /// });
 /// ```
+///
+/// **Note:** currently, security parameter $m$ is hardcoded into the library. Changing $m$ in security level
+/// doesn't change $m$ library uses due to compiler limitations. We're going to fix that once `feature(generic_const_exprs)`
+/// is stable.
 #[macro_export]
 macro_rules! define_security_level {
     ($struct_name:ident {

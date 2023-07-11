@@ -25,6 +25,9 @@
 //!     .set_progress_tracer(&mut tracer)
 //!     .generate_presignature(&mut rand::rngs::OsRng, party)
 //!     .await?;
+//!
+//! let perf_report = tracer.get_report()?;
+//! println!("{perf_report}");
 //! # Ok(()) }
 //!```
 
@@ -365,6 +368,10 @@ impl Default for PerfProfiler {
 }
 
 impl PerfReport {
+    /// Specifies whether time spent on i/o should be rendered in the final report
+    ///
+    /// Time spent on i/o is the time when signer was sending messages or waiting other
+    /// parties to send messages
     pub fn display_io(mut self, display: bool) -> Self {
         self.display_io = display;
         self
