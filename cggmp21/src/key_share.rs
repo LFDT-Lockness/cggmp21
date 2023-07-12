@@ -453,8 +453,7 @@ pub fn reconstruct_secret_key<E: Curve>(
     if let Some(VssSetup { I, .. }) = vss {
         let S = key_shares.iter().map(|s| s.core().i).collect::<Vec<_>>();
         let I = subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
-        let lagrange_coefficients =
-            (0..usize::from(t)).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
+        let lagrange_coefficients = (0..).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
         let mut sk = lagrange_coefficients
             .zip(key_shares)
             .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
