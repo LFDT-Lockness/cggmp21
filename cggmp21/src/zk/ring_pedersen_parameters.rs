@@ -155,7 +155,7 @@ mod test {
 
     #[test]
     fn passing() {
-        let mut rng = rand_core::OsRng::default();
+        let mut rng = rand_core::OsRng;
         let shared_state = sha2::Sha256::default();
 
         let p = BigNumber::prime_from_rng(256, &mut rng);
@@ -174,20 +174,14 @@ mod test {
             t: &t,
         };
 
-        let proof: super::Proof<16> = super::prove(
-            shared_state.clone(),
-            rand_core::OsRng::default(),
-            data,
-            &phi,
-            &lambda,
-        )
-        .unwrap();
+        let proof: super::Proof<16> =
+            super::prove(shared_state.clone(), rand_core::OsRng, data, &phi, &lambda).unwrap();
         super::verify(shared_state, data, &proof).expect("proof should pass");
     }
 
     #[test]
     fn failing() {
-        let mut rng = rand_core::OsRng::default();
+        let mut rng = rand_core::OsRng;
         let shared_state = sha2::Sha256::default();
 
         let p = BigNumber::prime_from_rng(256, &mut rng);
@@ -207,14 +201,8 @@ mod test {
             t: &t,
         };
 
-        let proof: super::Proof<16> = super::prove(
-            shared_state.clone(),
-            rand_core::OsRng::default(),
-            data,
-            &phi,
-            &lambda,
-        )
-        .unwrap();
+        let proof: super::Proof<16> =
+            super::prove(shared_state.clone(), rand_core::OsRng, data, &phi, &lambda).unwrap();
         if super::verify(shared_state, data, &proof).is_ok() {
             panic!("proof should fail");
         }

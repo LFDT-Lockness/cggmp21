@@ -33,7 +33,7 @@ use thiserror::Error;
 
 use crate::{
     key_share::{
-        DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyShare, IncompleteKeyShare, InvalidKeyShare,
+        AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, IncompleteKeyShare, InvalidKeyShare,
         KeyShare, PartyAux, VssSetup,
     },
     security_level::SecurityLevel,
@@ -177,34 +177,12 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         let n = self.n;
 
         let core_key_shares = self.generate_core_shares(rng)?;
-        let primes_setup = iter::repeat_with(|| generate_primes_setup::<L, _>(rng))
-            .take(n.into())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let parties_pubic_aux = primes_setup
-            .iter()
-            .map(|s| PartyAux {
-                N: s.N.clone(),
-                s: s.s.clone(),
-                t: s.t.clone(),
-            })
-            .collect::<Vec<_>>();
+        let aux_data = generate_aux_data(rng, n)?;
 
         let key_shares = core_key_shares
             .into_iter()
-            .zip(primes_setup)
-            .map(|(core_key_share, primes_setup)| {
-                DirtyKeyShare {
-                    core: core_key_share.into_inner(),
-                    aux: DirtyAuxInfo {
-                        p: primes_setup.p,
-                        q: primes_setup.q,
-                        parties: parties_pubic_aux.clone(),
-                        security_level: std::marker::PhantomData,
-                    },
-                }
-                .try_into()
-            })
+            .zip(aux_data)
+            .map(|(core_key_share, aux_data)| KeyShare::make(core_key_share, aux_data))
             .collect::<Result<Vec<_>, _>>()
             .map_err(Reason::InvalidKeyShare)?;
 
@@ -212,29 +190,49 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     }
 }
 
-struct PartyPrimesSetup {
-    p: BigNumber,
-    q: BigNumber,
-    N: BigNumber,
-    s: BigNumber,
-    t: BigNumber,
-}
-
-fn generate_primes_setup<L: SecurityLevel, R: RngCore + CryptoRng>(
+/// Generates auxiliary data for `n` signers
+///
+/// Auxiliary data can be used to "complete" core key share using [`KeyShare::make`] constructor.
+pub fn generate_aux_data<L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
-) -> Result<PartyPrimesSetup, TrustedDealerError> {
-    let p = BigNumber::safe_prime_from_rng(L::SECURITY_BITS * 4, rng);
-    let q = BigNumber::safe_prime_from_rng(L::SECURITY_BITS * 4, rng);
-    let N = &p * &q;
-    let φ_N = (&p - 1) * (&q - 1);
+    n: u16,
+) -> Result<Vec<AuxInfo<L>>, TrustedDealerError> {
+    let primes =
+        iter::repeat_with(|| crate::key_refresh::PregeneratedPrimes::<L>::generate(rng).split())
+            .take(n.into())
+            .collect::<Vec<_>>();
 
-    let r = sample_bigint_in_mult_group(rng, &N);
-    let λ = BigNumber::from_rng(&φ_N, rng);
+    let public_aux_data = primes
+        .iter()
+        .map(|(p, q)| {
+            let N = p * q;
 
-    let t = BigNumber::modmul(&r, &r, &N);
-    let s = BigNumber::powmod(&t, &λ, &N).map_err(|_| Reason::PowMod)?;
+            let φ_N = (p - 1) * (q - 1);
 
-    Ok(PartyPrimesSetup { p, q, N, s, t })
+            let r = sample_bigint_in_mult_group(rng, &N);
+            let λ = BigNumber::from_rng(&φ_N, rng);
+
+            let t = BigNumber::modmul(&r, &r, &N);
+            let s = BigNumber::powmod(&t, &λ, &N).map_err(|_| Reason::PowMod)?;
+
+            Ok(PartyAux { N, s, t })
+        })
+        .collect::<Result<Vec<_>, Reason>>()?;
+
+    primes
+        .into_iter()
+        .map(|(p, q)| {
+            DirtyAuxInfo {
+                p,
+                q,
+                parties: public_aux_data.clone(),
+                security_level: PhantomData,
+            }
+            .try_into()
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Reason::InvalidKeyShare)
+        .map_err(TrustedDealerError)
 }
 
 /// Error explaining why trusted dealer failed to generate shares
