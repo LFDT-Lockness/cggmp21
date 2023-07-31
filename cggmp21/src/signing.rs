@@ -397,8 +397,6 @@ where
         return Err(InvalidArgs::InvalidS.into());
     }
 
-    validate_security_level::<E, L>()?;
-
     // Assemble x_i and \vec X
     let (x_i, X) = if let Some(VssSetup { I, .. }) = &key_share.core.vss_setup {
         // For t-out-of-n keys generated via VSS DKG scheme
@@ -1059,25 +1057,6 @@ where
     Ok(ProtocolOutput::Signature(sig))
 }
 
-fn validate_security_level<E: Curve, L: SecurityLevel>() -> Result<(), InvalidSecurityLevel> {
-    let n_size = BigNumber::one() << (L::SECURITY_BITS * 4 + 1);
-    let q_minus_one = BigNumber::from_slice(&Scalar::<E>::from(-1).to_be_bytes());
-    if n_size < q_minus_one {
-        return Err(InvalidSecurityLevel::SecurityLevelTooSmall);
-    }
-
-    let q = q_minus_one + BigNumber::one();
-    if L::EPSILON < q.bit_length() {
-        return Err(InvalidSecurityLevel::EpsilonTooSmall);
-    }
-    let another_q = L::q();
-    if L::EPSILON < another_q.bit_length() {
-        return Err(InvalidSecurityLevel::EpsilonTooSmall);
-    }
-
-    Ok(())
-}
-
 impl<E> Presignature<E>
 where
     E: Curve,
@@ -1185,7 +1164,6 @@ crate::errors::impl_from! {
     impl From for SigningError {
         err: InvalidArgs => SigningError(Reason::InvalidArgs(err)),
         err: InvalidKeyShare => SigningError(Reason::InvalidKeyShare(err)),
-        err: InvalidSecurityLevel => SigningError(Reason::InvalidSecurityLevel(err)),
         err: SigningAborted => SigningError(Reason::Aborted(err)),
         err: IoError => SigningError(Reason::IoError(err)),
         err: Bug => SigningError(Reason::Bug(err)),
@@ -1206,12 +1184,6 @@ enum Reason {
         #[from]
         #[source]
         InvalidKeyShare,
-    ),
-    #[error("invalid security level")]
-    InvalidSecurityLevel(
-        #[source]
-        #[from]
-        InvalidSecurityLevel,
     ),
     /// Signing protocol was maliciously aborted by another party
     #[error("protocol was maliciously aborted by another party")]
@@ -1256,14 +1228,6 @@ enum SigningAborted {
     SignatureInvalid,
     #[error("other parties received different broadcast messages at round1a")]
     Round1aNotReliable(Vec<(PartyIndex, MsgId)>),
-}
-
-#[derive(Debug, Error)]
-enum InvalidSecurityLevel {
-    #[error("specified security level is too small to carry out protocol")]
-    SecurityLevelTooSmall,
-    #[error("epsilon is too small to carry out protocol")]
-    EpsilonTooSmall,
 }
 
 #[derive(Debug, Error)]

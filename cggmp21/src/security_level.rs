@@ -3,13 +3,19 @@
 //! Security level is defined as set of parameters in the CGGMP paper. Higher security level gives more
 //! security but makes protocol execution slower.
 //!
-//! We provide a predefined [ReasonablySecure] security level which is recommended to use for most use-cases.
+//! We provide a predefined default [ReasonablySecure] security level which should be sufficient for $n \le 128$.
 //!
 //! You can define your own security level using macro [define_security_level]. Be sure that you properly
 //! analyzed the CGGMP paper and you understand implications. Inconsistent security level may cause unexpected
 //! unverbose runtime error or reduced security of the protocol.
 
 use paillier_zk::libpaillier::unknown_order::BigNumber;
+
+/// Hardcoded value for parameter $m$ of security level
+///
+/// Currently, [security parameter $m$](SecurityLevel::M) is hardcoded to this constant. We're going to fix that
+/// once `feature(generic_const_exprs)` is stable.
+pub const M: usize = 128;
 
 /// Security level of the protocol
 ///
@@ -30,8 +36,10 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
 
     /// $m$ parameter
     ///
-    /// **Note:** currently, this parameter is hardcoded into the library. Changing $m$ in security level
-    /// doesn't change $m$ library uses.
+    /// **Note:** currently, security parameter $m$ is hardcoded to [`M = 128`](M) due to compiler limitations.
+    /// If you implement this trait directly, actual value of $m$ will be ignored. If you're using [define_security_level] macro
+    /// it will produce a compilation error if different value of $m$ is set. We're going to fix that once `generic_const_exprs`
+    /// feature is stable.
     const M: usize;
 
     /// Static array of $\kappa/8$ bytes
@@ -94,7 +102,8 @@ pub mod _internal {
 /// ## Example
 ///
 /// This code defines security level corresponding to $\kappa=1024$, $\varepsilon=128$, $\ell = \ell' = 1024$,
-/// $m = 50$, and $q = 2^{48}-1$:
+/// $m = 50$, and $q = 2^{48}-1$ (note: choice of parameters is random, it does not correspond to meaningful
+/// security level):
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
 /// use cggmp21::unknown_order::BigNumber;
@@ -106,14 +115,14 @@ pub mod _internal {
 ///     epsilon = 128,
 ///     ell = 1024,
 ///     ell_prime = 1024,
-///     m = 50,
+///     m = 128,
 ///     q = (BigNumber::one() << 48) - 1,
 /// });
 /// ```
 ///
-/// **Note:** currently, security parameter $m$ is hardcoded into the library. Changing $m$ in security level
-/// doesn't change $m$ library uses due to compiler limitations. We're going to fix that once `feature(generic_const_exprs)`
-/// is stable.
+/// **Note:** currently, security parameter $m$ is hardcoded to the [`M = 128`](M) due to compiler limitations.
+/// Setting any other value of $m$ results into compilation error. We're going to fix that once `generic_const_exprs`
+/// feature is stable.
 #[macro_export]
 macro_rules! define_security_level {
     ($struct_name:ident {
@@ -121,7 +130,7 @@ macro_rules! define_security_level {
         epsilon = $e:expr,
         ell = $ell:expr,
         ell_prime = $ell_prime:expr,
-        m = $m:expr,
+        m = 128,
         q = $q:expr,
     }) => {
         impl $crate::security_level::SecurityLevel for $struct_name {
@@ -130,13 +139,23 @@ macro_rules! define_security_level {
             const EPSILON: usize = $e;
             const ELL: usize = $ell;
             const ELL_PRIME: usize = $ell_prime;
-            const M: usize = $m;
+            const M: usize = 128;
             type Rid = $crate::security_level::_internal::Rid<{$k / 8}>;
 
             fn q() -> $crate::security_level::_internal::BigNumber {
                 $q
             }
         }
+    };
+    ($struct_name:ident {
+        security_bits = $k:expr,
+        epsilon = $e:expr,
+        ell = $ell:expr,
+        ell_prime = $ell_prime:expr,
+        m = $m:expr,
+        q = $q:expr,
+    }) => {
+        compile_error!(concat!("Currently, we can not set security parameter M to anything but 128 (you set m=", stringify!($m), ")"));
     };
 }
 
@@ -145,16 +164,16 @@ pub use define_security_level;
 
 /// Reasonably secure security level
 ///
-/// This security level is suitable for most use-cases.
+/// This security level should be sufficient for $n \le 128$.
 #[derive(Clone)]
 pub struct ReasonablySecure;
 define_security_level!(ReasonablySecure{
-    security_bits = 256,
-    epsilon = 512,
-    ell = 1024,
-    ell_prime = 1024,
-    m = 30,
-    q = (BigNumber::one() << 256) - 1,
+    security_bits = 384,
+    epsilon = 230,
+    ell = 256,
+    ell_prime = 848,
+    m = 128,
+    q = BigNumber::one() << 128,
 });
 
 /// Checks that public paillier key meets security level constraints

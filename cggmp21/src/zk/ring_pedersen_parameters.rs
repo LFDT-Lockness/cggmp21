@@ -7,9 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
 
-/// A reasonable security level for proof
-pub const SECURITY: usize = 64;
-
 struct Challenge<const M: usize> {
     es: [bool; M],
 }
