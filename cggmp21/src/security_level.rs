@@ -102,7 +102,7 @@ pub mod _internal {
 /// ## Example
 ///
 /// This code defines security level corresponding to $\kappa=1024$, $\varepsilon=128$, $\ell = \ell' = 1024$,
-/// $m = 50$, and $q = 2^{48}-1$ (note: choice of parameters is random, it does not correspond to meaningful
+/// $m = 128$, and $q = 2^{48}-1$ (note: choice of parameters is random, it does not correspond to meaningful
 /// security level):
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
