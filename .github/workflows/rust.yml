@@ -51,7 +51,7 @@ jobs:
       run: chmod +x ./measure_perf
     - name: Run benchmarks
       run: |
-        ./measure_perf -n 3 > perf_output
+        ./measure_perf -n 3 --no-bench-primes-gen > perf_output
         sed -e '/PERF_OUTPUT/{r perf_output' -e 'd}' .github/pr-comment.tpl > pr-comment
     - name: Leave PR comment
       continue-on-error: true
