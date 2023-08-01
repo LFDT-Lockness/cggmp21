@@ -1,20 +1,26 @@
 use anyhow::Context;
-use cggmp21::{progress::PerfProfiler, signing::DataToSign, ExecutionId};
+use cggmp21::{
+    progress::PerfProfiler,
+    security_level::{ReasonablySecure, SecurityLevel},
+    signing::DataToSign,
+    ExecutionId,
+};
 use rand::Rng;
 use rand_dev::DevRng;
 use round_based::simulation::Simulation;
 use sha2::Sha256;
 
 type E = generic_ec::curves::Secp256k1;
-type L = cggmp21::security_level::ReasonablySecure;
 type D = sha2::Sha256;
 
 struct Args {
     n: Vec<u16>,
+    bench_primes_gen: bool,
     bench_non_threshold_keygen: bool,
     bench_threshold_keygen: bool,
-    bench_refresh: bool,
+    bench_aux_data_gen: bool,
     bench_signing: bool,
+    custom_sec_level: bool,
 }
 
 fn args() -> Args {
@@ -24,147 +30,193 @@ fn args() -> Args {
         .argument::<String>("N")
         .parse(|s| s.split(',').map(std::str::FromStr::from_str).collect())
         .fallback(vec![3, 5, 7, 10]);
+    let bench_primes_gen = bpaf::long("no-bench-primes-gen").switch().map(|b| !b);
     let bench_non_threshold_keygen = bpaf::long("no-bench-non-threshold-keygen")
         .switch()
         .map(|b| !b);
     let bench_threshold_keygen = bpaf::long("no-bench-threshold-keygen").switch().map(|b| !b);
-    let bench_refresh = bpaf::long("no-bench-refresh").switch().map(|b| !b);
+    let bench_aux_data_gen = bpaf::long("no-bench-aux-data-gen").switch().map(|b| !b);
     let bench_signing = bpaf::long("no-bench-signing").switch().map(|b| !b);
+    let custom_sec_level = bpaf::long("custom-sec-level").switch();
 
     bpaf::construct!(Args {
         n,
+        bench_primes_gen,
         bench_non_threshold_keygen,
         bench_threshold_keygen,
-        bench_refresh,
-        bench_signing
+        bench_aux_data_gen,
+        bench_signing,
+        custom_sec_level,
     })
     .to_options()
     .run()
 }
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = args();
+    if args.custom_sec_level {
+        do_becnhmarks::<CustomSecLevel>(args).await
+    } else {
+        do_becnhmarks::<ReasonablySecure>(args).await
+    }
+}
+
+async fn do_becnhmarks<L: SecurityLevel>(args: Args) {
     let mut rng = DevRng::new();
 
     for n in args.n {
         println!("n = {n}");
         println!();
 
-        if args.bench_non_threshold_keygen {
-            let eid: [u8; 32] = rng.gen();
-            let eid = ExecutionId::new(&eid);
+        if args.bench_primes_gen {
+            let start = std::time::Instant::now();
+            let _primes =
+                std::iter::repeat_with(|| cggmp21::PregeneratedPrimes::<L>::generate(&mut rng))
+                    .take(n.into())
+                    .collect::<Vec<_>>();
+            let took = std::time::Instant::now().duration_since(start);
 
-            let mut simulation =
-                Simulation::<cggmp21::keygen::msg::non_threshold::Msg<E, L, D>>::new();
-
-            let outputs = (0..n).map(|i| {
-                let party = simulation.add_party();
-                let mut party_rng = rng.fork();
-
-                let mut profiler = PerfProfiler::new();
-
-                async move {
-                    let _key_share = cggmp21::keygen(eid, i, n)
-                        .set_progress_tracer(&mut profiler)
-                        .start(&mut party_rng, party)
-                        .await
-                        .context("keygen failed")?;
-                    profiler.get_report().context("get perf report")
-                }
-            });
-
-            let perf_reports = futures::future::try_join_all(outputs)
-                .await
-                .expect("non-threshold keygen failed");
-
-            println!("Non-threshold DKG");
-            println!("{}", perf_reports[0].clone().display_io(false));
+            println!("Primes generation (avg): {:?}", took / n.into());
             println!();
         }
 
-        if args.bench_threshold_keygen && n > 2 {
-            let t = n - 1;
+        let non_threshold_key_shares: Option<Vec<cggmp21::IncompleteKeyShare<E>>> =
+            if args.bench_non_threshold_keygen || args.bench_signing {
+                let eid: [u8; 32] = rng.gen();
+                let eid = ExecutionId::new(&eid);
 
-            let eid: [u8; 32] = rng.gen();
-            let eid = ExecutionId::new(&eid);
+                let mut simulation =
+                    Simulation::<cggmp21::keygen::msg::non_threshold::Msg<E, L, D>>::new();
 
-            let mut simulation =
-                Simulation::<cggmp21::keygen::msg::threshold::Msg<E, L, D>>::with_capacity(
-                    (2 * n * n).into(),
-                );
+                let outputs = (0..n).map(|i| {
+                    let party = simulation.add_party();
+                    let mut party_rng = rng.fork();
 
-            let outputs = (0..n).map(|i| {
-                let party = simulation.add_party();
-                let mut party_rng = rng.fork();
+                    let mut profiler = PerfProfiler::new();
 
-                let mut profiler = PerfProfiler::new();
+                    async move {
+                        let key_share = cggmp21::keygen(eid, i, n)
+                            .set_progress_tracer(&mut profiler)
+                            .set_security_level::<L>()
+                            .start(&mut party_rng, party)
+                            .await
+                            .context("keygen failed")?;
+                        let report = profiler.get_report().context("get perf report")?;
+                        Ok::<_, anyhow::Error>((key_share, report))
+                    }
+                });
 
-                async move {
-                    let _key_share = cggmp21::keygen(eid, i, n)
-                        .set_threshold(t)
-                        .set_progress_tracer(&mut profiler)
-                        .start(&mut party_rng, party)
-                        .await
-                        .context("keygen failed")?;
-                    profiler.get_report().context("get perf report")
+                let outputs = futures::future::try_join_all(outputs)
+                    .await
+                    .expect("non-threshold keygen failed");
+
+                if args.bench_non_threshold_keygen {
+                    println!("Non-threshold DKG");
+                    println!("{}", outputs[0].1.clone().display_io(false));
+                    println!();
                 }
-            });
 
-            let perf_reports = futures::future::try_join_all(outputs)
-                .await
-                .expect("threshold keygen failed");
+                Some(outputs.into_iter().map(|(k, _)| k).collect())
+            } else {
+                None
+            };
 
-            println!("Threshold DKG");
-            println!("{}", perf_reports[0].clone().display_io(false));
-            println!();
-        }
+        let _threshold_key_shares: Option<Vec<cggmp21::IncompleteKeyShare<E>>> =
+            if args.bench_threshold_keygen {
+                let t = n - 1;
 
-        if args.bench_refresh {
-            let shares = cggmp21_tests::CACHED_SHARES
-                .get_shares::<E, L>(None, n)
-                .expect("retrieve key shares from cache");
+                let eid: [u8; 32] = rng.gen();
+                let eid = ExecutionId::new(&eid);
 
-            let eid: [u8; 32] = rng.gen();
-            let eid = ExecutionId::new(&eid);
+                let mut simulation =
+                    Simulation::<cggmp21::keygen::msg::threshold::Msg<E, L, D>>::with_capacity(
+                        (2 * n * n).into(),
+                    );
 
-            let mut simulation =
-                Simulation::<cggmp21::key_refresh::NonThresholdMsg<E, D, L>>::new();
+                let outputs = (0..n).map(|i| {
+                    let party = simulation.add_party();
+                    let mut party_rng = rng.fork();
 
-            let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
+                    let mut profiler = PerfProfiler::new();
 
-            let outputs = shares.iter().map(|share| {
-                let party = simulation.add_party();
-                let mut party_rng = rng.fork();
-                let pregen = primes.next().expect("Can't get pregenerated prime");
+                    async move {
+                        let key_share = cggmp21::keygen(eid, i, n)
+                            .set_threshold(t)
+                            .set_progress_tracer(&mut profiler)
+                            .set_security_level::<L>()
+                            .start(&mut party_rng, party)
+                            .await
+                            .context("keygen failed")?;
+                        let report = profiler.get_report().context("get perf report")?;
+                        Ok::<_, anyhow::Error>((key_share, report))
+                    }
+                });
 
-                let mut profiler = PerfProfiler::new();
+                let outputs = futures::future::try_join_all(outputs)
+                    .await
+                    .expect("threshold keygen failed");
 
-                async move {
-                    let _new_share = cggmp21::key_refresh(eid, share, pregen)
-                        .set_progress_tracer(&mut profiler)
-                        .start(&mut party_rng, party)
-                        .await
-                        .context("refresh failed")?;
-                    profiler.get_report().context("get perf report")
+                println!("Threshold DKG");
+                println!("{}", outputs[0].1.clone().display_io(false));
+                println!();
+
+                Some(outputs.into_iter().map(|(k, _)| k).collect())
+            } else {
+                None
+            };
+
+        let aux_data: Option<Vec<cggmp21::key_share::AuxInfo<L>>> =
+            if args.bench_aux_data_gen || args.bench_signing {
+                let eid: [u8; 32] = rng.gen();
+                let eid = ExecutionId::new(&eid);
+
+                let mut simulation = Simulation::<cggmp21::key_refresh::AuxOnlyMsg<D, L>>::new();
+
+                let mut primes = cggmp21_tests::CACHED_PRIMES.iter::<L>();
+
+                let outputs = (0..n).map(|i| {
+                    let party = simulation.add_party();
+                    let mut party_rng = rng.fork();
+                    let pregen = primes.next().expect("Can't get pregenerated prime");
+
+                    let mut profiler = PerfProfiler::new();
+
+                    async move {
+                        let aux_data = cggmp21::aux_info_gen(eid, i, n, pregen)
+                            .set_progress_tracer(&mut profiler)
+                            .start(&mut party_rng, party)
+                            .await
+                            .context("aux data gen failed")?;
+                        let report = profiler.get_report().context("get perf report")?;
+                        Ok::<_, anyhow::Error>((aux_data, report))
+                    }
+                });
+
+                let outputs = futures::future::try_join_all(outputs)
+                    .await
+                    .expect("key refresh failed");
+
+                if args.bench_aux_data_gen {
+                    println!("Auxiliary data generation protocol");
+                    println!("{}", outputs[0].1.clone().display_io(false));
+                    println!();
                 }
-            });
 
-            let perf_reports = futures::future::try_join_all(outputs)
-                .await
-                .expect("key refresh failed");
-
-            println!("Key refresh protocol");
-            println!("{}", perf_reports[0].clone().display_io(false));
-            println!();
-        }
+                Some(outputs.into_iter().map(|(a, _)| a).collect())
+            } else {
+                None
+            };
 
         if args.bench_signing {
             // Note that we don't parametrize signing performance tests by `t` as it doesn't make much sense
             // since performance of t-out-of-n protocol should be roughly the same as t-out-of-t
-            let shares = cggmp21_tests::CACHED_SHARES
-                .get_shares::<E, L>(None, n)
-                .expect("retrieve key shares from cache");
+            let shares = non_threshold_key_shares
+                .expect("non threshold key shares are not generated")
+                .into_iter()
+                .zip(aux_data.expect("aux data is not generated"))
+                .map(|(key_share, aux_data)| cggmp21::KeyShare::make(key_share, aux_data))
+                .collect::<Result<Vec<_>, _>>()
+                .expect("couldn't complete a share");
 
             let eid: [u8; 32] = rng.gen();
             let eid = ExecutionId::new(&eid);
@@ -204,3 +256,14 @@ async fn main() {
         }
     }
 }
+
+#[derive(Clone, Copy)]
+struct CustomSecLevel;
+cggmp21::define_security_level!(CustomSecLevel {
+    security_bits = 384,
+    epsilon = 220,
+    ell = 256,
+    ell_prime = 824,
+    m = 128,
+    q = cggmp21::unknown_order::BigNumber::one() << 128,
+});

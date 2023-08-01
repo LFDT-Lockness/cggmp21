@@ -50,6 +50,7 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
         + hex::FromHex<Error = hex::FromHexError>
         + Send
         + Sync
+        + Unpin
         + 'static;
 
     /// $q$ parameter
