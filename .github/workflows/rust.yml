@@ -32,7 +32,7 @@ jobs:
         name: benchmark-tool
         path: target/release/measure_perf
     - name: Run tests
-      run: cargo test
+      run: cargo test -r
     - name: Check formatting
       run: cargo fmt --all -- --check
     - name: Run clippy
