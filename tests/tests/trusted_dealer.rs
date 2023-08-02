@@ -15,7 +15,7 @@ mod test {
         epsilon = 64,
         ell = 128,
         ell_prime = 128,
-        m = 1,
+        m = 128,
         q = (cggmp21::unknown_order::BigNumber::one() << 128) - 1,
     });
 

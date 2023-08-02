@@ -60,7 +60,7 @@ pub struct MsgRound2<D: Digest, L: SecurityLevel> {
     pub t: BigNumber,
     /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
-    pub params_proof: π_prm::Proof<{ π_prm::SECURITY }>,
+    pub params_proof: π_prm::Proof<{ crate::security_level::M }>,
     /// $\rho_i$
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
     #[serde(with = "hex")]
@@ -73,7 +73,10 @@ pub struct MsgRound2<D: Digest, L: SecurityLevel> {
 pub struct MsgRound3 {
     /// $\psi_i$
     // this should be L::M instead, but no rustc support yet
-    pub mod_proof: (π_mod::Commitment, π_mod::Proof<{ π_prm::SECURITY }>),
+    pub mod_proof: (
+        π_mod::Commitment,
+        π_mod::Proof<{ crate::security_level::M }>,
+    ),
     /// $\phi_i^j$
     pub fac_proof: π_fac::Proof,
 }
