@@ -108,7 +108,7 @@ pub mod _internal {
 /// security level):
 /// ```rust
 /// use cggmp21::security_level::define_security_level;
-/// use cggmp21::unknown_order::BigNumber;
+/// use cggmp21::rug::Integer;
 ///
 /// #[derive(Clone)]
 /// pub struct MyLevel;
@@ -118,7 +118,7 @@ pub mod _internal {
 ///     ell = 1024,
 ///     ell_prime = 1024,
 ///     m = 128,
-///     q = (BigNumber::one() << 48) - 1,
+///     q = (Integer::ONE.clone() << 48_u32) - 1,
 /// });
 /// ```
 ///

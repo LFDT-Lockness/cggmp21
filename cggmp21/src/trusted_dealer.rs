@@ -48,12 +48,7 @@ use crate::{
 ///
 /// Alias to [`TrustedDealerBuilder::new`]
 pub fn builder<E: Curve, L: SecurityLevel>(n: u16) -> TrustedDealerBuilder<E, L> {
-    TrustedDealerBuilder {
-        t: None,
-        n,
-        shared_secret_key: None,
-        _ph: PhantomData,
-    }
+    TrustedDealerBuilder::new(n)
 }
 
 /// Trusted dealer builder
@@ -61,6 +56,7 @@ pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
     t: Option<u16>,
     n: u16,
     shared_secret_key: Option<SecretScalar<E>>,
+    pregenerated_primes: Option<Vec<(Integer, Integer)>>,
     _ph: PhantomData<L>,
 }
 
@@ -73,6 +69,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             t: None,
             n,
             shared_secret_key: None,
+            pregenerated_primes: None,
             _ph: PhantomData,
         }
     }
@@ -99,6 +96,16 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     pub fn set_shared_secret_key(self, sk: SecretScalar<E>) -> Self {
         Self {
             shared_secret_key: Some(sk),
+            ..self
+        }
+    }
+
+    /// Sets pregenerated primes to use
+    ///
+    /// `primes` should have exactly `n` pairs of primes.
+    pub fn set_pregenerated_primes(self, primes: Vec<(Integer, Integer)>) -> Self {
+        Self {
+            pregenerated_primes: Some(primes),
             ..self
         }
     }
@@ -173,13 +180,18 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
     pub fn generate_shares(
-        self,
+        mut self,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
         let n = self.n;
 
+        let primes = self.pregenerated_primes.take();
         let core_key_shares = self.generate_core_shares(rng)?;
-        let aux_data = generate_aux_data(rng, n)?;
+        let aux_data = if let Some(primes) = primes {
+            generate_aux_data_with_primes(rng, primes)?
+        } else {
+            generate_aux_data(rng, n)?
+        };
 
         let key_shares = core_key_shares
             .into_iter()
@@ -222,6 +234,46 @@ pub fn generate_aux_data<L: SecurityLevel, R: RngCore + CryptoRng>(
         .collect::<Result<Vec<_>, Reason>>()?;
 
     primes
+        .into_iter()
+        .map(|(p, q)| {
+            DirtyAuxInfo {
+                p,
+                q,
+                parties: public_aux_data.clone(),
+                security_level: PhantomData,
+            }
+            .try_into()
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Reason::InvalidKeyShare)
+        .map_err(TrustedDealerError)
+}
+
+/// Generates auxiliary data for `n` signers using provided pregenerated primes
+///
+/// `pregenerated_primes` should have exactly `n` pairs of primes.
+pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
+    rng: &mut R,
+    pregenerated_primes: Vec<(Integer, Integer)>,
+) -> Result<Vec<AuxInfo<L>>, TrustedDealerError> {
+    let public_aux_data = pregenerated_primes
+        .iter()
+        .map(|(p, q)| {
+            let N = (p * q).complete();
+
+            let φ_N = (p - 1u8).complete() * (q - 1u8).complete();
+
+            let r = Integer::gen_inversible(&N, rng);
+            let λ = φ_N.random_below_ref(&mut utils::external_rand(rng)).into();
+
+            let t = r.square().modulo(&N);
+            let s = t.pow_mod_ref(&λ, &N).ok_or(Reason::PowMod)?.into();
+
+            Ok(PartyAux { N, s, t })
+        })
+        .collect::<Result<Vec<_>, Reason>>()?;
+
+    pregenerated_primes
         .into_iter()
         .map(|(p, q)| {
             DirtyAuxInfo {
