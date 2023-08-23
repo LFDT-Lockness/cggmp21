@@ -1,7 +1,11 @@
 //! Пprm or Rprm in the paper. Proof that s ⋮ t modulo N. Non-interactive
 //! version only.
 use digest::{typenum::U32, Digest};
-use paillier_zk::{unknown_order::BigNumber, BigNumberExt};
+use paillier_zk::{
+    fast_paillier::utils,
+    rug::{self, Complete, Integer},
+    IntegerExt,
+};
 use rand_core::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -14,9 +18,9 @@ struct Challenge<const M: usize> {
 /// Data to construct proof about
 #[derive(Clone, Copy)]
 pub struct Data<'a> {
-    pub N: &'a BigNumber,
-    pub s: &'a BigNumber,
-    pub t: &'a BigNumber,
+    pub N: &'a Integer,
+    pub s: &'a Integer,
+    pub t: &'a Integer,
 }
 
 /// The ZK proof. Computed by [`prove`].
@@ -28,25 +32,26 @@ pub struct Data<'a> {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Proof<const M: usize> {
     #[serde_as(as = "[_; M]")]
-    pub commitment: [BigNumber; M],
+    pub commitment: [Integer; M],
     #[serde_as(as = "[_; M]")]
-    pub zs: [BigNumber; M],
+    pub zs: [Integer; M],
 }
 
 fn derive_challenge<const M: usize, D>(
     shared_state: D,
     data: Data,
-    commitment: &[BigNumber; M],
+    commitment: &[Integer; M],
 ) -> Challenge<M>
 where
     D: Digest<OutputSize = U32>,
 {
+    let order = rug::integer::Order::Msf;
     let mut digest = shared_state
-        .chain_update(&data.N.to_bytes())
-        .chain_update(&data.s.to_bytes())
-        .chain_update(&data.t.to_bytes());
+        .chain_update(&data.N.to_digits(order))
+        .chain_update(&data.s.to_digits(order))
+        .chain_update(&data.t.to_digits(order));
     for a in commitment.iter() {
-        digest.update(a.to_bytes());
+        digest.update(a.to_digits(order));
     }
     let seed = digest.finalize();
     let mut rng = rand_chacha::ChaCha20Rng::from_seed(seed.into());
@@ -73,26 +78,27 @@ where
 /// - `lambda` - λ such that $s = t^λ$
 pub fn prove<const M: usize, R, D>(
     shared_state: D,
-    mut rng: R,
+    rng: &mut R,
     data: Data,
-    phi: &BigNumber,
-    lambda: &BigNumber,
+    phi: &Integer,
+    lambda: &Integer,
 ) -> Result<Proof<M>, ZkError>
 where
     D: Digest<OutputSize = U32>,
     R: RngCore,
 {
-    let private_commitment = [(); M].map(|()| BigNumber::from_rng(phi, &mut rng));
+    let private_commitment =
+        [(); M].map(|()| phi.random_below_ref(&mut utils::external_rand(rng)).into());
     let commitment = private_commitment
         .clone()
-        .map(|a| data.t.powmod(&a, data.N));
+        .map(|a| data.t.pow_mod_ref(&a, data.N).map(|r| r.into()));
     // TODO: since array::try_map is not stable yet, we have to be hacky here
-    let commitment = if commitment.iter().any(Result::is_err) {
+    let commitment = if commitment.iter().any(Option::is_none) {
         return Err(Reason::PowMod.into());
     } else {
-        // We made sure that every item in the array is `Ok(_)`
+        // We made sure that every item in the array is `Some(_)`
         #[allow(clippy::unwrap_used)]
-        commitment.map(Result::unwrap)
+        commitment.map(Option::unwrap)
     };
 
     let challenge: Challenge<M> = derive_challenge(shared_state, data, &commitment);
@@ -100,7 +106,8 @@ where
     let mut zs = private_commitment;
     for (z_ref, e) in zs.iter_mut().zip(&challenge.es) {
         if *e {
-            *z_ref = z_ref.modadd(lambda, phi);
+            *z_ref += lambda;
+            *z_ref = z_ref.modulo(phi);
         }
     }
     Ok(Proof { commitment, zs })
@@ -118,9 +125,9 @@ where
 {
     let challenge: Challenge<M> = derive_challenge(shared_state, data, &proof.commitment);
     for ((z, a), e) in proof.zs.iter().zip(&proof.commitment).zip(&challenge.es) {
-        let lhs = data.t.powmod(z, data.N).map_err(|_| InvalidProof)?;
+        let lhs: Integer = data.t.pow_mod_ref(z, data.N).ok_or(InvalidProof)?.into();
         if *e {
-            let rhs = data.s.modmul(a, data.N);
+            let rhs = (data.s * a).complete().modulo(data.N);
             if lhs != rhs {
                 return Err(InvalidProof);
             }
@@ -148,22 +155,29 @@ pub struct InvalidProof;
 // running with M=64 completed in 1.22 on my machine in debug build
 #[cfg(test)]
 mod test {
-    use paillier_zk::{unknown_order::BigNumber, BigNumberExt};
+    use paillier_zk::{
+        rug::{Complete, Integer},
+        IntegerExt,
+    };
+
+    use crate::utils;
 
     #[test]
     fn passing() {
         let mut rng = rand_core::OsRng;
         let shared_state = sha2::Sha256::default();
 
-        let p = BigNumber::prime_from_rng(256, &mut rng);
-        let q = BigNumber::prime_from_rng(256, &mut rng);
-        let n = &p * &q;
-        let phi = (&p - 1) * (&q - 1);
+        let p = utils::generate_blum_prime(&mut rng, 256);
+        let q = utils::generate_blum_prime(&mut rng, 256);
+        let n = (&p * &q).complete();
+        let phi = (&p - 1u8).complete() * (&q - 1u8).complete();
 
-        let r = crate::utils::sample_bigint_in_mult_group(&mut rng, &n);
-        let lambda = BigNumber::from_rng(&phi, &mut rng);
-        let t = r.modmul(&r, &n);
-        let s = t.powmod(&lambda, &n).unwrap();
+        let r = Integer::gen_inversible(&n, &mut rng);
+        let lambda = phi
+            .random_below_ref(&mut utils::external_rand(&mut rng))
+            .into();
+        let t = r.square().modulo(&n);
+        let s = t.pow_mod_ref(&lambda, &n).unwrap().into();
 
         let data = super::Data {
             N: &n,
@@ -172,7 +186,7 @@ mod test {
         };
 
         let proof: super::Proof<16> =
-            super::prove(shared_state.clone(), rand_core::OsRng, data, &phi, &lambda).unwrap();
+            super::prove(shared_state.clone(), &mut rng, data, &phi, &lambda).unwrap();
         super::verify(shared_state, data, &proof).expect("proof should pass");
     }
 
@@ -181,16 +195,18 @@ mod test {
         let mut rng = rand_core::OsRng;
         let shared_state = sha2::Sha256::default();
 
-        let p = BigNumber::prime_from_rng(256, &mut rng);
-        let q = BigNumber::prime_from_rng(256, &mut rng);
-        let n = &p * &q;
-        let phi = (&p - 1) * (&q - 1);
+        let p = utils::generate_blum_prime(&mut rng, 256);
+        let q = utils::generate_blum_prime(&mut rng, 256);
+        let n = (&p * &q).complete();
+        let phi = (&p - 1u8).complete() * (&q - 1u8).complete();
 
-        let r = crate::utils::sample_bigint_in_mult_group(&mut rng, &n);
-        let lambda = BigNumber::from_rng(&phi, &mut rng);
-        let t = r.modmul(&r, &n);
-        let correct_s = t.powmod(&lambda, &n).unwrap();
-        let s = correct_s.modadd(&BigNumber::one(), &n);
+        let r = Integer::gen_inversible(&n, &mut rng);
+        let lambda = phi
+            .random_below_ref(&mut utils::external_rand(&mut rng))
+            .into();
+        let t = r.square().modulo(&n);
+        let correct_s: Integer = t.pow_mod_ref(&lambda, &n).unwrap().into();
+        let s = (correct_s + 1u8).modulo(&n);
 
         let data = super::Data {
             N: &n,
@@ -199,7 +215,7 @@ mod test {
         };
 
         let proof: super::Proof<16> =
-            super::prove(shared_state.clone(), rand_core::OsRng, data, &phi, &lambda).unwrap();
+            super::prove(shared_state.clone(), &mut rng, data, &phi, &lambda).unwrap();
         if super::verify(shared_state, data, &proof).is_ok() {
             panic!("proof should fail");
         }

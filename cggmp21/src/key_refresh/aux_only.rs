@@ -2,8 +2,10 @@ use digest::Digest;
 use futures::SinkExt;
 use generic_ec_zkp::hash_commitment::{self, HashCommit};
 use paillier_zk::{
-    no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
-    unknown_order::BigNumber, BigNumberExt,
+    no_small_factor::non_interactive as π_fac,
+    paillier_blum_modulus as π_mod,
+    rug::{self, Complete, Integer},
+    IntegerExt,
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
@@ -53,11 +55,11 @@ pub struct MsgRound1<D: Digest> {
 #[serde(bound = "")]
 pub struct MsgRound2<D: Digest, L: SecurityLevel> {
     /// $N_i$
-    pub N: BigNumber,
+    pub N: Integer,
     /// $s_i$
-    pub s: BigNumber,
+    pub s: Integer,
     /// $t_i$
-    pub t: BigNumber,
+    pub t: Integer,
     /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
     pub params_proof: π_prm::Proof<{ crate::security_level::M }>,
@@ -127,14 +129,16 @@ where
     tracer.stage("Retrieve primes (p and q)");
     let PregeneratedPrimes { p, q, .. } = pregenerated;
     tracer.stage("Compute paillier decryption key (N)");
-    let N = &p * &q;
-    let phi_N = (&p - 1) * (&q - 1);
+    let N = (&p * &q).complete();
+    let phi_N = (&p - 1u8).complete() * (&q - 1u8).complete();
 
     tracer.stage("Generate auxiliary params r, λ, t, s");
-    let r = utils::sample_bigint_in_mult_group(rng, &N);
-    let lambda = BigNumber::from_rng(&phi_N, rng);
-    let t = r.modmul(&r, &N);
-    let s = t.powmod(&lambda, &N).map_err(|_| Bug::PowMod)?;
+    let r = Integer::gen_inversible(&N, rng);
+    let lambda = phi_N
+        .random_below_ref(&mut utils::external_rand(rng))
+        .into();
+    let t = r.square().modulo(&N);
+    let s = t.pow_mod_ref(&lambda, &N).ok_or(Bug::PowMod)?.into();
 
     tracer.stage("Prove Πprm (ψˆ_i)");
     let hat_psi = π_prm::prove(
@@ -158,15 +162,16 @@ where
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
     // TODO: decommitment should be kappa bits
+    let order = rug::integer::Order::Msf;
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
         .mix(n)
         .mix(i)
-        .mix_bytes(&N.to_bytes())
-        .mix_bytes(&s.to_bytes())
-        .mix_bytes(&t.to_bytes())
-        .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_bytes()))
-        .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_bytes()))
+        .mix_bytes(&N.to_digits::<u8>(order))
+        .mix_bytes(&s.to_digits::<u8>(order))
+        .mix_bytes(&t.to_digits::<u8>(order))
+        .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_digits::<u8>(order)))
+        .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_digits::<u8>(order)))
         .mix_bytes(&rho_bytes)
         .commit(rng);
 
@@ -260,11 +265,23 @@ where
             .mix_bytes(sid)
             .mix(n)
             .mix(j)
-            .mix_bytes(decomm.N.to_bytes())
-            .mix_bytes(decomm.s.to_bytes())
-            .mix_bytes(decomm.t.to_bytes())
-            .mix_many_bytes(decomm.params_proof.commitment.iter().map(|x| x.to_bytes()))
-            .mix_many_bytes(decomm.params_proof.zs.iter().map(|x| x.to_bytes()))
+            .mix_bytes(decomm.N.to_digits::<u8>(order))
+            .mix_bytes(decomm.s.to_digits::<u8>(order))
+            .mix_bytes(decomm.t.to_digits::<u8>(order))
+            .mix_many_bytes(
+                decomm
+                    .params_proof
+                    .commitment
+                    .iter()
+                    .map(|x| x.to_digits::<u8>(order)),
+            )
+            .mix_many_bytes(
+                decomm
+                    .params_proof
+                    .zs
+                    .iter()
+                    .map(|x| x.to_digits::<u8>(order)),
+            )
             .mix_bytes(&decomm.rho_bytes)
             .verify(&comm.commitment, &decomm.decommit)
             .is_err()

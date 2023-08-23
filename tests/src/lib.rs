@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cggmp21::{key_share::KeyShare, security_level::SecurityLevel, unknown_order::BigNumber};
+use cggmp21::{key_share::KeyShare, rug::Integer, security_level::SecurityLevel};
 use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::{Map, Value};
@@ -69,8 +69,8 @@ impl PrecomputedKeyShares {
 pub struct PregeneratedPrimes {
     // It would be better to use key_refresh::PregeneratedPrimes here, but
     // adding serialization to that is an enormous pain in the ass
-    primes: Vec<BigNumber>,
-    bitsize: usize,
+    primes: Vec<Integer>,
+    bitsize: u32,
 }
 
 impl PregeneratedPrimes {

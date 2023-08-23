@@ -207,7 +207,8 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 pub use {
-    generic_ec, paillier_zk, paillier_zk::libpaillier, paillier_zk::libpaillier::unknown_order,
+    generic_ec, paillier_zk,
+    paillier_zk::{fast_paillier, rug},
     round_based,
 };
 

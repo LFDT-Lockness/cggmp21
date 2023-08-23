@@ -26,8 +26,10 @@ use std::{iter, marker::PhantomData};
 
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::Polynomial;
-use paillier_zk::libpaillier::unknown_order::BigNumber;
-use paillier_zk::BigNumberExt;
+use paillier_zk::{
+    rug::{Complete, Integer},
+    IntegerExt,
+};
 use rand_core::{CryptoRng, RngCore};
 use thiserror::Error;
 
@@ -37,7 +39,7 @@ use crate::{
         KeyShare, PartyAux, VssSetup,
     },
     security_level::SecurityLevel,
-    utils::sample_bigint_in_mult_group,
+    utils,
 };
 
 /// Construct a trusted dealer builder
@@ -205,15 +207,15 @@ pub fn generate_aux_data<L: SecurityLevel, R: RngCore + CryptoRng>(
     let public_aux_data = primes
         .iter()
         .map(|(p, q)| {
-            let N = p * q;
+            let N = (p * q).complete();
 
-            let φ_N = (p - 1) * (q - 1);
+            let φ_N = (p - 1u8).complete() * (q - 1u8).complete();
 
-            let r = sample_bigint_in_mult_group(rng, &N);
-            let λ = BigNumber::from_rng(&φ_N, rng);
+            let r = Integer::gen_inversible(&N, rng);
+            let λ = φ_N.random_below_ref(&mut utils::external_rand(rng)).into();
 
-            let t = BigNumber::modmul(&r, &r, &N);
-            let s = BigNumber::powmod(&t, &λ, &N).map_err(|_| Reason::PowMod)?;
+            let t = r.square().modulo(&N);
+            let s = t.pow_mod_ref(&λ, &N).ok_or(Reason::PowMod)?.into();
 
             Ok(PartyAux { N, s, t })
         })

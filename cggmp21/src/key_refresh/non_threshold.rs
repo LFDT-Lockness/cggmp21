@@ -9,8 +9,11 @@ use generic_ec_zkp::{
     schnorr_pok,
 };
 use paillier_zk::{
-    libpaillier, no_small_factor::non_interactive as π_fac, paillier_blum_modulus as π_mod,
-    unknown_order::BigNumber, BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
+    fast_paillier,
+    no_small_factor::non_interactive as π_fac,
+    paillier_blum_modulus as π_mod,
+    rug::{self, Complete, Integer},
+    IntegerExt,
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::ProtocolMessage;
@@ -67,11 +70,11 @@ pub struct MsgRound2<E: Curve, D: Digest, L: SecurityLevel> {
     /// $\vec A_i$
     pub sch_commits_a: Vec<schnorr_pok::Commit<E>>,
     /// $N_i$
-    pub N: BigNumber,
+    pub N: Integer,
     /// $s_i$
-    pub s: BigNumber,
+    pub s: Integer,
     /// $t_i$
-    pub t: BigNumber,
+    pub t: Integer,
     /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
     pub params_proof: π_prm::Proof<{ crate::security_level::M }>,
@@ -95,7 +98,7 @@ pub struct MsgRound3<E: Curve> {
     /// $\phi_i^j$
     pub fac_proof: π_fac::Proof,
     /// $C_i^j$
-    pub C: BigNumber,
+    pub C: Integer,
     /// $\psi_i^k$
     ///
     /// Here in the paper you only send one proof, but later they require you to
@@ -154,10 +157,11 @@ where
     tracer.stage("Retrieve primes (p and q)");
     let PregeneratedPrimes { p, q, .. } = pregenerated;
     tracer.stage("Compute paillier decryption key (N)");
-    let N = &p * &q;
-    let phi_N = (&p - 1) * (&q - 1);
-    let dec =
-        libpaillier::DecryptionKey::with_primes_unchecked(&p, &q).ok_or(Bug::PaillierKeyError)?;
+    let N = (&p * &q).complete();
+    let phi_N = (&p - 1u8).complete() * (&q - 1u8).complete();
+    let dec: fast_paillier::DecryptionKey =
+        fast_paillier::DecryptionKey::from_primes(p.clone(), q.clone())
+            .map_err(|_| Bug::PaillierKeyError)?;
 
     // *x_i* in paper
     tracer.stage("Generate secret x_i and public X_i");
@@ -176,10 +180,12 @@ where
         .collect::<Vec<_>>();
 
     tracer.stage("Generate auxiliary params r, λ, t, s");
-    let r = utils::sample_bigint_in_mult_group(rng, &N);
-    let lambda = BigNumber::from_rng(&phi_N, rng);
-    let t = r.modmul(&r, &N);
-    let s = t.powmod(&lambda, &N).map_err(|_| Bug::PowMod)?;
+    let r = Integer::gen_inversible(&N, rng);
+    let lambda = phi_N
+        .random_below_ref(&mut utils::external_rand(rng))
+        .into();
+    let t = r.square().modulo(&N);
+    let s = t.pow_mod_ref(&lambda, &N).ok_or(Bug::PowMod)?.into();
 
     tracer.stage("Prove Πprm (ψˆ_i)");
     let hat_psi = π_prm::prove(
@@ -209,17 +215,18 @@ where
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
     // TODO: decommitment should be kappa bits
+    let order = rug::integer::Order::Msf;
     let (hash_commit, decommit) = HashCommit::<D>::builder()
         .mix_bytes(sid)
         .mix(n)
         .mix(i)
         .mix_many(&Xs)
         .mix_many(As.iter().map(|a| a.0))
-        .mix_bytes(&N.to_bytes())
-        .mix_bytes(&s.to_bytes())
-        .mix_bytes(&t.to_bytes())
-        .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_bytes()))
-        .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_bytes()))
+        .mix_bytes(&N.to_digits::<u8>(order))
+        .mix_bytes(&s.to_digits::<u8>(order))
+        .mix_bytes(&t.to_digits::<u8>(order))
+        .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_digits::<u8>(order)))
+        .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_digits::<u8>(order)))
         .mix_bytes(&rho_bytes)
         .commit(rng);
 
@@ -317,11 +324,23 @@ where
             .mix(j)
             .mix_many(&decomm.Xs)
             .mix_many(decomm.sch_commits_a.iter().map(|a| a.0))
-            .mix_bytes(decomm.N.to_bytes())
-            .mix_bytes(decomm.s.to_bytes())
-            .mix_bytes(decomm.t.to_bytes())
-            .mix_many_bytes(decomm.params_proof.commitment.iter().map(|x| x.to_bytes()))
-            .mix_many_bytes(decomm.params_proof.zs.iter().map(|x| x.to_bytes()))
+            .mix_bytes(decomm.N.to_digits::<u8>(order))
+            .mix_bytes(decomm.s.to_digits::<u8>(order))
+            .mix_bytes(decomm.t.to_digits::<u8>(order))
+            .mix_many_bytes(
+                decomm
+                    .params_proof
+                    .commitment
+                    .iter()
+                    .map(|x| x.to_digits::<u8>(order)),
+            )
+            .mix_many_bytes(
+                decomm
+                    .params_proof
+                    .zs
+                    .iter()
+                    .map(|x| x.to_digits::<u8>(order)),
+            )
             .mix_bytes(&decomm.rho_bytes)
             .verify(&comm.commitment, &decomm.decommit)
             .is_err()
@@ -373,7 +392,7 @@ where
     // encryption keys for each party
     let encs = decommitments
         .iter()
-        .map(|d| utils::encryption_key_from_n(&d.N))
+        .map(|d| fast_paillier::EncryptionKey::from_n(d.N.clone()))
         .collect::<Vec<_>>();
 
     tracer.stage("Add together shared random bytes");
@@ -426,7 +445,7 @@ where
     for (((x, enc), d), j) in iterator {
         tracer.stage("Paillier encryption of x_i^j");
         let (C, _) = enc
-            .encrypt_with_random(&scalar_to_bignumber(x), &mut rng)
+            .encrypt_with_random(&mut rng, &scalar_to_bignumber(x))
             .map_err(|_| Bug::PaillierEnc)?;
         tracer.stage("Compute П_fac (ф_i^j)");
         let phi = π_fac::prove(
@@ -478,7 +497,7 @@ where
     let (shares, blame) =
         utils::partition_results(shares_msg_b.iter_indexed().map(|(j, mid, m)| {
             let bigint = dec
-                .decrypt_to_bigint(&m.C)
+                .decrypt(&m.C)
                 .map_err(|_| AbortBlame::new(j, mid, mid))?;
             Ok::<_, AbortBlame>(bigint.to_scalar())
         }));

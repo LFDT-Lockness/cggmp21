@@ -9,7 +9,7 @@
 //! analyzed the CGGMP paper and you understand implications. Inconsistent security level may cause unexpected
 //! unverbose runtime error or reduced security of the protocol.
 
-use paillier_zk::libpaillier::unknown_order::BigNumber;
+use crate::rug::Integer;
 
 /// Hardcoded value for parameter $m$ of security level
 ///
@@ -22,7 +22,7 @@ pub const M: usize = 128;
 /// You should not implement this trait manually. Use [define_security_level] macro instead.
 pub trait SecurityLevel: Clone + Sync + Send + 'static {
     /// $\kappa$ bits of security
-    const SECURITY_BITS: usize;
+    const SECURITY_BITS: u32;
     /// $\kappa/8$ bytes of security
     const SECURITY_BYTES: usize;
 
@@ -57,14 +57,15 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
     ///
     /// Note that it's not curve order, and it doesn't need to be a prime, it's another security parameter
     /// that determines security level.
-    fn q() -> BigNumber;
+    fn q() -> Integer;
 }
 
 /// Internal module that's powers `define_security_level` macro
 #[doc(hidden)]
 pub mod _internal {
     use hex::FromHex;
-    pub use paillier_zk::libpaillier::unknown_order::BigNumber;
+
+    pub use crate::rug::Integer;
 
     #[derive(Clone)]
     pub struct Rid<const N: usize>([u8; N]);
@@ -135,7 +136,7 @@ macro_rules! define_security_level {
         q = $q:expr,
     }) => {
         impl $crate::security_level::SecurityLevel for $struct_name {
-            const SECURITY_BITS: usize = $k;
+            const SECURITY_BITS: u32 = $k;
             const SECURITY_BYTES: usize = $k / 8;
             const EPSILON: usize = $e;
             const ELL: usize = $ell;
@@ -143,7 +144,7 @@ macro_rules! define_security_level {
             const M: usize = 128;
             type Rid = $crate::security_level::_internal::Rid<{$k / 8}>;
 
-            fn q() -> $crate::security_level::_internal::BigNumber {
+            fn q() -> $crate::security_level::_internal::Integer {
                 $q
             }
         }
@@ -174,18 +175,18 @@ define_security_level!(ReasonablySecure{
     ell = 256,
     ell_prime = 848,
     m = 128,
-    q = BigNumber::one() << 128,
+    q = (Integer::ONE << 128_u32).into(),
 });
 
 /// Checks that public paillier key meets security level constraints
-pub(crate) fn validate_public_paillier_key_size<L: SecurityLevel>(N: &BigNumber) -> bool {
-    N.bit_length() >= 8 * L::SECURITY_BITS - 1
+pub(crate) fn validate_public_paillier_key_size<L: SecurityLevel>(N: &Integer) -> bool {
+    N.significant_bits() >= 8 * L::SECURITY_BITS - 1
 }
 
 /// Checks that secret paillier key meets security level constraints
 pub(crate) fn validate_secret_paillier_key_size<L: SecurityLevel>(
-    p: &BigNumber,
-    q: &BigNumber,
+    p: &Integer,
+    q: &Integer,
 ) -> bool {
-    p.bit_length() >= 4 * L::SECURITY_BITS && q.bit_length() >= 4 * L::SECURITY_BITS
+    p.significant_bits() >= 4 * L::SECURITY_BITS && q.significant_bits() >= 4 * L::SECURITY_BITS
 }

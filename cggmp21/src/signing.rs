@@ -6,11 +6,12 @@ use generic_ec::{
     coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar, SecretScalar,
 };
 use generic_ec_zkp::polynomial::lagrange_coefficient;
-use paillier_zk::libpaillier::{unknown_order::BigNumber, DecryptionKey};
+use paillier_zk::rug::Complete;
+use paillier_zk::{fast_paillier, rug::Integer};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as pi_log,
     paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
-    BigNumberExt, SafePaillierDecryptionExt, SafePaillierEncryptionExt,
+    IntegerExt,
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
@@ -24,12 +25,7 @@ use crate::errors::IoError;
 use crate::key_share::{KeyShare, PartyAux, VssSetup};
 use crate::progress::Tracer;
 use crate::utils::{hash_message, iter_peers, subset, HashMessageError};
-use crate::{
-    key_share::InvalidKeyShare,
-    security_level::SecurityLevel,
-    utils::{encryption_key_from_n, scalar_to_bignumber},
-    ExecutionId,
-};
+use crate::{key_share::InvalidKeyShare, security_level::SecurityLevel, utils, ExecutionId};
 
 use self::msg::*;
 
@@ -117,8 +113,7 @@ pub mod msg {
     use generic_ec::Curve;
     use generic_ec::{Point, Scalar};
 
-    use libpaillier::Ciphertext;
-    use paillier_zk::libpaillier;
+    use paillier_zk::fast_paillier;
     use paillier_zk::{
         group_element_vs_paillier_encryption_in_range as pi_log,
         paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
@@ -151,9 +146,9 @@ pub mod msg {
     #[derive(Clone, Serialize, Deserialize)]
     pub struct MsgRound1a {
         /// $K_i$
-        pub K: libpaillier::Ciphertext,
+        pub K: fast_paillier::Ciphertext,
         /// $G_i$
-        pub G: libpaillier::Ciphertext,
+        pub G: fast_paillier::Ciphertext,
     }
 
     /// Message from round 1b
@@ -170,13 +165,13 @@ pub mod msg {
         /// $\Gamma_i$
         pub Gamma: Point<E>,
         /// $D_{j,i}$
-        pub D: Ciphertext,
+        pub D: fast_paillier::Ciphertext,
         /// $F_{j,i}$
-        pub F: Ciphertext,
+        pub F: fast_paillier::Ciphertext,
         /// $\hat D_{j,i}$
-        pub hat_D: Ciphertext,
+        pub hat_D: fast_paillier::Ciphertext,
         /// $\hat F_{j,i}$
-        pub hat_F: Ciphertext,
+        pub hat_F: fast_paillier::Ciphertext,
         /// $\psi_{j,i}$
         pub psi: (pi_aff::Commitment<E>, pi_aff::Proof),
         /// $\hat \psi_{j,i}$
@@ -460,8 +455,8 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     x_i: &SecretScalar<E>,
     X: &[Point<E>],
     pk: Point<E>,
-    p_i: &BigNumber,
-    q_i: &BigNumber,
+    p_i: &Integer,
+    q_i: &Integer,
     R: &[PartyAux],
     message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
@@ -481,8 +476,10 @@ where
     tracer.stage("Retrieve auxiliary data");
     let R_i = &R[usize::from(i)];
     let N_i = &R_i.N;
-    let enc_i = encryption_key_from_n(N_i);
-    let dec_i = DecryptionKey::with_primes(p_i, q_i).ok_or(Bug::InvalidOwnPaillierKey)?;
+    let enc_i = fast_paillier::EncryptionKey::from_n(N_i.clone());
+    let dec_i: fast_paillier::DecryptionKey =
+        fast_paillier::DecryptionKey::from_primes(p_i.clone(), q_i.clone())
+            .map_err(|_| Bug::InvalidOwnPaillierKey)?;
 
     tracer.stage("Precompute execution id and security params");
     let sid = sid.as_bytes();
@@ -505,15 +502,15 @@ where
     let gamma_i = SecretScalar::<E>::random(rng);
     let k_i = SecretScalar::<E>::random(rng);
 
-    let v_i = BigNumber::gen_inversible(N_i, rng);
-    let rho_i = BigNumber::gen_inversible(N_i, rng);
+    let v_i = Integer::gen_inversible(N_i, rng);
+    let rho_i = Integer::gen_inversible(N_i, rng);
 
     tracer.stage("Encrypt G_i and K_i");
     let G_i = enc_i
-        .encrypt_with(&scalar_to_bignumber(&gamma_i), &v_i)
+        .encrypt_with(&utils::scalar_to_bignumber(&gamma_i), &v_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::G_i))?;
     let K_i = enc_i
-        .encrypt_with(&scalar_to_bignumber(&k_i), &rho_i)
+        .encrypt_with(&utils::scalar_to_bignumber(&k_i), &rho_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::K_i))?;
 
     tracer.send_msg();
@@ -539,7 +536,7 @@ where
                 ciphertext: K_i.clone(),
             },
             &pi_enc::PrivateData {
-                plaintext: scalar_to_bignumber(&k_i),
+                plaintext: utils::scalar_to_bignumber(&k_i),
                 nonce: rho_i.clone(),
             },
             &security_params.pi_enc,
@@ -622,7 +619,7 @@ where
                 parties_shared_state.clone().chain_update(j.to_be_bytes()),
                 &R_i.into(),
                 &pi_enc::Data {
-                    key: encryption_key_from_n(&R_j.N),
+                    key: fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
                     ciphertext: ciphertext.K.clone(),
                 },
                 &proof.psi0.0,
@@ -642,7 +639,7 @@ where
 
     // Step 2
     let Gamma_i = Point::generator() * &gamma_i;
-    let J = BigNumber::one() << L::ELL_PRIME;
+    let J = (Integer::ONE << L::ELL_PRIME).complete();
 
     let mut beta_sum = Scalar::zero();
     let mut hat_beta_sum = Scalar::zero();
@@ -650,15 +647,15 @@ where
         tracer.stage("Sample random r, hat_r, s, hat_s, beta, hat_beta");
         let R_j = &R[usize::from(j)];
         let N_j = &R_j.N;
-        let enc_j = encryption_key_from_n(N_j);
+        let enc_j = fast_paillier::EncryptionKey::from_n(N_j.clone());
 
-        let r_ij = BigNumber::from_rng(N_i, rng);
-        let hat_r_ij = BigNumber::from_rng(N_i, rng);
-        let s_ij = BigNumber::from_rng(N_j, rng);
-        let hat_s_ij = BigNumber::from_rng(N_j, rng);
+        let r_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
+        let hat_r_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
+        let s_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
+        let hat_s_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
 
-        let beta_ij = BigNumber::from_rng_pm(&J, rng);
-        let hat_beta_ij = BigNumber::from_rng_pm(&J, rng);
+        let beta_ij = Integer::from_rng_pm(&J, rng);
+        let hat_beta_ij = Integer::from_rng_pm(&J, rng);
 
         beta_sum += beta_ij.to_scalar();
         hat_beta_sum += hat_beta_ij.to_scalar();
@@ -667,10 +664,10 @@ where
         // D_ji = (gamma_i * K_j) + enc_j(-beta_ij, s_ij)
         let D_ji = {
             let gamma_i_times_K_j = enc_j
-                .omul(&scalar_to_bignumber(&gamma_i), &ciphertext_j.K)
+                .omul(&utils::scalar_to_bignumber(&gamma_i), &ciphertext_j.K)
                 .map_err(|_| Bug::PaillierOp(BugSource::gamma_i_times_K_j))?;
             let neg_beta_ij_enc = enc_j
-                .encrypt_with(&-&beta_ij, &s_ij)
+                .encrypt_with(&(-&beta_ij).complete(), &s_ij)
                 .map_err(|_| Bug::PaillierEnc(BugSource::neg_beta_ij_enc))?;
             enc_j
                 .oadd(&gamma_i_times_K_j, &neg_beta_ij_enc)
@@ -679,17 +676,17 @@ where
 
         tracer.stage("Encrypt F_ji");
         let F_ji = enc_i
-            .encrypt_with(&-&beta_ij, &r_ij)
+            .encrypt_with(&(-&beta_ij).complete(), &r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::F_ji))?;
 
         tracer.stage("Encrypt hat_D_ji");
         // Dˆ_ji = (x_i * K_j) + enc_j(-hat_beta_ij, hat_s_ij)
         let hat_D_ji = {
             let x_i_times_K_j = enc_j
-                .omul(&scalar_to_bignumber(x_i), &ciphertext_j.K)
+                .omul(&utils::scalar_to_bignumber(x_i), &ciphertext_j.K)
                 .map_err(|_| Bug::PaillierOp(BugSource::x_i_times_K_j))?;
             let neg_hat_beta_ij_enc = enc_j
-                .encrypt_with(&-&hat_beta_ij, &hat_s_ij)
+                .encrypt_with(&(-&hat_beta_ij).complete(), &hat_s_ij)
                 .map_err(|_| Bug::PaillierEnc(BugSource::hat_beta_ij_enc))?;
             enc_j
                 .oadd(&x_i_times_K_j, &neg_hat_beta_ij_enc)
@@ -698,7 +695,7 @@ where
 
         tracer.stage("Encrypt hat_F_ji");
         let hat_F_ji = enc_i
-            .encrypt_with(&-&hat_beta_ij, &hat_r_ij)
+            .encrypt_with(&(-&hat_beta_ij).complete(), &hat_r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::hat_F))?;
 
         tracer.stage("Prove psi_ji");
@@ -715,8 +712,8 @@ where
                 x: Gamma_i,
             },
             &pi_aff::PrivateData {
-                x: scalar_to_bignumber(&gamma_i),
-                y: -&beta_ij,
+                x: utils::scalar_to_bignumber(&gamma_i),
+                y: (-&beta_ij).complete(),
                 nonce: s_ij.clone(),
                 nonce_y: r_ij.clone(),
             },
@@ -738,8 +735,8 @@ where
                 x: Point::generator() * x_i,
             },
             &pi_aff::PrivateData {
-                x: scalar_to_bignumber(x_i),
-                y: -&hat_beta_ij,
+                x: utils::scalar_to_bignumber(x_i),
+                y: (-&hat_beta_ij).complete(),
                 nonce: hat_s_ij.clone(),
                 nonce_y: hat_r_ij.clone(),
             },
@@ -759,7 +756,7 @@ where
                 b: Point::<E>::generator().to_point(),
             },
             &pi_log::PrivateData {
-                x: scalar_to_bignumber(&gamma_i),
+                x: utils::scalar_to_bignumber(&gamma_i),
                 nonce: v_i.clone(),
             },
             &security_params.pi_log,
@@ -805,7 +802,7 @@ where
         tracer.stage("Retrieve auxiliary data");
         let X_j = X[usize::from(j)];
         let R_j = &R[usize::from(j)];
-        let enc_j = encryption_key_from_n(&R_j.N);
+        let enc_j = fast_paillier::EncryptionKey::from_n(R_j.N.clone());
         let cst_j = parties_shared_state.clone().chain_update(j.to_be_bytes());
 
         tracer.stage("Validate psi");
@@ -885,7 +882,7 @@ where
             .map(|msg| &msg.D)
             .try_fold(Scalar::<E>::zero(), |sum, D_ij| {
                 let alpha_ij = dec_i
-                    .decrypt_to_bigint(D_ij)
+                    .decrypt(D_ij)
                     .map_err(|_| Bug::PaillierDec(BugSource::alpha))?;
                 Ok::<_, Bug>(sum + alpha_ij.to_scalar())
             })?;
@@ -895,7 +892,7 @@ where
             .map(|msg| &msg.hat_D)
             .try_fold(Scalar::zero(), |sum, hat_D_ij| {
                 let hat_alpha_ij = dec_i
-                    .decrypt_to_bigint(hat_D_ij)
+                    .decrypt(hat_D_ij)
                     .map_err(|_| Bug::PaillierDec(BugSource::hat_alpha))?;
                 Ok::<_, Bug>(sum + hat_alpha_ij.to_scalar())
             })?;
@@ -916,7 +913,7 @@ where
                 b: Gamma,
             },
             &pi_log::PrivateData {
-                x: scalar_to_bignumber(&k_i),
+                x: utils::scalar_to_bignumber(&k_i),
                 nonce: rho_i.clone(),
             },
             &security_params.pi_log,
@@ -956,7 +953,7 @@ where
         round3_msgs.iter_indexed().zip(ciphertexts.iter_indexed())
     {
         let R_j = &R[usize::from(j)];
-        let enc_j = encryption_key_from_n(&R_j.N);
+        let enc_j = fast_paillier::EncryptionKey::from_n(R_j.N.clone());
 
         let data = pi_log::Data {
             key0: enc_j.clone(),

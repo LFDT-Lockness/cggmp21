@@ -7,7 +7,6 @@ mod non_threshold;
 
 use digest::Digest;
 use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
-use paillier_zk::unknown_order::BigNumber;
 use rand_core::{CryptoRng, RngCore};
 use round_based::Mpc;
 use thiserror::Error;
@@ -20,6 +19,7 @@ use crate::{
     utils::AbortBlame,
     ExecutionId,
 };
+use crate::{fast_paillier, rug::Integer};
 
 #[doc(no_inline)]
 pub use self::msg::{aux_only::Msg as AuxOnlyMsg, non_threshold::Msg as NonThresholdMsg};
@@ -44,8 +44,8 @@ pub mod msg {
 /// generated ahead of time
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PregeneratedPrimes<L = crate::default_choice::SecurityLevel> {
-    p: BigNumber,
-    q: BigNumber,
+    p: Integer,
+    q: Integer,
     _phantom: std::marker::PhantomData<L>,
 }
 
@@ -56,7 +56,7 @@ impl<L: SecurityLevel> PregeneratedPrimes<L> {
     ///
     /// Function doesn't validate that provided numbers are primes. If they're not,
     /// key refresh protocol should fail with some ZK proof error.
-    pub fn new(p: BigNumber, q: BigNumber) -> Option<Self> {
+    pub fn new(p: Integer, q: Integer) -> Option<Self> {
         if !crate::security_level::validate_secret_paillier_key_size::<L>(&p, &q) {
             None
         } else {
@@ -69,15 +69,15 @@ impl<L: SecurityLevel> PregeneratedPrimes<L> {
     }
 
     /// Returns `p, q`
-    pub fn split(self) -> (BigNumber, BigNumber) {
+    pub fn split(self) -> (Integer, Integer) {
         (self.p, self.q)
     }
 
     /// Generates primes. Takes some time.
     pub fn generate<R: RngCore>(rng: &mut R) -> Self {
         Self {
-            p: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
-            q: BigNumber::safe_prime_from_rng(4 * L::SECURITY_BITS, rng),
+            p: fast_paillier::utils::generate_safe_prime(rng, 4 * L::SECURITY_BITS),
+            q: fast_paillier::utils::generate_safe_prime(rng, 4 * L::SECURITY_BITS),
             _phantom: std::marker::PhantomData,
         }
     }
