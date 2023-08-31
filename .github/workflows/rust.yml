@@ -25,6 +25,7 @@ jobs:
         ssh-private-key: |
           ${{ secrets.GENERIC_EC_KEY }}
           ${{ secrets.PAILLIER_ZK_KEY }}
+          ${{ secrets.FAST_PAILLIER_KEY }}
     - name: Build
       run: cargo build --release
     - uses: actions/upload-artifact@v3
