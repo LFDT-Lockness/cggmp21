@@ -172,7 +172,7 @@ mod test {
         let n = (&p * &q).complete();
         let phi = (&p - 1u8).complete() * (&q - 1u8).complete();
 
-        let r = Integer::gen_inversible(&n, &mut rng);
+        let r = Integer::gen_invertible(&n, &mut rng);
         let lambda = phi
             .random_below_ref(&mut utils::external_rand(&mut rng))
             .into();
@@ -200,7 +200,7 @@ mod test {
         let n = (&p * &q).complete();
         let phi = (&p - 1u8).complete() * (&q - 1u8).complete();
 
-        let r = Integer::gen_inversible(&n, &mut rng);
+        let r = Integer::gen_invertible(&n, &mut rng);
         let lambda = phi
             .random_below_ref(&mut utils::external_rand(&mut rng))
             .into();

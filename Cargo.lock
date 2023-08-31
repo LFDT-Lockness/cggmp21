@@ -861,6 +861,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#e003d4fb38b776eead6822cef1126f7053dc409f"
 dependencies = [
  "digest",
  "fast-paillier",

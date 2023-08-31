@@ -223,7 +223,7 @@ pub fn generate_aux_data<L: SecurityLevel, R: RngCore + CryptoRng>(
 
             let φ_N = (p - 1u8).complete() * (q - 1u8).complete();
 
-            let r = Integer::gen_inversible(&N, rng);
+            let r = Integer::gen_invertible(&N, rng);
             let λ = φ_N.random_below_ref(&mut utils::external_rand(rng)).into();
 
             let t = r.square().modulo(&N);
@@ -263,7 +263,7 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
 
             let φ_N = (p - 1u8).complete() * (q - 1u8).complete();
 
-            let r = Integer::gen_inversible(&N, rng);
+            let r = Integer::gen_invertible(&N, rng);
             let λ = φ_N.random_below_ref(&mut utils::external_rand(rng)).into();
 
             let t = r.square().modulo(&N);

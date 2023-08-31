@@ -180,7 +180,7 @@ where
         .collect::<Vec<_>>();
 
     tracer.stage("Generate auxiliary params r, λ, t, s");
-    let r = Integer::gen_inversible(&N, rng);
+    let r = Integer::gen_invertible(&N, rng);
     let lambda = phi_N
         .random_below_ref(&mut utils::external_rand(rng))
         .into();

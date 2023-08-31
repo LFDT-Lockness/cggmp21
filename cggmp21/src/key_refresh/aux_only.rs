@@ -133,7 +133,7 @@ where
     let phi_N = (&p - 1u8).complete() * (&q - 1u8).complete();
 
     tracer.stage("Generate auxiliary params r, λ, t, s");
-    let r = Integer::gen_inversible(&N, rng);
+    let r = Integer::gen_invertible(&N, rng);
     let lambda = phi_N
         .random_below_ref(&mut utils::external_rand(rng))
         .into();

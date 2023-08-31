@@ -502,8 +502,8 @@ where
     let gamma_i = SecretScalar::<E>::random(rng);
     let k_i = SecretScalar::<E>::random(rng);
 
-    let v_i = Integer::gen_inversible(N_i, rng);
-    let rho_i = Integer::gen_inversible(N_i, rng);
+    let v_i = Integer::gen_invertible(N_i, rng);
+    let rho_i = Integer::gen_invertible(N_i, rng);
 
     tracer.stage("Encrypt G_i and K_i");
     let G_i = enc_i
