@@ -151,3 +151,9 @@ they are all documented in [the spec].
 [CGGMP21]: https://ia.cr/2021/060
 [the spec]: https://github.com/dfns-labs/cggmp21/tree/m/docs/spec.pdf
 [security guidelines]: #security-guidelines
+
+## Timing attacks
+Timing attacks are type of side-channel attacks that leak sensitive information through duration of
+execution. We consider timing attacks out of scope as they are nearly impossible to perform for such
+complicated protcol as CGGMP21 and impossible to do in our specific deployment. Thus, we intentionally
+don't do constant-time operations which gives us a significant performance boost.
