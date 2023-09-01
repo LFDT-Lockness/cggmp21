@@ -138,6 +138,16 @@ Alternatively, you can generate presignature and use it to sign data:
 **Never reuse presignatures!** If you use the same presignature to sign two different messages,
 it leaks private key to anyone who can observe the signatures.
 
+## SPOF code: Key Import and Export
+CGGMP21 protocol is designed to avoid Single Point of Failure by guaranteeing that attacker would
+need to compromise threshold amount of nodes to obtain a secret key. However, some use-cases may
+require you to create a SPOF, for instance, importing an existing key into TSS and exporting key
+from TSS.
+
+Such use-cases contradict to nature of MPC so we don't include those primitives by default.
+However, you may opt for them by enabling `spof` feature, then you can use `trusted_dealer`
+for key import and `key_share::reconstruct_secret_key` for key export.
+
 ## Implementation vs CGGMP21 paper differences
 Original CGGMP21 paper only defines non-threshold (n-out-of-n) protocol. To support threshold
 (t-out-of-n) signing, we defined our own CGGMP21-like key generation and threshold signing
