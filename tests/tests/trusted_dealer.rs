@@ -16,7 +16,7 @@ mod test {
         ell = 128,
         ell_prime = 128,
         m = 128,
-        q = (cggmp21::unknown_order::BigNumber::one() << 128) - 1,
+        q = (cggmp21::rug::Integer::ONE.clone() << 128) - 1,
     });
 
     #[test]

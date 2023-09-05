@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
+use cggmp21::security_level::SecurityLevel;
 use cggmp21::supported_curves::{Secp256k1, Secp256r1};
 use cggmp21::{security_level::ReasonablySecure, trusted_dealer};
-use cggmp21_tests::{PrecomputedKeyShares, PregeneratedPrimes};
+use cggmp21_tests::{generate_blum_prime, PrecomputedKeyShares, PregeneratedPrimes};
 use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 
@@ -63,8 +64,16 @@ where
             .filter(|t| t.map(|t| t <= n).unwrap_or(true))
         {
             eprintln!("t={t:?},n={n},curve={}", E::CURVE_NAME);
+            let primes = std::iter::repeat_with(|| {
+                let p = generate_blum_prime(rng, ReasonablySecure::SECURITY_BITS * 4);
+                let q = generate_blum_prime(rng, ReasonablySecure::SECURITY_BITS * 4);
+                (p, q)
+            })
+            .take(n.into())
+            .collect();
             let shares = trusted_dealer::builder::<E, ReasonablySecure>(n)
                 .set_threshold(t)
+                .set_pregenerated_primes(primes)
                 .generate_shares(rng)
                 .context("generate shares")?;
             cache.add_shares(t, n, &shares).context("add shares")?;

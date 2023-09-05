@@ -265,5 +265,5 @@ cggmp21::define_security_level!(CustomSecLevel {
     ell = 256,
     ell_prime = 824,
     m = 128,
-    q = cggmp21::unknown_order::BigNumber::one() << 128,
+    q = cggmp21::rug::Integer::ONE.clone() << 128,
 });

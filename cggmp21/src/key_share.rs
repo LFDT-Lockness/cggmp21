@@ -6,8 +6,8 @@ use std::{fmt, ops};
 use generic_ec::serde::{Compact, CurveName};
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient;
-use paillier_zk::libpaillier::unknown_order::BigNumber;
 use paillier_zk::paillier_encryption_in_range as π_enc;
+use paillier_zk::rug::{Complete, Integer};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
@@ -63,9 +63,9 @@ pub struct DirtyIncompleteKeyShare<E: Curve> {
 #[serde(bound = "")]
 pub struct DirtyAuxInfo<L: SecurityLevel = crate::default_choice::SecurityLevel> {
     /// Secret prime $p$
-    pub p: BigNumber,
+    pub p: Integer,
     /// Secret prime $q$
-    pub q: BigNumber,
+    pub q: Integer,
     /// Public auxiliary data of all parties sharing the key
     ///
     /// `parties[i]` corresponds to public auxiliary data of $\ith$ party
@@ -92,11 +92,11 @@ pub struct DirtyKeyShare<E: Curve, L: SecurityLevel = crate::default_choice::Sec
 #[serde(bound = "")]
 pub struct PartyAux {
     /// $N_i = p_i \cdot q_i$
-    pub N: BigNumber,
+    pub N: Integer,
     /// Ring-Perdesten parameter $s_i$
-    pub s: BigNumber,
+    pub s: Integer,
     /// Ring-Perdesten parameter $t_i$
-    pub t: BigNumber,
+    pub t: Integer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -206,11 +206,10 @@ impl<L: SecurityLevel> DirtyAuxInfo<L> {
     /// Performs consistency checks against aux info, returns a valid share
     /// you can use with other algorithms
     pub fn validate(&self) -> Result<(), InvalidKeyShare> {
-        if self
-            .parties
-            .iter()
-            .any(|p| p.s.gcd(&p.N) != BigNumber::one() || p.t.gcd(&p.N) != BigNumber::one())
-        {
+        if self.parties.iter().any(|p| {
+            p.s.gcd_ref(&p.N).complete() != *Integer::ONE
+                || p.t.gcd_ref(&p.N).complete() != *Integer::ONE
+        }) {
             return Err(InvalidKeyShareReason::StGcdN.into());
         }
 
@@ -225,7 +224,7 @@ impl<L: SecurityLevel> DirtyAuxInfo<L> {
         {
             return Err(InvalidKeyShareReason::PaillierPkTooSmall {
                 required: 8 * L::SECURITY_BITS - 1,
-                actual: invalid_aux.N.bit_length(),
+                actual: invalid_aux.N.significant_bits(),
             }
             .into());
         }
@@ -242,7 +241,7 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
         }
 
         let N_i = &self.aux.parties[usize::from(self.core.i)].N;
-        if *N_i != &self.aux.p * &self.aux.q {
+        if *N_i != (&self.aux.p * &self.aux.q).complete() {
             return Err(InvalidKeyShareReason::PrimesMul.into());
         }
 
@@ -591,7 +590,7 @@ enum InvalidKeyShareReason {
     #[error("paillier secret key doesn't match security level (primes are too small)")]
     PaillierSkTooSmall,
     #[error("paillier public key of one of the signers doesn't match security level: required bit length = {required}, actual = {actual}")]
-    PaillierPkTooSmall { required: usize, actual: usize },
+    PaillierPkTooSmall { required: u32, actual: u32 },
 }
 
 /// Error indicating that [key reconstruction](reconstruct_secret_key) failed

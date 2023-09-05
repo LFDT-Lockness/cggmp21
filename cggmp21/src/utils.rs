@@ -1,11 +1,10 @@
 use digest::Digest;
 use generic_ec::{Curve, Scalar};
-use paillier_zk::libpaillier::{unknown_order::BigNumber, EncryptionKey};
+use paillier_zk::rug::{self, Integer};
 use paillier_zk::{
     group_element_vs_paillier_encryption_in_range as pi_log,
     paillier_affine_operation_in_range as pi_aff, paillier_encryption_in_range as pi_enc,
 };
-use rand_core::RngCore;
 use round_based::rounds_router::simple_store::RoundMsgs;
 use round_based::{MsgId, PartyIndex};
 use serde::Serialize;
@@ -13,31 +12,11 @@ use thiserror::Error;
 
 use crate::security_level::SecurityLevel;
 
-/// Samples $x \gets \Z^*_N$
-pub fn sample_bigint_in_mult_group<R: RngCore>(rng: &mut R, N: &BigNumber) -> BigNumber {
-    loop {
-        let x = BigNumber::from_rng(N, rng);
-        if x.gcd(N) == BigNumber::one() {
-            break x;
-        }
-    }
-}
+pub use paillier_zk::fast_paillier::utils::external_rand;
 
-/// Constructs `EncryptionKey` from $N = p * q$
-///
-/// `EncryptionKey` from `libpaillier` currently lack of this constructor. This function should
-/// be removed once [PR] is merged and changes are released.
-///
-/// [PR]: https://github.com/mikelodder7/paillier-rs/pull/6
-pub fn encryption_key_from_n(N: &BigNumber) -> EncryptionKey {
-    // `expect` usage excuse: we reviewed code of `from_bytes` constructor, it never returns error.
-    #[allow(clippy::expect_used)]
-    EncryptionKey::from_bytes(N.to_bytes()).expect("`from_bytes` should never fail")
-}
-
-/// Converts `&Scalar<E>` into BigNumber
-pub fn scalar_to_bignumber<E: Curve>(scalar: impl AsRef<Scalar<E>>) -> BigNumber {
-    BigNumber::from_slice(scalar.as_ref().to_be_bytes())
+/// Converts `&Scalar<E>` into Integer
+pub fn scalar_to_bignumber<E: Curve>(scalar: impl AsRef<Scalar<E>>) -> Integer {
+    Integer::from_digits(&scalar.as_ref().to_be_bytes(), rug::integer::Order::Msf)
 }
 
 pub struct SecurityParams {
@@ -209,23 +188,12 @@ pub fn but_nth<T, I: IntoIterator<Item = T>>(n: u16, iter: I) -> impl Iterator<I
 
 /// Binary search for rounded down square root. For non-positive numbers returns
 /// one
-pub fn sqrt(x: &BigNumber) -> BigNumber {
-    let mut low = BigNumber::one();
-    let mut high = x.clone();
-    while low < &high - 1 {
-        let mid: BigNumber = (&high + &low) / 2;
-        let test = &mid * &mid;
-        match test.cmp(x) {
-            std::cmp::Ordering::Equal => return mid,
-            std::cmp::Ordering::Less => {
-                low = mid;
-            }
-            std::cmp::Ordering::Greater => {
-                high = mid;
-            }
-        }
+pub fn sqrt(x: &Integer) -> Integer {
+    if x.cmp0().is_le() {
+        Integer::ONE.clone()
+    } else {
+        x.sqrt_ref().into()
     }
-    low
 }
 
 /// Partition into vector of errors and vector of values
@@ -254,34 +222,54 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Opt
         .collect()
 }
 
+/// Generates **unsafe** blum primes
+///
+/// Blum primes are faster to generate than safe primes, and they don't break correctness of CGGMP protocol.
+/// However, they do break security of the protocol.
+///
+/// Only supposed to be used in the tests.
+#[cfg(test)]
+pub fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) -> Integer {
+    loop {
+        let mut n: Integer = Integer::random_bits(bits_size, &mut external_rand(rng)).into();
+        n.set_bit(bits_size - 1, true);
+        n.next_prime_mut();
+
+        if n.mod_u(4) == 3 {
+            break n;
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use paillier_zk::rug::Complete;
+
     #[test]
     fn test_sqrt() {
-        use super::{sqrt, BigNumber};
-        assert_eq!(sqrt(&BigNumber::from(-5)), BigNumber::from(1));
-        assert_eq!(sqrt(&BigNumber::from(1)), BigNumber::from(1));
-        assert_eq!(sqrt(&BigNumber::from(2)), BigNumber::from(1));
-        assert_eq!(sqrt(&BigNumber::from(3)), BigNumber::from(1));
-        assert_eq!(sqrt(&BigNumber::from(4)), BigNumber::from(2));
-        assert_eq!(sqrt(&BigNumber::from(5)), BigNumber::from(2));
-        assert_eq!(sqrt(&BigNumber::from(6)), BigNumber::from(2));
-        assert_eq!(sqrt(&BigNumber::from(7)), BigNumber::from(2));
-        assert_eq!(sqrt(&BigNumber::from(8)), BigNumber::from(2));
-        assert_eq!(sqrt(&BigNumber::from(9)), BigNumber::from(3));
-        assert_eq!(
-            sqrt(&(BigNumber::from(1) << 1024)),
-            BigNumber::from(1) << 512
-        );
+        use super::{sqrt, Integer};
+        assert_eq!(sqrt(&Integer::from(-5)), Integer::from(1));
+        assert_eq!(sqrt(&Integer::from(1)), Integer::from(1));
+        assert_eq!(sqrt(&Integer::from(2)), Integer::from(1));
+        assert_eq!(sqrt(&Integer::from(3)), Integer::from(1));
+        assert_eq!(sqrt(&Integer::from(4)), Integer::from(2));
+        assert_eq!(sqrt(&Integer::from(5)), Integer::from(2));
+        assert_eq!(sqrt(&Integer::from(6)), Integer::from(2));
+        assert_eq!(sqrt(&Integer::from(7)), Integer::from(2));
+        assert_eq!(sqrt(&Integer::from(8)), Integer::from(2));
+        assert_eq!(sqrt(&Integer::from(9)), Integer::from(3));
+        assert_eq!(sqrt(&(Integer::from(1) << 1024)), Integer::from(1) << 512);
 
-        let modulo = BigNumber::one() << 1024;
+        let modulo = (Integer::ONE << 1024_u32).complete();
         let mut rng = rand_dev::DevRng::new();
         for _ in 0..100 {
-            let x = BigNumber::from_rng(&modulo, &mut rng);
+            let x = modulo
+                .random_below_ref(&mut super::external_rand(&mut rng))
+                .into();
             let root = sqrt(&x);
-            assert!(&root * &root <= x);
-            let root: BigNumber = root + 1;
-            assert!(&root * &root > x);
+            assert!(root.square_ref().complete() <= x);
+            let root = root + 1u8;
+            assert!(root.square_ref().complete() > x);
         }
     }
 }
