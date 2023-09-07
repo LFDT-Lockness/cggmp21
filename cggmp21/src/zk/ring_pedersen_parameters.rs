@@ -4,7 +4,6 @@ use digest::{typenum::U32, Digest};
 use paillier_zk::{
     fast_paillier::utils,
     rug::{self, Complete, Integer},
-    IntegerExt,
 };
 use rand_core::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -107,7 +106,7 @@ where
     for (z_ref, e) in zs.iter_mut().zip(&challenge.es) {
         if *e {
             *z_ref += lambda;
-            *z_ref = z_ref.modulo(phi);
+            z_ref.modulo_mut(phi);
         }
     }
     Ok(Proof { commitment, zs })
