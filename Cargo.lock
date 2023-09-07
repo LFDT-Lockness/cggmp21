@@ -450,7 +450,7 @@ dependencies = [
 [[package]]
 name = "fast-paillier"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/fast-paillier?branch=m#fec7aa7e80b7e9364d48e4d73d1100c1b6b765c2"
+source = "git+https://github.com/dfns-labs/fast-paillier?branch=m#09ba60ec8c6be5d725433cca6b31d714b8caca61"
 dependencies = [
  "bytemuck",
  "rand_core",
@@ -861,7 +861,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#e003d4fb38b776eead6822cef1126f7053dc409f"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#b344dd32cb8704e4f730e613e47b6adc6dbc238d"
 dependencies = [
  "digest",
  "fast-paillier",
@@ -1052,9 +1052,9 @@ dependencies = [
 
 [[package]]
 name = "rug"
-version = "1.20.1"
+version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "240ad7cbc5fc7cea4592203f8f6100835e8ad083196491b8a9c84ce84711ff68"
+checksum = "8882d6fd62b334b72dcf5c79f7e6b529d6790322de14bb49339415266131b031"
 dependencies = [
  "az",
  "gmp-mpfr-sys",
