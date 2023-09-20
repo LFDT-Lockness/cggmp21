@@ -940,7 +940,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#91cf66651671c9cf1b7a4d5ca4b7827b1d76a802"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=precomp#43f50aed7b9593027fc722399bcf2541759a6f5d"
 dependencies = [
  "digest",
  "fast-paillier",
@@ -1118,7 +1118,7 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#46bdc24d29377b862efed738c0008000adc673e8"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#f626f96e20a5a06753fe7ff52f8bf9e9eee526d2"
 dependencies = [
  "async-stream",
  "bincode",
@@ -1136,7 +1136,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.1.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#46bdc24d29377b862efed738c0008000adc673e8"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#f626f96e20a5a06753fe7ff52f8bf9e9eee526d2"
 dependencies = [
  "proc-macro2",
  "quote",

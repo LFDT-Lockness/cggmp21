@@ -97,6 +97,7 @@ pub async fn run_aux_gen<R, M, L, D>(
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
+    compute_multiexp_table: bool,
 ) -> Result<AuxInfo<L>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
@@ -109,7 +110,9 @@ where
     tracer.stage("Retrieve auxiliary data");
 
     tracer.stage("Setup networking");
-    let MpcParty { delivery, .. } = party.into_party();
+    let MpcParty {
+        delivery, blocking, ..
+    } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     let mut rounds = RoundsRouter::<Msg<D, L>>::builder();
@@ -354,6 +357,7 @@ where
                 s: d.s.clone(),
                 t: d.t.clone(),
                 rsa_modulo: d.N.clone(),
+                multiexp: None,
             },
             π_fac::Data {
                 n: &N,
@@ -419,6 +423,7 @@ where
         s: s.clone(),
         t: t.clone(),
         rsa_modulo: N.clone(),
+        multiexp: None,
     };
     let blame = collect_blame(
         &decommitments,
@@ -453,15 +458,30 @@ where
             N: d.N.clone(),
             s: d.s.clone(),
             t: d.t.clone(),
+            multiexp: None,
         })
         .collect();
-    let aux = DirtyAuxInfo {
+    let mut aux: AuxInfo<L> = DirtyAuxInfo {
         p,
         q,
         parties: party_auxes,
         security_level: std::marker::PhantomData,
-    };
+    }
+    .try_into()
+    .map_err(Bug::InvalidShareGenerated)?;
+
+    if compute_multiexp_table {
+        tracer.stage("Precompute multiexp tables");
+        aux = blocking
+            .spawn(move || {
+                aux.precompute_multiexp_tables()?;
+                Ok(aux)
+            })
+            .await
+            .map_err(|err| Bug::SpawnBlocking(Box::new(err)))?
+            .map_err(Bug::BuildMultiexpTables)?
+    }
 
     tracer.protocol_ends();
-    Ok(aux.try_into().map_err(Bug::InvalidShareGenerated)?)
+    Ok(aux)
 }

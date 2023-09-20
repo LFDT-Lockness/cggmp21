@@ -1,6 +1,7 @@
 //! Key share
 
 use std::convert::TryFrom;
+use std::sync::Arc;
 use std::{fmt, ops};
 
 use generic_ec::serde::{Compact, CurveName};
@@ -97,6 +98,8 @@ pub struct PartyAux {
     pub s: Integer,
     /// Ring-Perdesten parameter $t_i$
     pub t: Integer,
+    /// Precomputed table for faster multiexponentiation
+    pub multiexp: Option<Arc<paillier_zk::multiexp::MultiexpTable>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -198,6 +201,40 @@ impl<E: Curve> DirtyIncompleteKeyShare<E> {
         if self.shared_public_key != self.public_shares.iter().sum::<Point<E>>() {
             return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
         }
+        Ok(())
+    }
+}
+
+impl<L: SecurityLevel> AuxInfo<L> {
+    /// Precomputes multiexponentiation tables
+    ///
+    /// Enables optimization that makes signing and presigning faster. Precomputation may take a while.
+    /// It noticebly increases size of aux data both in RAM and on disk (after serialization).
+    ///
+    /// Returns error if building a multiexp table failed. In this case, the key share stays unmodified.
+    /// On success, multiexp tables are saved into the key share (old tables, if present, are overwritten).
+    pub fn precompute_multiexp_tables(&mut self) -> Result<(), InvalidKeyShare> {
+        let (x_bits, y_bits) = crate::security_level::max_exponents_size::<L>();
+        let tables = self
+            .parties
+            .iter()
+            .map(|aux_i| {
+                paillier_zk::multiexp::MultiexpTable::build(
+                    &aux_i.s,
+                    &aux_i.t,
+                    x_bits,
+                    y_bits,
+                    aux_i.N.clone(),
+                )
+                .map(Arc::new)
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or(InvalidKeyShareReason::BuildMultiexpTable)?;
+        self.0
+            .parties
+            .iter_mut()
+            .zip(tables)
+            .for_each(|(aux_i, table_i)| aux_i.multiexp = Some(table_i));
         Ok(())
     }
 }
@@ -475,6 +512,7 @@ impl From<&PartyAux> for π_enc::Aux {
             s: aux.s.clone(),
             t: aux.t.clone(),
             rsa_modulo: aux.N.clone(),
+            multiexp: aux.multiexp.clone(),
         }
     }
 }
@@ -591,6 +629,8 @@ enum InvalidKeyShareReason {
     PaillierSkTooSmall,
     #[error("paillier public key of one of the signers doesn't match security level: required bit length = {required}, actual = {actual}")]
     PaillierPkTooSmall { required: u32, actual: u32 },
+    #[error("couldn't build a multiexp table")]
+    BuildMultiexpTable,
 }
 
 /// Error indicating that [key reconstruction](reconstruct_secret_key) failed

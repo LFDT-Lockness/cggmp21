@@ -216,37 +216,7 @@ pub fn generate_aux_data<L: SecurityLevel, R: RngCore + CryptoRng>(
             .take(n.into())
             .collect::<Vec<_>>();
 
-    let public_aux_data = primes
-        .iter()
-        .map(|(p, q)| {
-            let N = (p * q).complete();
-
-            let φ_N = (p - 1u8).complete() * (q - 1u8).complete();
-
-            let r = Integer::gen_invertible(&N, rng);
-            let λ = φ_N.random_below_ref(&mut utils::external_rand(rng)).into();
-
-            let t = r.square().modulo(&N);
-            let s = t.pow_mod_ref(&λ, &N).ok_or(Reason::PowMod)?.into();
-
-            Ok(PartyAux { N, s, t })
-        })
-        .collect::<Result<Vec<_>, Reason>>()?;
-
-    primes
-        .into_iter()
-        .map(|(p, q)| {
-            DirtyAuxInfo {
-                p,
-                q,
-                parties: public_aux_data.clone(),
-                security_level: PhantomData,
-            }
-            .try_into()
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Reason::InvalidKeyShare)
-        .map_err(TrustedDealerError)
+    generate_aux_data_with_primes(rng, primes)
 }
 
 /// Generates auxiliary data for `n` signers using provided pregenerated primes
@@ -269,7 +239,12 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
             let t = r.square().modulo(&N);
             let s = t.pow_mod_ref(&λ, &N).ok_or(Reason::PowMod)?.into();
 
-            Ok(PartyAux { N, s, t })
+            Ok(PartyAux {
+                N,
+                s,
+                t,
+                multiexp: None,
+            })
         })
         .collect::<Result<Vec<_>, Reason>>()?;
 
