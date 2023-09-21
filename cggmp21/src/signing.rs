@@ -532,12 +532,12 @@ where
             parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &R_j.into(),
             &pi_enc::Data {
-                key: enc_i.clone(),
-                ciphertext: K_i.clone(),
+                key: &dec_i,
+                ciphertext: &K_i,
             },
             &pi_enc::PrivateData {
-                plaintext: utils::scalar_to_bignumber(&k_i),
-                nonce: rho_i.clone(),
+                plaintext: &utils::scalar_to_bignumber(&k_i),
+                nonce: &rho_i,
             },
             &security_params.pi_enc,
             &mut *rng,
@@ -619,8 +619,8 @@ where
                 parties_shared_state.clone().chain_update(j.to_be_bytes()),
                 &R_i.into(),
                 &pi_enc::Data {
-                    key: fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
-                    ciphertext: ciphertext.K.clone(),
+                    key: &fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
+                    ciphertext: &ciphertext.K,
                 },
                 &proof.psi0.0,
                 &security_params.pi_enc,
