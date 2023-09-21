@@ -476,7 +476,6 @@ where
     tracer.stage("Retrieve auxiliary data");
     let R_i = &R[usize::from(i)];
     let N_i = &R_i.N;
-    let enc_i = fast_paillier::EncryptionKey::from_n(N_i.clone());
     let dec_i: fast_paillier::DecryptionKey =
         fast_paillier::DecryptionKey::from_primes(p_i.clone(), q_i.clone())
             .map_err(|_| Bug::InvalidOwnPaillierKey)?;
@@ -750,14 +749,14 @@ where
             psi_cst,
             &R_j.into(),
             &pi_log::Data {
-                key0: enc_i.clone(),
-                c: G_i.clone(),
-                x: Gamma_i,
-                b: Point::<E>::generator().to_point(),
+                key0: &dec_i,
+                c: &G_i,
+                x: &Gamma_i,
+                b: &Point::<E>::generator().to_point(),
             },
             &pi_log::PrivateData {
-                x: utils::scalar_to_bignumber(&gamma_i),
-                nonce: v_i.clone(),
+                x: &utils::scalar_to_bignumber(&gamma_i),
+                nonce: &v_i,
             },
             &security_params.pi_log,
             &mut *rng,
@@ -846,10 +845,10 @@ where
             cst_j,
             &R_i.into(),
             &pi_log::Data {
-                key0: enc_j.clone(),
-                c: ciphertexts.G.clone(),
-                x: msg.Gamma,
-                b: Point::<E>::generator().to_point(),
+                key0: &enc_j,
+                c: &ciphertexts.G,
+                x: &msg.Gamma,
+                b: &Point::<E>::generator().to_point(),
             },
             &msg.psi_prime.0,
             &security_params.pi_log,
@@ -907,14 +906,14 @@ where
             parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &R_j.into(),
             &pi_log::Data {
-                key0: enc_i.clone(),
-                c: K_i.clone(),
-                x: Delta_i,
-                b: Gamma,
+                key0: &dec_i,
+                c: &K_i,
+                x: &Delta_i,
+                b: &Gamma,
             },
             &pi_log::PrivateData {
-                x: utils::scalar_to_bignumber(&k_i),
-                nonce: rho_i.clone(),
+                x: &utils::scalar_to_bignumber(&k_i),
+                nonce: &rho_i,
             },
             &security_params.pi_log,
             &mut *rng,
@@ -956,10 +955,10 @@ where
         let enc_j = fast_paillier::EncryptionKey::from_n(R_j.N.clone());
 
         let data = pi_log::Data {
-            key0: enc_j.clone(),
-            c: ciphertext_j.K.clone(),
-            x: msg_j.Delta,
-            b: Gamma,
+            key0: &enc_j,
+            c: &ciphertext_j.K,
+            x: &msg_j.Delta,
+            b: &Gamma,
         };
 
         if pi_log::non_interactive::verify(
