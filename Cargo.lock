@@ -450,7 +450,7 @@ dependencies = [
 [[package]]
 name = "fast-paillier"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/fast-paillier?branch=m#ed548d608db37482bcb9e854f3ee1dee2d6cf9b9"
+source = "git+https://github.com/dfns-labs/fast-paillier?branch=enc-trait#72b2fc654e4f9af3172204ca0ae9a3e0bcd5f66e"
 dependencies = [
  "bytemuck",
  "rand_core",
