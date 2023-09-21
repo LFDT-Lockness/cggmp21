@@ -268,6 +268,20 @@ impl<L: SecurityLevel> DirtyAuxInfo<L> {
 
         Ok(())
     }
+
+    /// Returns size of all multiexp tables (in bytes) stored within key share
+    pub fn multiexp_tables_size(&self) -> usize {
+        self.parties
+            .iter()
+            .map(|aux_i| {
+                aux_i
+                    .multiexp
+                    .as_ref()
+                    .map(|t| t.size_in_bytes())
+                    .unwrap_or(0)
+            })
+            .sum()
+    }
 }
 
 impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {

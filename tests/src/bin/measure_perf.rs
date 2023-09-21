@@ -219,6 +219,14 @@ async fn do_becnhmarks<L: SecurityLevel>(args: Args) {
             let took = std::time::Instant::now().duration_since(start);
 
             println!("Precompute multiexp tables (avg): {:?}", took / n.into());
+            println!(
+                "Size of multiexp tables per key share: {} bytes",
+                aux_data[0].multiexp_tables_size()
+            );
+            println!(
+                "Size of exponents: {:?}",
+                cggmp21::security_level::max_exponents_size::<L>()
+            );
             println!();
         }
 
