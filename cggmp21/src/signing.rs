@@ -506,10 +506,10 @@ where
     let rho_i = Integer::gen_invertible(N_i, rng);
 
     tracer.stage("Encrypt G_i and K_i");
-    let G_i = enc_i
+    let G_i = dec_i
         .encrypt_with(&utils::scalar_to_bignumber(&gamma_i), &v_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::G_i))?;
-    let K_i = enc_i
+    let K_i = dec_i
         .encrypt_with(&utils::scalar_to_bignumber(&k_i), &rho_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::K_i))?;
 
@@ -675,7 +675,7 @@ where
         };
 
         tracer.stage("Encrypt F_ji");
-        let F_ji = enc_i
+        let F_ji = dec_i
             .encrypt_with(&(-&beta_ij).complete(), &r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::F_ji))?;
 
@@ -694,7 +694,7 @@ where
         };
 
         tracer.stage("Encrypt hat_F_ji");
-        let hat_F_ji = enc_i
+        let hat_F_ji = dec_i
             .encrypt_with(&(-&hat_beta_ij).complete(), &hat_r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::hat_F))?;
 
