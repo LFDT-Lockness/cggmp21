@@ -530,11 +530,11 @@ where
         let psi0 = pi_enc::non_interactive::prove(
             parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &R_j.into(),
-            &pi_enc::Data {
+            pi_enc::Data {
                 key: &dec_i,
                 ciphertext: &K_i,
             },
-            &pi_enc::PrivateData {
+            pi_enc::PrivateData {
                 plaintext: &utils::scalar_to_bignumber(&k_i),
                 nonce: &rho_i,
             },
@@ -617,7 +617,7 @@ where
             if pi_enc::non_interactive::verify(
                 parties_shared_state.clone().chain_update(j.to_be_bytes()),
                 &R_i.into(),
-                &pi_enc::Data {
+                pi_enc::Data {
                     key: &fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
                     ciphertext: &ciphertext.K,
                 },
@@ -702,7 +702,7 @@ where
         let psi_ji = pi_aff::non_interactive::prove(
             psi_cst.clone(),
             &R_j.into(),
-            &pi_aff::Data {
+            pi_aff::Data {
                 key0: &enc_j,
                 key1: &dec_i,
                 c: &ciphertext_j.K,
@@ -710,7 +710,7 @@ where
                 y: &F_ji,
                 x: &Gamma_i,
             },
-            &pi_aff::PrivateData {
+            pi_aff::PrivateData {
                 x: &utils::scalar_to_bignumber(&gamma_i),
                 y: &(-&beta_ij).complete(),
                 nonce: &s_ij,
@@ -725,7 +725,7 @@ where
         let hat_psi_ji = pi_aff::non_interactive::prove(
             psi_cst.clone(),
             &R_j.into(),
-            &pi_aff::Data {
+            pi_aff::Data {
                 key0: &enc_j,
                 key1: &dec_i,
                 c: &ciphertext_j.K,
@@ -733,7 +733,7 @@ where
                 y: &hat_F_ji,
                 x: &(Point::generator() * x_i),
             },
-            &pi_aff::PrivateData {
+            pi_aff::PrivateData {
                 x: &utils::scalar_to_bignumber(x_i),
                 y: &(-&hat_beta_ij).complete(),
                 nonce: &hat_s_ij,
@@ -748,13 +748,13 @@ where
         let psi_prime_ji = pi_log::non_interactive::prove(
             psi_cst,
             &R_j.into(),
-            &pi_log::Data {
+            pi_log::Data {
                 key0: &dec_i,
                 c: &G_i,
                 x: &Gamma_i,
                 b: &Point::<E>::generator().to_point(),
             },
-            &pi_log::PrivateData {
+            pi_log::PrivateData {
                 x: &utils::scalar_to_bignumber(&gamma_i),
                 nonce: &v_i,
             },
@@ -808,7 +808,7 @@ where
         let psi_invalid = pi_aff::non_interactive::verify(
             cst_j.clone(),
             &R_i.into(),
-            &pi_aff::Data {
+            pi_aff::Data {
                 key0: &dec_i,
                 key1: &enc_j,
                 c: &K_i,
@@ -826,7 +826,7 @@ where
         let hat_psi_invalid = pi_aff::non_interactive::verify(
             cst_j.clone(),
             &R_i.into(),
-            &pi_aff::Data {
+            pi_aff::Data {
                 key0: &dec_i,
                 key1: &enc_j,
                 c: &K_i,
@@ -844,7 +844,7 @@ where
         let psi_prime_invalid = pi_log::non_interactive::verify(
             cst_j,
             &R_i.into(),
-            &pi_log::Data {
+            pi_log::Data {
                 key0: &enc_j,
                 c: &ciphertexts.G,
                 x: &msg.Gamma,
@@ -905,13 +905,13 @@ where
         let psi_prime_prime = pi_log::non_interactive::prove(
             parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &R_j.into(),
-            &pi_log::Data {
+            pi_log::Data {
                 key0: &dec_i,
                 c: &K_i,
                 x: &Delta_i,
                 b: &Gamma,
             },
-            &pi_log::PrivateData {
+            pi_log::PrivateData {
                 x: &utils::scalar_to_bignumber(&k_i),
                 nonce: &rho_i,
             },
@@ -964,7 +964,7 @@ where
         if pi_log::non_interactive::verify(
             parties_shared_state.clone().chain_update(j.to_be_bytes()),
             &R_i.into(),
-            &data,
+            data,
             &msg_j.psi_prime_prime.0,
             &security_params.pi_log,
             &msg_j.psi_prime_prime.1,
