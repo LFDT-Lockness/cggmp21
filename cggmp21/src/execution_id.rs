@@ -3,6 +3,7 @@
 /// Each protocol execution must have unique execution ID. All signers taking part in the protocol
 /// (keygen/signing/etc.) must share the same execution ID, otherwise protocol will abort with
 /// unverbose error.
+#[derive(Clone, Copy)]
 pub struct ExecutionId<'id> {
     id: &'id [u8],
 }
@@ -18,11 +19,3 @@ impl<'id> ExecutionId<'id> {
         self.id
     }
 }
-
-impl<'id> Clone for ExecutionId<'id> {
-    fn clone(&self) -> Self {
-        Self { id: self.id }
-    }
-}
-
-impl<'id> Copy for ExecutionId<'id> {}
