@@ -476,7 +476,6 @@ where
     tracer.stage("Retrieve auxiliary data");
     let R_i = &R[usize::from(i)];
     let N_i = &R_i.N;
-    let enc_i = fast_paillier::EncryptionKey::from_n(N_i.clone());
     let dec_i: fast_paillier::DecryptionKey =
         fast_paillier::DecryptionKey::from_primes(p_i.clone(), q_i.clone())
             .map_err(|_| Bug::InvalidOwnPaillierKey)?;
@@ -506,10 +505,10 @@ where
     let rho_i = Integer::gen_invertible(N_i, rng);
 
     tracer.stage("Encrypt G_i and K_i");
-    let G_i = enc_i
+    let G_i = dec_i
         .encrypt_with(&utils::scalar_to_bignumber(&gamma_i), &v_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::G_i))?;
-    let K_i = enc_i
+    let K_i = dec_i
         .encrypt_with(&utils::scalar_to_bignumber(&k_i), &rho_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::K_i))?;
 
@@ -531,13 +530,13 @@ where
         let psi0 = pi_enc::non_interactive::prove(
             parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &R_j.into(),
-            &pi_enc::Data {
-                key: enc_i.clone(),
-                ciphertext: K_i.clone(),
+            pi_enc::Data {
+                key: &dec_i,
+                ciphertext: &K_i,
             },
-            &pi_enc::PrivateData {
-                plaintext: utils::scalar_to_bignumber(&k_i),
-                nonce: rho_i.clone(),
+            pi_enc::PrivateData {
+                plaintext: &utils::scalar_to_bignumber(&k_i),
+                nonce: &rho_i,
             },
             &security_params.pi_enc,
             &mut *rng,
@@ -618,9 +617,9 @@ where
             if pi_enc::non_interactive::verify(
                 parties_shared_state.clone().chain_update(j.to_be_bytes()),
                 &R_i.into(),
-                &pi_enc::Data {
-                    key: fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
-                    ciphertext: ciphertext.K.clone(),
+                pi_enc::Data {
+                    key: &fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
+                    ciphertext: &ciphertext.K,
                 },
                 &proof.psi0.0,
                 &security_params.pi_enc,
@@ -675,7 +674,7 @@ where
         };
 
         tracer.stage("Encrypt F_ji");
-        let F_ji = enc_i
+        let F_ji = dec_i
             .encrypt_with(&(-&beta_ij).complete(), &r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::F_ji))?;
 
@@ -694,7 +693,7 @@ where
         };
 
         tracer.stage("Encrypt hat_F_ji");
-        let hat_F_ji = enc_i
+        let hat_F_ji = dec_i
             .encrypt_with(&(-&hat_beta_ij).complete(), &hat_r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::hat_F))?;
 
@@ -703,19 +702,19 @@ where
         let psi_ji = pi_aff::non_interactive::prove(
             psi_cst.clone(),
             &R_j.into(),
-            &pi_aff::Data {
-                key0: enc_j.clone(),
-                key1: enc_i.clone(),
-                c: ciphertext_j.K.clone(),
-                d: D_ji.clone(),
-                y: F_ji.clone(),
-                x: Gamma_i,
+            pi_aff::Data {
+                key0: &enc_j,
+                key1: &dec_i,
+                c: &ciphertext_j.K,
+                d: &D_ji,
+                y: &F_ji,
+                x: &Gamma_i,
             },
-            &pi_aff::PrivateData {
-                x: utils::scalar_to_bignumber(&gamma_i),
-                y: (-&beta_ij).complete(),
-                nonce: s_ij.clone(),
-                nonce_y: r_ij.clone(),
+            pi_aff::PrivateData {
+                x: &utils::scalar_to_bignumber(&gamma_i),
+                y: &(-&beta_ij).complete(),
+                nonce: &s_ij,
+                nonce_y: &r_ij,
             },
             &security_params.pi_aff,
             &mut *rng,
@@ -726,19 +725,19 @@ where
         let hat_psi_ji = pi_aff::non_interactive::prove(
             psi_cst.clone(),
             &R_j.into(),
-            &pi_aff::Data {
-                key0: enc_j.clone(),
-                key1: enc_i.clone(),
-                c: ciphertext_j.K.clone(),
-                d: hat_D_ji.clone(),
-                y: hat_F_ji.clone(),
-                x: Point::generator() * x_i,
+            pi_aff::Data {
+                key0: &enc_j,
+                key1: &dec_i,
+                c: &ciphertext_j.K,
+                d: &hat_D_ji,
+                y: &hat_F_ji,
+                x: &(Point::generator() * x_i),
             },
-            &pi_aff::PrivateData {
-                x: utils::scalar_to_bignumber(x_i),
-                y: (-&hat_beta_ij).complete(),
-                nonce: hat_s_ij.clone(),
-                nonce_y: hat_r_ij.clone(),
+            pi_aff::PrivateData {
+                x: &utils::scalar_to_bignumber(x_i),
+                y: &(-&hat_beta_ij).complete(),
+                nonce: &hat_s_ij,
+                nonce_y: &hat_r_ij,
             },
             &security_params.pi_aff,
             &mut *rng,
@@ -749,15 +748,15 @@ where
         let psi_prime_ji = pi_log::non_interactive::prove(
             psi_cst,
             &R_j.into(),
-            &pi_log::Data {
-                key0: enc_i.clone(),
-                c: G_i.clone(),
-                x: Gamma_i,
-                b: Point::<E>::generator().to_point(),
+            pi_log::Data {
+                key0: &dec_i,
+                c: &G_i,
+                x: &Gamma_i,
+                b: &Point::<E>::generator().to_point(),
             },
-            &pi_log::PrivateData {
-                x: utils::scalar_to_bignumber(&gamma_i),
-                nonce: v_i.clone(),
+            pi_log::PrivateData {
+                x: &utils::scalar_to_bignumber(&gamma_i),
+                nonce: &v_i,
             },
             &security_params.pi_log,
             &mut *rng,
@@ -809,13 +808,13 @@ where
         let psi_invalid = pi_aff::non_interactive::verify(
             cst_j.clone(),
             &R_i.into(),
-            &pi_aff::Data {
-                key0: enc_i.clone(),
-                key1: enc_j.clone(),
-                c: K_i.clone(),
-                d: msg.D.clone(),
-                y: msg.F.clone(),
-                x: msg.Gamma,
+            pi_aff::Data {
+                key0: &dec_i,
+                key1: &enc_j,
+                c: &K_i,
+                d: &msg.D,
+                y: &msg.F,
+                x: &msg.Gamma,
             },
             &msg.psi.0,
             &security_params.pi_aff,
@@ -827,13 +826,13 @@ where
         let hat_psi_invalid = pi_aff::non_interactive::verify(
             cst_j.clone(),
             &R_i.into(),
-            &pi_aff::Data {
-                key0: enc_i.clone(),
-                key1: enc_j.clone(),
-                c: K_i.clone(),
-                d: msg.hat_D.clone(),
-                y: msg.hat_F.clone(),
-                x: X_j,
+            pi_aff::Data {
+                key0: &dec_i,
+                key1: &enc_j,
+                c: &K_i,
+                d: &msg.hat_D,
+                y: &msg.hat_F,
+                x: &X_j,
             },
             &msg.hat_psi.0,
             &security_params.pi_aff,
@@ -845,11 +844,11 @@ where
         let psi_prime_invalid = pi_log::non_interactive::verify(
             cst_j,
             &R_i.into(),
-            &pi_log::Data {
-                key0: enc_j.clone(),
-                c: ciphertexts.G.clone(),
-                x: msg.Gamma,
-                b: Point::<E>::generator().to_point(),
+            pi_log::Data {
+                key0: &enc_j,
+                c: &ciphertexts.G,
+                x: &msg.Gamma,
+                b: &Point::<E>::generator().to_point(),
             },
             &msg.psi_prime.0,
             &security_params.pi_log,
@@ -906,15 +905,15 @@ where
         let psi_prime_prime = pi_log::non_interactive::prove(
             parties_shared_state.clone().chain_update(i.to_be_bytes()),
             &R_j.into(),
-            &pi_log::Data {
-                key0: enc_i.clone(),
-                c: K_i.clone(),
-                x: Delta_i,
-                b: Gamma,
+            pi_log::Data {
+                key0: &dec_i,
+                c: &K_i,
+                x: &Delta_i,
+                b: &Gamma,
             },
-            &pi_log::PrivateData {
-                x: utils::scalar_to_bignumber(&k_i),
-                nonce: rho_i.clone(),
+            pi_log::PrivateData {
+                x: &utils::scalar_to_bignumber(&k_i),
+                nonce: &rho_i,
             },
             &security_params.pi_log,
             &mut *rng,
@@ -956,16 +955,16 @@ where
         let enc_j = fast_paillier::EncryptionKey::from_n(R_j.N.clone());
 
         let data = pi_log::Data {
-            key0: enc_j.clone(),
-            c: ciphertext_j.K.clone(),
-            x: msg_j.Delta,
-            b: Gamma,
+            key0: &enc_j,
+            c: &ciphertext_j.K,
+            x: &msg_j.Delta,
+            b: &Gamma,
         };
 
         if pi_log::non_interactive::verify(
             parties_shared_state.clone().chain_update(j.to_be_bytes()),
             &R_i.into(),
-            &data,
+            data,
             &msg_j.psi_prime_prime.0,
             &security_params.pi_log,
             &msg_j.psi_prime_prime.1,
@@ -1003,9 +1002,9 @@ where
     // If message is not specified, protocol terminates here and outputs partial
     // signature
     let Some(message_to_sign) = message_to_sign else {
-            tracer.protocol_ends();
-            return Ok(ProtocolOutput::Presignature(presig))
-        };
+        tracer.protocol_ends();
+        return Ok(ProtocolOutput::Presignature(presig));
+    };
 
     // Signing
     tracer.named_round_begins("Partial signing");
