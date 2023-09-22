@@ -1002,9 +1002,9 @@ where
     // If message is not specified, protocol terminates here and outputs partial
     // signature
     let Some(message_to_sign) = message_to_sign else {
-            tracer.protocol_ends();
-            return Ok(ProtocolOutput::Presignature(presig))
-        };
+        tracer.protocol_ends();
+        return Ok(ProtocolOutput::Presignature(presig));
+    };
 
     // Signing
     tracer.named_round_begins("Partial signing");
