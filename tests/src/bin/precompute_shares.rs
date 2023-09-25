@@ -3,7 +3,7 @@ use cggmp21::security_level::SecurityLevel;
 use cggmp21::supported_curves::{Secp256k1, Secp256r1};
 use cggmp21::{security_level::ReasonablySecure, trusted_dealer};
 use cggmp21_tests::{generate_blum_prime, PrecomputedKeyShares, PregeneratedPrimes};
-use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
+use generic_ec::{Curve, curves::Stark};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 
 fn main() -> Result<()> {
@@ -37,6 +37,7 @@ fn precompute_shares() -> Result<()> {
 
     precompute_shares_for_curve::<Secp256r1, _>(&mut rng, &mut cache)?;
     precompute_shares_for_curve::<Secp256k1, _>(&mut rng, &mut cache)?;
+    precompute_shares_for_curve::<Stark, _>(&mut rng, &mut cache)?;
 
     let cache_json = cache.to_serialized().context("serialize cache")?;
     println!("{cache_json}");
@@ -53,10 +54,7 @@ fn precompute_primes() -> Result<()> {
 fn precompute_shares_for_curve<E: Curve, R: RngCore + CryptoRng>(
     rng: &mut R,
     cache: &mut PrecomputedKeyShares,
-) -> Result<()>
-where
-    Scalar<E>: FromHash,
-{
+) -> Result<()> {
     for n in [2, 3, 5, 7, 10] {
         let threshold_values = [None, Some(2), Some(3), Some(5), Some(7)];
         for t in threshold_values

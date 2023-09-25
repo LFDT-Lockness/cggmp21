@@ -228,7 +228,7 @@ pub use {
     round_based,
 };
 
-use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
+use generic_ec::{coords::HasAffineX, Curve, Point};
 use key_share::AnyKeyShare;
 use round_based::PartyIndex;
 use security_level::SecurityLevel;
@@ -274,7 +274,6 @@ pub use self::{
 pub fn keygen<E>(eid: ExecutionId, i: u16, n: u16) -> keygen::KeygenBuilder<E>
 where
     E: Curve,
-    Scalar<E>: FromHash,
 {
     keygen::KeygenBuilder::new(eid, i, n)
 }
@@ -332,7 +331,6 @@ pub fn signing<'r, E, L>(
 where
     E: Curve,
     Point<E>: HasAffineX<E>,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
 {
     SigningBuilder::new(eid, i, parties_indexes_at_keygen, key_share)

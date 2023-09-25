@@ -1,6 +1,6 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::hash_to_curve::{self, FromHash};
+use generic_ec::hash_to_curve;
 use generic_ec::{Curve, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
@@ -82,7 +82,6 @@ pub async fn run_keygen<E, R, M, L, D>(
 ) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
     R: RngCore + CryptoRng,
@@ -238,8 +237,16 @@ where
         .iter()
         .map(|d| &d.rid)
         .fold(L::Rid::default(), xor_array);
-    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rid.as_ref()])
-        .map_err(Bug::HashToScalarError)?;
+    let challenge = {
+        let hash = |d: D| {
+            d.chain_update(tag_htc.as_bytes())
+                .chain_update(&i.to_be_bytes())
+                .chain_update(rid.as_ref())
+                .finalize()
+        };
+        let mut rng = crate::utils::rng::HashRng::new(hash);
+        Scalar::random(&mut rng)
+    };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     tracer.stage("Prove knowledge of `x_i`");
@@ -267,9 +274,17 @@ where
     tracer.stage("Validate schnorr proofs");
     let mut blame = vec![];
     for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
-            .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
-            .map_err(Bug::HashToScalarError)?;
+        let challenge = {
+            let hash = |d: D| {
+                d.chain_update(tag_htc.as_bytes())
+                    .chain_update(&j.to_be_bytes())
+                    .chain_update(rid.as_ref())
+                    .finalize()
+            };
+            let mut rng = crate::utils::rng::HashRng::new(hash);
+            Scalar::random(&mut rng)
+        };
+        let challenge = schnorr_pok::Challenge { nonce: challenge };
         if sch_proof
             .sch_proof
             .verify(&decommitment.sch_commit, &challenge, &decommitment.X)

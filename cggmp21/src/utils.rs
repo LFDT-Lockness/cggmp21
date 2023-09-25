@@ -222,6 +222,97 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Opt
         .collect()
 }
 
+pub mod rng {
+    use digest::Digest;
+
+    /// Pseudo-random generateur that obtains values by hashing the provided values
+    /// salted with an internal counter. The counter is prepended to conserve
+    /// entropy.
+    ///
+    /// Having u64 counter means that the period of the sequence is 2^64 times
+    /// `Digest::OutputSize` bytes
+    pub struct HashRng<F, D: Digest> {
+        hash: F,
+        counter: u64,
+        buffer: digest::Output<D>,
+        offset: usize,
+    }
+
+    impl<F, D: Digest> HashRng<F, D> {
+        /// Create the RNG from the hash finalization function. Use it like this:
+        /// ```ignore
+        /// HashRng::new(|d| d.chain_update("my_values").finalize())
+        /// ```
+        pub fn new(hash: F) -> Self
+        where
+            F: Fn(D) -> digest::Output<D>,
+        {
+            let d: D = D::new().chain_update(0u64.to_le_bytes());
+            let buffer: digest::Output<D> = hash(d);
+            HashRng {
+                hash,
+                counter: 1,
+                offset: 0,
+                buffer,
+            }
+        }
+    }
+
+    impl<F, D> rand_core::RngCore for HashRng<F, D>
+    where
+        D: Digest,
+        F: Fn(D) -> digest::Output<D>,
+    {
+        fn next_u32(&mut self) -> u32 {
+            const SIZE: usize = std::mem::size_of::<u32>();
+            // NOTE: careful with SIZE usage, otherwise it panics
+            if self.offset + SIZE > self.buffer.len() {
+                self.buffer = (self.hash)(D::new().chain_update(self.counter.to_le_bytes()));
+                self.counter = self.counter.wrapping_add(1);
+                self.offset = 0;
+            }
+            let bytes = &self.buffer[self.offset..self.offset + SIZE];
+            self.offset += SIZE;
+            #[allow(clippy::expect_used)]
+            let bytes: [u8; SIZE] = bytes.try_into().expect("Size mismatch");
+            u32::from_le_bytes(bytes)
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            rand_core::impls::next_u64_via_u32(self)
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            rand_core::impls::fill_bytes_via_next(self, dest)
+        }
+
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use rand_core::RngCore;
+        use sha2::Digest;
+
+        #[test]
+        fn generate_bytes() {
+            let hash = |d: sha2::Sha256| d.chain_update("foobar").finalize();
+            let mut rng = super::HashRng::new(hash);
+
+            // Check that it doesn't panic for any window size
+            for _ in 0..100 {
+                let size = (rng.next_u32() as usize) % 256 + 1;
+                let mut buffer = Vec::new();
+                buffer.resize(size, 0);
+                rng.fill_bytes(&mut buffer);
+            }
+        }
+    }
+}
+
 /// Generates **unsafe** blum primes
 ///
 /// Blum primes are faster to generate than safe primes, and they don't break correctness of CGGMP protocol.

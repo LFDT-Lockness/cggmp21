@@ -3,7 +3,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{
-    coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar, SecretScalar,
+    coords::AlwaysHasAffineX, Curve, NonZero, Point, Scalar, SecretScalar,
 };
 use generic_ec_zkp::polynomial::lagrange_coefficient;
 use paillier_zk::rug::Complete;
@@ -229,7 +229,6 @@ pub struct SigningBuilder<
 impl<'r, E, L, D> SigningBuilder<'r, E, L, D>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
@@ -363,7 +362,6 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
     R: RngCore + CryptoRng,
-    Scalar<E>: FromHash,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
     tracer.protocol_begins();
@@ -467,7 +465,6 @@ where
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
     R: RngCore + CryptoRng,
-    Scalar<E>: FromHash,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
     let MpcParty { delivery, .. } = party.into_party();

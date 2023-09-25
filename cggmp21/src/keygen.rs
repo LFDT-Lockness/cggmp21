@@ -6,8 +6,7 @@ mod non_threshold;
 mod threshold;
 
 use digest::Digest;
-use generic_ec::hash_to_curve::FromHash;
-use generic_ec::{Curve, Scalar};
+use generic_ec::Curve;
 use rand_core::{CryptoRng, RngCore};
 use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
@@ -79,7 +78,6 @@ pub struct WithThreshold(u16);
 impl<'a, E, L, D> GenericKeygenBuilder<'a, E, NonThreshold, L, D>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
@@ -102,7 +100,6 @@ where
 impl<'a, E, L, D, M> GenericKeygenBuilder<'a, E, M, L, D>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
@@ -168,7 +165,6 @@ where
 impl<'a, E, L, D> GenericKeygenBuilder<'a, E, NonThreshold, L, D>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
@@ -198,7 +194,6 @@ where
 impl<'a, E, L, D> GenericKeygenBuilder<'a, E, WithThreshold, L, D>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
@@ -274,8 +269,6 @@ enum KeygenAborted {
 
 #[derive(Debug, Error)]
 enum Bug {
-    #[error("hash to scalar returned error")]
-    HashToScalarError(#[source] generic_ec::errors::HashError),
     #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
     InvalidHashToCurveTag,
     #[error("resulting key share is not valid")]
