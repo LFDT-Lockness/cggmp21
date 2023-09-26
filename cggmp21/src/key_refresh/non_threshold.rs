@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 use crate::{
     errors::IoError,
-    key_share::{DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyShare, KeyShare, PartyAux},
+    key_share::{AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, KeyShare, PartyAux},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -35,7 +35,7 @@ use crate::{
         scalar_to_bignumber, xor_array, AbortBlame,
     },
     zk::ring_pedersen_parameters as π_prm,
-    ExecutionId,
+    ExecutionId, IncompleteKeyShare,
 };
 
 /// Message of key refresh protocol
@@ -119,6 +119,7 @@ pub async fn run_refresh<R, M, E, L, D>(
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
+    build_multiexp_tables: bool,
     core_share: &DirtyIncompleteKeyShare<E>,
 ) -> Result<KeyShare<E, L>, KeyRefreshError>
 where
@@ -136,7 +137,9 @@ where
     let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
     tracer.stage("Setup networking");
-    let MpcParty { delivery, .. } = party.into_party();
+    let MpcParty {
+        delivery, blocking, ..
+    } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     let mut rounds = RoundsRouter::<Msg<E, D, L>>::builder();
@@ -454,6 +457,7 @@ where
                 s: d.s.clone(),
                 t: d.t.clone(),
                 rsa_modulo: d.N.clone(),
+                multiexp: None,
             },
             π_fac::Data {
                 n: &N,
@@ -593,6 +597,7 @@ where
         s: s.clone(),
         t: t.clone(),
         rsa_modulo: N.clone(),
+        multiexp: None,
     };
     let blame = collect_blame(
         &decommitments,
@@ -640,11 +645,13 @@ where
         .collect();
 
     tracer.stage("Assemble new core share");
-    let new_core_share = DirtyIncompleteKeyShare {
+    let new_core_share: IncompleteKeyShare<E> = DirtyIncompleteKeyShare {
         public_shares: X_stars,
         x: SecretScalar::new(&mut x_star),
         ..old_core_share
-    };
+    }
+    .try_into()
+    .map_err(Bug::InvalidShareGenerated)?;
     tracer.stage("Assemble auxiliary info");
     let party_auxes = decommitments
         .iter_including_me(&decommitment)
@@ -652,19 +659,33 @@ where
             N: d.N.clone(),
             s: d.s.clone(),
             t: d.t.clone(),
+            multiexp: None,
         })
         .collect();
-    let aux = DirtyAuxInfo {
+    let mut aux: AuxInfo<L> = DirtyAuxInfo {
         p,
         q,
         parties: party_auxes,
         security_level: std::marker::PhantomData,
-    };
-    let key_share = DirtyKeyShare {
-        core: new_core_share,
-        aux,
-    };
+    }
+    .try_into()
+    .map_err(Bug::InvalidShareGenerated)?;
+
+    if build_multiexp_tables {
+        tracer.stage("Build multiexp tables");
+        aux = blocking
+            .spawn(move || {
+                aux.precompute_multiexp_tables()?;
+                Ok(aux)
+            })
+            .await
+            .map_err(|err| Bug::SpawnBlocking(Box::new(err)))?
+            .map_err(Bug::BuildMultiexpTables)?;
+    }
+
+    tracer.stage("Assemble key share");
+    let key_share = KeyShare::make(new_core_share, aux).map_err(Bug::InvalidShareGenerated)?;
 
     tracer.protocol_ends();
-    Ok(key_share.try_into().map_err(Bug::InvalidShareGenerated)?)
+    Ok(key_share)
 }

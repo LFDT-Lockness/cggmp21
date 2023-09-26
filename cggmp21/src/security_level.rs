@@ -60,6 +60,26 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
     fn q() -> Integer;
 }
 
+/// Determines max size of exponents
+///
+/// During the CGGMP21 protocol, we often calculate $s^x t^y \mod N$. Given the security level
+/// we can determine max size of $x$ and $y$ in bits.
+///
+/// Size of exponents can be used to build a [multiexp table](paillier_zk::multiexp).
+///
+/// Returns `(x_bits, y_bits)`
+pub fn max_exponents_size<L: SecurityLevel>() -> (u32, u32) {
+    use std::cmp;
+
+    let x_bits = cmp::max(
+        L::ELL as u32 + L::EPSILON as u32 + 4 * L::SECURITY_BITS,
+        (L::ELL_PRIME + L::EPSILON) as _,
+    );
+    let y_bits = (L::ELL + L::EPSILON) as u32 + 8 * L::SECURITY_BITS;
+
+    (x_bits, y_bits)
+}
+
 /// Internal module that's powers `define_security_level` macro
 #[doc(hidden)]
 pub mod _internal {

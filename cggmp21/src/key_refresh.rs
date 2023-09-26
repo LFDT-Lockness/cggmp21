@@ -110,6 +110,7 @@ where
     pregenerated: PregeneratedPrimes<L>,
     tracer: Option<&'a mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
+    precompute_multiexp_tables: bool,
     _digest: std::marker::PhantomData<D>,
 }
 
@@ -141,6 +142,7 @@ where
             pregenerated,
             tracer: None,
             enforce_reliable_broadcast: true,
+            precompute_multiexp_tables: false,
             _digest: std::marker::PhantomData,
         }
     }
@@ -162,6 +164,7 @@ where
             self.pregenerated,
             self.tracer,
             self.enforce_reliable_broadcast,
+            self.precompute_multiexp_tables,
             self.target.0,
         )
         .await
@@ -188,6 +191,7 @@ where
             pregenerated,
             tracer: None,
             enforce_reliable_broadcast: true,
+            precompute_multiexp_tables: false,
             _digest: std::marker::PhantomData,
         }
     }
@@ -209,6 +213,7 @@ where
             self.pregenerated,
             self.tracer,
             self.enforce_reliable_broadcast,
+            self.precompute_multiexp_tables,
         )
         .await
     }
@@ -227,6 +232,7 @@ where
             pregenerated: self.pregenerated,
             tracer: self.tracer,
             enforce_reliable_broadcast: self.enforce_reliable_broadcast,
+            precompute_multiexp_tables: self.precompute_multiexp_tables,
             _digest: std::marker::PhantomData,
         }
     }
@@ -243,6 +249,16 @@ where
             enforce_reliable_broadcast: v,
             ..self
         }
+    }
+
+    /// Precomputes multiexponentiation tables for output aux data
+    ///
+    /// Enables optimization that makes signing and presigning faster. Precomputation takes a
+    /// while and makes protocol a bit longer. It noticebly increases size of aux data both
+    /// in RAM and on disk (after serialization).
+    pub fn precompute_multiexp_tables(mut self, v: bool) -> Self {
+        self.precompute_multiexp_tables = v;
+        self
     }
 }
 
@@ -295,6 +311,10 @@ enum Bug {
     PiPrm(#[source] crate::zk::ring_pedersen_parameters::ZkError),
     #[error("couldn't hash a message")]
     HashMessage(#[source] crate::utils::HashMessageError),
+    #[error("spawned blocking routine panicked")]
+    SpawnBlocking(#[source] Box<dyn std::error::Error + Send + Sync>),
+    #[error("couldn't build multiexp tables")]
+    BuildMultiexpTables(#[source] crate::key_share::InvalidKeyShare),
 }
 
 /// Error indicating that protocol was aborted by malicious party

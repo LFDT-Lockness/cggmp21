@@ -20,6 +20,7 @@ struct Args {
     bench_threshold_keygen: bool,
     bench_aux_data_gen: bool,
     bench_signing: bool,
+    optimize_multiexp: bool,
     custom_sec_level: bool,
 }
 
@@ -37,6 +38,7 @@ fn args() -> Args {
     let bench_threshold_keygen = bpaf::long("no-bench-threshold-keygen").switch().map(|b| !b);
     let bench_aux_data_gen = bpaf::long("no-bench-aux-data-gen").switch().map(|b| !b);
     let bench_signing = bpaf::long("no-bench-signing").switch().map(|b| !b);
+    let optimize_multiexp = bpaf::long("optimize-multiexp").switch();
     let custom_sec_level = bpaf::long("custom-sec-level").switch();
 
     bpaf::construct!(Args {
@@ -46,6 +48,7 @@ fn args() -> Args {
         bench_threshold_keygen,
         bench_aux_data_gen,
         bench_signing,
+        optimize_multiexp,
         custom_sec_level,
     })
     .to_options()
@@ -165,7 +168,7 @@ async fn do_becnhmarks<L: SecurityLevel>(args: Args) {
                 None
             };
 
-        let aux_data: Option<Vec<cggmp21::key_share::AuxInfo<L>>> =
+        let mut aux_data: Option<Vec<cggmp21::key_share::AuxInfo<L>>> =
             if args.bench_aux_data_gen || args.bench_signing {
                 let eid: [u8; 32] = rng.gen();
                 let eid = ExecutionId::new(&eid);
@@ -206,6 +209,26 @@ async fn do_becnhmarks<L: SecurityLevel>(args: Args) {
             } else {
                 None
             };
+
+        if aux_data.is_some() && args.optimize_multiexp {
+            let aux_data = aux_data.as_mut().unwrap();
+            let start = std::time::Instant::now();
+            aux_data
+                .iter_mut()
+                .for_each(|aux_i| aux_i.precompute_multiexp_tables().unwrap());
+            let took = std::time::Instant::now().duration_since(start);
+
+            println!("Precompute multiexp tables (avg): {:?}", took / n.into());
+            println!(
+                "Size of multiexp tables per key share: {} bytes",
+                aux_data[0].multiexp_tables_size()
+            );
+            println!(
+                "Size of exponents: {:?}",
+                cggmp21::security_level::max_exponents_size::<L>()
+            );
+            println!();
+        }
 
         if args.bench_signing {
             // Note that we don't parametrize signing performance tests by `t` as it doesn't make much sense
