@@ -30,6 +30,11 @@ lazy_static = "1.4"
 # external verifiers
 secp256k1 = { version = "0.26", features = ["global-context", "bitcoin-hashes"] }
 starknet-crypto = { version = "0.6" }
+starknet-core = { version = "0.6" }
+starknet-accounts = { version = "0.5" }
+starknet-providers = { version = "0.6" }
+starknet-signers = { version = "0.4" }
+url = "2.4"
 
 [dev-dependencies]
 generic-tests = "0.1"

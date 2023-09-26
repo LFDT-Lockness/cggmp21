@@ -137,3 +137,21 @@ pub fn generate_blum_prime(rng: &mut impl rand::RngCore, bits_size: u32) -> Inte
         }
     }
 }
+
+pub fn convert_stark_scalar(
+    x: &generic_ec::Scalar<generic_ec::curves::Stark>,
+) -> anyhow::Result<starknet_crypto::FieldElement> {
+    let bytes = x.to_be_bytes();
+    debug_assert_eq!(bytes.len(), 32);
+    let mut buffer = [0u8; 32];
+    buffer.copy_from_slice(bytes.as_bytes());
+    starknet_crypto::FieldElement::from_bytes_be(&buffer)
+        .map_err(|e| anyhow::Error::msg(format!("Can't convert scalar: {}", e)))
+}
+
+pub fn convert_from_stark_scalar(
+    x: &starknet_crypto::FieldElement,
+) -> anyhow::Result<generic_ec::Scalar<generic_ec::curves::Stark>> {
+    let bytes = x.to_bytes_be();
+    generic_ec::Scalar::from_be_bytes(bytes).context("Can't read bytes")
+}

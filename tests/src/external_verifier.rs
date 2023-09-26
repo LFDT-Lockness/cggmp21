@@ -28,7 +28,7 @@ pub mod blockchains {
     use cggmp21::supported_curves::Secp256k1;
     use generic_ec::curves::Stark;
 
-    use crate::external_verifier::ExternalVerifier;
+    use crate::{external_verifier::ExternalVerifier, convert_stark_scalar};
 
     /// Verifies ECDSA signature using the same library as used in Bitcoin
     pub struct Bitcoin;
@@ -81,16 +81,5 @@ pub mod blockchains {
             }
             Ok(())
         }
-    }
-
-    fn convert_stark_scalar(
-        x: &generic_ec::Scalar<Stark>,
-    ) -> anyhow::Result<starknet_crypto::FieldElement> {
-        let bytes = x.to_be_bytes();
-        debug_assert_eq!(bytes.len(), 32);
-        let mut buffer = [0u8; 32];
-        buffer.copy_from_slice(bytes.as_bytes());
-        starknet_crypto::FieldElement::from_bytes_be(&buffer)
-            .map_err(|e| anyhow::Error::msg(format!("Can't convert scalar: {}", e)))
     }
 }
