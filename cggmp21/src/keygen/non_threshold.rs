@@ -240,7 +240,7 @@ where
     let challenge = {
         let hash = |d: D| {
             d.chain_update(tag_htc.as_bytes())
-                .chain_update(&i.to_be_bytes())
+                .chain_update(i.to_be_bytes())
                 .chain_update(rid.as_ref())
                 .finalize()
         };
@@ -277,7 +277,7 @@ where
         let challenge = {
             let hash = |d: D| {
                 d.chain_update(tag_htc.as_bytes())
-                    .chain_update(&j.to_be_bytes())
+                    .chain_update(j.to_be_bytes())
                     .chain_update(rid.as_ref())
                     .finalize()
             };

@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
-use cggmp21::security_level::SecurityLevel;
-use cggmp21::supported_curves::{Secp256k1, Secp256r1};
-use cggmp21::{security_level::ReasonablySecure, trusted_dealer};
+use cggmp21::supported_curves::{Secp256k1, Secp256r1, Stark};
+use cggmp21::{
+    security_level::{ReasonablySecure, SecurityLevel},
+    trusted_dealer,
+};
 use cggmp21_tests::{generate_blum_prime, PrecomputedKeyShares, PregeneratedPrimes};
-use generic_ec::{Curve, curves::Stark};
+use generic_ec::Curve;
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 
 fn main() -> Result<()> {

@@ -139,7 +139,7 @@ pub fn generate_blum_prime(rng: &mut impl rand::RngCore, bits_size: u32) -> Inte
 }
 
 pub fn convert_stark_scalar(
-    x: &generic_ec::Scalar<generic_ec::curves::Stark>,
+    x: &generic_ec::Scalar<cggmp21::supported_curves::Stark>,
 ) -> anyhow::Result<starknet_crypto::FieldElement> {
     let bytes = x.to_be_bytes();
     debug_assert_eq!(bytes.len(), 32);

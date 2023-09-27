@@ -2,9 +2,7 @@
 
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::{
-    coords::AlwaysHasAffineX, Curve, NonZero, Point, Scalar, SecretScalar,
-};
+use generic_ec::{coords::AlwaysHasAffineX, Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient;
 use paillier_zk::rug::Complete;
 use paillier_zk::{fast_paillier, rug::Integer};

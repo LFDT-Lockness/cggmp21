@@ -313,9 +313,9 @@ where
     let challenge = {
         let hash = |d: D| {
             d.chain_update(tag_htc.as_bytes())
-                .chain_update(&i.to_be_bytes())
+                .chain_update(i.to_be_bytes())
                 .chain_update(rid.as_ref())
-                .chain_update(&ys[usize::from(i)].to_bytes(true))            // y_i
+                .chain_update(&ys[usize::from(i)].to_bytes(true)) // y_i
                 .chain_update(&my_decommitment.sch_commit.0.to_bytes(false)) // h
                 .finalize()
         };
@@ -354,9 +354,9 @@ where
         let challenge = {
             let hash = |d: D| {
                 d.chain_update(tag_htc.as_bytes())
-                    .chain_update(&j.to_be_bytes())
+                    .chain_update(j.to_be_bytes())
                     .chain_update(rid.as_ref())
-                    .chain_update(&ys[usize::from(j)].to_bytes(true))         // y_i
+                    .chain_update(&ys[usize::from(j)].to_bytes(true)) // y_i
                     .chain_update(&decommitment.sch_commit.0.to_bytes(false)) // h
                     .finalize()
             };

@@ -25,10 +25,9 @@ impl<E: Curve> ExternalVerifier<E> for Noop {
 
 pub mod blockchains {
     use anyhow::Context;
-    use cggmp21::supported_curves::Secp256k1;
-    use generic_ec::curves::Stark;
+    use cggmp21::supported_curves::{Secp256k1, Stark};
 
-    use crate::{external_verifier::ExternalVerifier, convert_stark_scalar};
+    use crate::{convert_stark_scalar, external_verifier::ExternalVerifier};
 
     /// Verifies ECDSA signature using the same library as used in Bitcoin
     pub struct Bitcoin;

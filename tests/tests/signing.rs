@@ -82,6 +82,6 @@ mod generic {
     mod secp256k1 {}
     #[instantiate_tests(<cggmp21::supported_curves::Secp256r1, cggmp21_tests::external_verifier::Noop>)]
     mod secp256r1 {}
-    #[instantiate_tests(<generic_ec::curves::Stark, cggmp21_tests::external_verifier::blockchains::StarkNet>)]
+    #[instantiate_tests(<cggmp21::supported_curves::Stark, cggmp21_tests::external_verifier::blockchains::StarkNet>)]
     mod stark {}
 }

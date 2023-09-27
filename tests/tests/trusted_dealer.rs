@@ -67,6 +67,6 @@ mod test {
     mod secp256r1 {}
     #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]
     mod secp256k1 {}
-    #[instantiate_tests(<generic_ec::curves::Stark>)]
+    #[instantiate_tests(<cggmp21::supported_curves::Stark>)]
     mod stark {}
 }

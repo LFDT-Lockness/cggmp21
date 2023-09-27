@@ -1,7 +1,7 @@
 use cggmp21::{security_level::ReasonablySecure, signing::msg::Msg};
-use cggmp21_tests::{convert_stark_scalar, convert_from_stark_scalar};
-use generic_ec::{curves::Stark, coords::HasAffineX};
-use rand::{Rng, seq::SliceRandom, SeedableRng};
+use cggmp21_tests::{convert_from_stark_scalar, convert_stark_scalar};
+use generic_ec::{coords::HasAffineX, curves::Stark};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_dev::DevRng;
 use round_based::simulation::Simulation;
 use sha2::Sha256;
@@ -22,7 +22,10 @@ async fn sign_transaction() {
     let eid = cggmp21::ExecutionId::new(&eid);
 
     let fe = |hex| starknet_crypto::FieldElement::from_hex_be(hex).unwrap();
-    let sep = |hex, idx| starknet_core::types::SierraEntryPoint { selector: fe(hex), function_idx: idx };
+    let sep = |hex, idx| starknet_core::types::SierraEntryPoint {
+        selector: fe(hex),
+        function_idx: idx,
+    };
 
     let account = starknet_accounts::single_owner::SingleOwnerAccount::new(
         starknet_providers::sequencer::SequencerGatewayProvider::new(
@@ -47,12 +50,12 @@ async fn sign_transaction() {
                 l1_handler: vec![sep("03", 3)],
             },
             abi: "cdecl_for_web3".to_owned(),
-
         }),
         fe("deadf00d"),
         &account,
-    ).nonce(fe("404ce"))
-        .max_fee(fe("f333"));
+    )
+    .nonce(fe("404ce"))
+    .max_fee(fe("f333"));
     let declaration = declaration.prepared().unwrap();
     let transaction_hash = declaration.transaction_hash();
 
@@ -94,10 +97,7 @@ async fn sign_transaction() {
     assert!(signatures.iter().all(|s_i| signatures[0] == *s_i));
 
     // verify with starknet lib
-    let public_key_x = shares[0].core.shared_public_key
-        .x()
-        .unwrap()
-        .to_scalar();
+    let public_key_x = shares[0].core.shared_public_key.x().unwrap().to_scalar();
     let public_key = convert_stark_scalar(&public_key_x).unwrap();
     let r = convert_stark_scalar(&signatures[0].r).unwrap();
     let s = convert_stark_scalar(&signatures[0].s).unwrap();
