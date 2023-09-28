@@ -1,6 +1,5 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::hash_to_curve;
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
@@ -119,7 +118,6 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
-    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
 
     tracer.stage("Sample rid_i, schnorr commitment, polynomial");
     let mut rid = L::Rid::default();
@@ -312,7 +310,7 @@ where
     tracer.stage("Calculate challenge");
     let challenge = {
         let hash = |d: D| {
-            d.chain_update(tag_htc.as_bytes())
+            d.chain_update(sid)
                 .chain_update(i.to_be_bytes())
                 .chain_update(rid.as_ref())
                 .chain_update(&ys[usize::from(i)].to_bytes(true)) // y_i
@@ -353,7 +351,7 @@ where
     {
         let challenge = {
             let hash = |d: D| {
-                d.chain_update(tag_htc.as_bytes())
+                d.chain_update(sid)
                     .chain_update(j.to_be_bytes())
                     .chain_update(rid.as_ref())
                     .chain_update(&ys[usize::from(j)].to_bytes(true)) // y_i

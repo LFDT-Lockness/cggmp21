@@ -1,6 +1,6 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::{hash_to_curve, Curve, Point, Scalar, SecretScalar};
+use generic_ec::{Curve, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
@@ -147,7 +147,6 @@ where
 
     tracer.stage("Precompute execution id and shared state");
     let sid = execution_id.as_bytes();
-    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(D::digest(sid));
 
     // Round 1
@@ -427,7 +426,7 @@ where
     tracer.stage("Compute schnorr proof ψ_i^j");
     let challenge = {
         let hash = |d: D| {
-            d.chain_update(tag_htc.as_bytes())
+            d.chain_update(sid)
                 .chain_update(i.to_be_bytes())
                 .chain_update(rho_bytes.as_ref())
                 .finalize()
@@ -543,7 +542,7 @@ where
         |j, decommitment, proof_msg| {
             let challenge = {
                 let hash = |d: D| {
-                    d.chain_update(tag_htc.as_bytes())
+                    d.chain_update(sid)
                         .chain_update(j.to_be_bytes())
                         .chain_update(rho_bytes.as_ref())
                         .finalize()

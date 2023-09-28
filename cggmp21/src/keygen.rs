@@ -269,8 +269,6 @@ enum KeygenAborted {
 
 #[derive(Debug, Error)]
 enum Bug {
-    #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
-    InvalidHashToCurveTag,
     #[error("resulting key share is not valid")]
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("hash message")]

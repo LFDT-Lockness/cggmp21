@@ -288,8 +288,6 @@ enum Reason {
 /// Unexpected error in operation not caused by other parties
 #[derive(Debug, Error)]
 enum Bug {
-    #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
-    InvalidHashToCurveTag,
     #[error("Unexpected error when creating paillier decryption key")]
     PaillierKeyError,
     #[error("paillier enctyption failed")]

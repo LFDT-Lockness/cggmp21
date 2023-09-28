@@ -1,6 +1,5 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::hash_to_curve;
 use generic_ec::{Curve, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
@@ -105,7 +104,6 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
-    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
 
     tracer.stage("Sample x_i, rid_i");
     let x_i = SecretScalar::<E>::random(rng);
@@ -239,7 +237,7 @@ where
         .fold(L::Rid::default(), xor_array);
     let challenge = {
         let hash = |d: D| {
-            d.chain_update(tag_htc.as_bytes())
+            d.chain_update(sid)
                 .chain_update(i.to_be_bytes())
                 .chain_update(rid.as_ref())
                 .finalize()
@@ -276,7 +274,7 @@ where
     for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
         let challenge = {
             let hash = |d: D| {
-                d.chain_update(tag_htc.as_bytes())
+                d.chain_update(sid)
                     .chain_update(j.to_be_bytes())
                     .chain_update(rid.as_ref())
                     .finalize()
