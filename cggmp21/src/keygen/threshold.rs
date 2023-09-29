@@ -317,7 +317,7 @@ where
                 .chain_update(&my_decommitment.sch_commit.0.to_bytes(false)) // h
                 .finalize()
         };
-        let mut rng = crate::utils::rng::HashRng::new(hash);
+        let mut rng = paillier_zk::rng::HashRng::new(hash);
         Scalar::random(&mut rng)
     };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
@@ -358,7 +358,7 @@ where
                     .chain_update(&decommitment.sch_commit.0.to_bytes(false)) // h
                     .finalize()
             };
-            let mut rng = crate::utils::rng::HashRng::new(hash);
+            let mut rng = paillier_zk::rng::HashRng::new(hash);
             Scalar::random(&mut rng)
         };
         let challenge = schnorr_pok::Challenge { nonce: challenge };

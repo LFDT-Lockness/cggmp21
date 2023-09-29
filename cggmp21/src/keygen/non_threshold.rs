@@ -242,7 +242,7 @@ where
                 .chain_update(rid.as_ref())
                 .finalize()
         };
-        let mut rng = crate::utils::rng::HashRng::new(hash);
+        let mut rng = paillier_zk::rng::HashRng::new(hash);
         Scalar::random(&mut rng)
     };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
@@ -279,7 +279,7 @@ where
                     .chain_update(rid.as_ref())
                     .finalize()
             };
-            let mut rng = crate::utils::rng::HashRng::new(hash);
+            let mut rng = paillier_zk::rng::HashRng::new(hash);
             Scalar::random(&mut rng)
         };
         let challenge = schnorr_pok::Challenge { nonce: challenge };
