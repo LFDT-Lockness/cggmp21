@@ -1,9 +1,6 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::{
-    hash_to_curve::{self, FromHash},
-    Curve, Point, Scalar, SecretScalar,
-};
+use generic_ec::{Curve, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
     schnorr_pok,
@@ -126,7 +123,6 @@ where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, D, L>>,
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
 {
@@ -151,7 +147,6 @@ where
 
     tracer.stage("Precompute execution id and shared state");
     let sid = execution_id.as_bytes();
-    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
     let parties_shared_state = D::new_with_prefix(D::digest(sid));
 
     // Round 1
@@ -429,8 +424,16 @@ where
     };
     let n_sqrt = utils::sqrt(&N);
     tracer.stage("Compute schnorr proof ψ_i^j");
-    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rho_bytes.as_ref()])
-        .map_err(Bug::HashToScalarError)?;
+    let challenge = {
+        let hash = |d: D| {
+            d.chain_update(sid)
+                .chain_update(i.to_be_bytes())
+                .chain_update(rho_bytes.as_ref())
+                .finalize()
+        };
+        let mut rng = paillier_zk::rng::HashRng::new(hash);
+        Scalar::random(&mut rng)
+    };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     let psis = xs
         .iter()
@@ -537,9 +540,16 @@ where
         &decommitments,
         &shares_msg_b,
         |j, decommitment, proof_msg| {
-            let challenge =
-                Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rho_bytes.as_ref()])
-                    .map_err(Bug::HashToScalarError)?;
+            let challenge = {
+                let hash = |d: D| {
+                    d.chain_update(sid)
+                        .chain_update(j.to_be_bytes())
+                        .chain_update(rho_bytes.as_ref())
+                        .finalize()
+                };
+                let mut rng = paillier_zk::rng::HashRng::new(hash);
+                Scalar::random(&mut rng)
+            };
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // x length is verified above

@@ -1,6 +1,5 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::hash_to_curve::{self, FromHash};
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
@@ -95,7 +94,6 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
 ) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
     R: RngCore + CryptoRng,
@@ -120,7 +118,6 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
-    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
 
     tracer.stage("Sample rid_i, schnorr commitment, polynomial");
     let mut rid = L::Rid::default();
@@ -311,16 +308,18 @@ where
     debug_assert_eq!(Point::generator() * &sigma, ys[usize::from(i)]);
 
     tracer.stage("Calculate challenge");
-    let challenge = Scalar::<E>::hash_concat(
-        tag_htc,
-        &[
-            &i.to_be_bytes(),
-            rid.as_ref(),
-            &ys[usize::from(i)].to_bytes(true),            // y_i
-            &my_decommitment.sch_commit.0.to_bytes(false), // h
-        ],
-    )
-    .map_err(Bug::HashToScalarError)?;
+    let challenge = {
+        let hash = |d: D| {
+            d.chain_update(sid)
+                .chain_update(i.to_be_bytes())
+                .chain_update(rid.as_ref())
+                .chain_update(&ys[usize::from(i)].to_bytes(true)) // y_i
+                .chain_update(&my_decommitment.sch_commit.0.to_bytes(false)) // h
+                .finalize()
+        };
+        let mut rng = paillier_zk::rng::HashRng::new(hash);
+        Scalar::random(&mut rng)
+    };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     tracer.stage("Prove knowledge of `sigma_i`");
@@ -350,17 +349,19 @@ where
         .zip(decommitments.iter())
         .zip(sch_proofs.iter())
     {
-        let challenge = Scalar::<E>::hash_concat(
-            tag_htc,
-            &[
-                &j.to_be_bytes(),
-                rid.as_ref(),
-                &ys[usize::from(j)].to_bytes(true),         // y_i
-                &decommitment.sch_commit.0.to_bytes(false), // h
-            ],
-        )
-        .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
-        .map_err(Bug::HashToScalarError)?;
+        let challenge = {
+            let hash = |d: D| {
+                d.chain_update(sid)
+                    .chain_update(j.to_be_bytes())
+                    .chain_update(rid.as_ref())
+                    .chain_update(&ys[usize::from(j)].to_bytes(true)) // y_i
+                    .chain_update(&decommitment.sch_commit.0.to_bytes(false)) // h
+                    .finalize()
+            };
+            let mut rng = paillier_zk::rng::HashRng::new(hash);
+            Scalar::random(&mut rng)
+        };
+        let challenge = schnorr_pok::Challenge { nonce: challenge };
         if sch_proof
             .sch_proof
             .verify(&decommitment.sch_commit, &challenge, &ys[usize::from(j)])

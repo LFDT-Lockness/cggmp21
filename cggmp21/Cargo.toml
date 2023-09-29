@@ -38,7 +38,8 @@ rand_chacha = "0.3"
 generic-tests = "0.1"
 
 [features]
-all-curves = ["curve-secp256k1", "curve-secp256r1"]
+all-curves = ["curve-secp256k1", "curve-secp256r1", "curve-stark"]
 curve-secp256k1 = ["generic-ec/curve-secp256k1"]
 curve-secp256r1 = ["generic-ec/curve-secp256r1"]
+curve-stark = ["generic-ec/curve-stark"]
 spof = []

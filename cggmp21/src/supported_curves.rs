@@ -11,19 +11,18 @@
 pub use generic_ec::curves::Secp256k1;
 #[cfg(feature = "curve-secp256r1")]
 pub use generic_ec::curves::Secp256r1;
+#[cfg(feature = "curve-stark")]
+pub use generic_ec::curves::Stark;
 
 pub use generic_ec::Curve;
 
 #[cfg(test)]
 #[allow(dead_code)]
 mod check_compatibility {
-    use generic_ec::{
-        coords::AlwaysHasAffineX, hash_to_curve::FromHash, Curve, NonZero, Point, Scalar,
-    };
+    use generic_ec::{coords::AlwaysHasAffineX, Curve, NonZero, Point};
 
     fn curve_is_compatible<E: Curve>()
     where
-        Scalar<E>: FromHash,
         NonZero<Point<E>>: AlwaysHasAffineX<E>,
     {
     }
@@ -33,5 +32,7 @@ mod check_compatibility {
         curve_is_compatible::<super::Secp256k1>();
         #[cfg(feature = "curve-secp256r1")]
         curve_is_compatible::<super::Secp256r1>();
+        #[cfg(feature = "curve-stark")]
+        curve_is_compatible::<super::Stark>();
     }
 }

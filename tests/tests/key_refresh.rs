@@ -1,6 +1,6 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
-    use generic_ec::{hash_to_curve::FromHash, Point};
+    use generic_ec::Point;
     use rand::seq::SliceRandom;
     use rand::Rng;
     use round_based::simulation::Simulation;
@@ -14,7 +14,6 @@ mod generic {
     #[tokio::test]
     async fn key_refresh_works<E: generic_ec::Curve>(n: u16, reliable_broadcast: bool)
     where
-        generic_ec::Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         let mut rng = rand_dev::DevRng::new();
@@ -111,7 +110,6 @@ mod generic {
     #[tokio::test]
     async fn aux_gen_works<E: generic_ec::Curve>(t: u16, n: u16, reliable_broadcast: bool)
     where
-        generic_ec::Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         let mut rng = rand_dev::DevRng::new();
@@ -194,4 +192,6 @@ mod generic {
     mod secp256r1 {}
     #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]
     mod secp256k1 {}
+    #[instantiate_tests(<cggmp21::supported_curves::Stark>)]
+    mod stark {}
 }

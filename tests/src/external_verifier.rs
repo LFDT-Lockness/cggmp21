@@ -25,9 +25,9 @@ impl<E: Curve> ExternalVerifier<E> for Noop {
 
 pub mod blockchains {
     use anyhow::Context;
-    use cggmp21::supported_curves::Secp256k1;
+    use cggmp21::supported_curves::{Secp256k1, Stark};
 
-    use crate::external_verifier::ExternalVerifier;
+    use crate::{convert_stark_scalar, external_verifier::ExternalVerifier};
 
     /// Verifies ECDSA signature using the same library as used in Bitcoin
     pub struct Bitcoin;
@@ -51,6 +51,34 @@ pub mod blockchains {
             signature
                 .verify(&message, &public_key)
                 .context("invalid siganture")
+        }
+    }
+
+    pub struct StarkNet;
+
+    impl ExternalVerifier<Stark> for StarkNet {
+        fn verify(
+            public_key: &generic_ec::Point<Stark>,
+            signature: &cggmp21::Signature<Stark>,
+            message: &[u8],
+        ) -> anyhow::Result<()> {
+            use generic_ec::coords::HasAffineX;
+            let message_to_sign = cggmp21::DataToSign::<Stark>::digest::<sha2::Sha256>(message);
+            let public_key_x = public_key
+                .x()
+                .ok_or(anyhow::Error::msg("No affine x for public key"))?
+                .to_scalar();
+
+            let public_key = convert_stark_scalar(&public_key_x)?;
+            let message = convert_stark_scalar(&message_to_sign.to_scalar())?;
+            let r = convert_stark_scalar(&signature.r)?;
+            let s = convert_stark_scalar(&signature.s)?;
+
+            let r = starknet_crypto::verify(&public_key, &message, &r, &s)?;
+            if !r {
+                anyhow::bail!("Signature verification failed");
+            }
+            Ok(())
         }
     }
 }

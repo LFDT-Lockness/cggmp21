@@ -1,6 +1,6 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
-    use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
+    use generic_ec::{Curve, Point};
     use rand::{seq::SliceRandom, Rng};
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
@@ -21,7 +21,6 @@ mod generic {
     #[tokio::test]
     async fn full_pipeline_works<E: Curve>(t: u16, n: u16)
     where
-        Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         let mut rng = DevRng::new();
@@ -33,7 +32,6 @@ mod generic {
     async fn run_keygen<E>(t: u16, n: u16, rng: &mut DevRng) -> Vec<Incomplete<E>>
     where
         E: Curve,
-        Scalar<E>: FromHash,
     {
         let mut simulation = Simulation::<ThresholdMsg<E, ReasonablySecure, Sha256>>::new();
 
@@ -61,7 +59,6 @@ mod generic {
     async fn run_refresh<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
     where
         E: Curve,
-        Scalar<E>: FromHash,
     {
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
         let n = shares.len().try_into().unwrap();
@@ -97,7 +94,6 @@ mod generic {
     async fn run_signing<E>(shares: &[Share<E>], rng: &mut DevRng)
     where
         E: Curve,
-        Scalar<E>: FromHash,
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         use rand::RngCore;
@@ -149,4 +145,6 @@ mod generic {
     mod secp256r1 {}
     #[instantiate_tests(<cggmp21::supported_curves::Secp256k1>)]
     mod secp256k1 {}
+    #[instantiate_tests(<cggmp21::supported_curves::Stark>)]
+    mod stark {}
 }

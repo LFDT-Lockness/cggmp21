@@ -1,7 +1,7 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
     use cggmp21_tests::external_verifier::ExternalVerifier;
-    use generic_ec::{coords::HasAffineX, hash_to_curve::FromHash, Curve, Point, Scalar};
+    use generic_ec::{coords::HasAffineX, Curve, Point};
     use rand::seq::SliceRandom;
     use rand::{Rng, RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -22,7 +22,6 @@ mod generic {
     async fn signing_works<E: Curve, V>(t: Option<u16>, n: u16, reliable_broadcast: bool)
     where
         Point<E>: HasAffineX<E>,
-        Scalar<E>: FromHash,
         V: ExternalVerifier<E>,
     {
         let mut rng = DevRng::new();
@@ -83,4 +82,6 @@ mod generic {
     mod secp256k1 {}
     #[instantiate_tests(<cggmp21::supported_curves::Secp256r1, cggmp21_tests::external_verifier::Noop>)]
     mod secp256r1 {}
+    #[instantiate_tests(<cggmp21::supported_curves::Stark, cggmp21_tests::external_verifier::blockchains::StarkNet>)]
+    mod stark {}
 }

@@ -1,6 +1,5 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::hash_to_curve::{self, FromHash};
 use generic_ec::{Curve, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{
     hash_commitment::{self, HashCommit},
@@ -82,7 +81,6 @@ pub async fn run_keygen<E, R, M, L, D>(
 ) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
-    Scalar<E>: FromHash,
     L: SecurityLevel,
     D: Digest + Clone + 'static,
     R: RngCore + CryptoRng,
@@ -106,7 +104,6 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
-    let tag_htc = hash_to_curve::Tag::new(sid).ok_or(Bug::InvalidHashToCurveTag)?;
 
     tracer.stage("Sample x_i, rid_i");
     let x_i = SecretScalar::<E>::random(rng);
@@ -238,8 +235,16 @@ where
         .iter()
         .map(|d| &d.rid)
         .fold(L::Rid::default(), xor_array);
-    let challenge = Scalar::<E>::hash_concat(tag_htc, &[&i.to_be_bytes(), rid.as_ref()])
-        .map_err(Bug::HashToScalarError)?;
+    let challenge = {
+        let hash = |d: D| {
+            d.chain_update(sid)
+                .chain_update(i.to_be_bytes())
+                .chain_update(rid.as_ref())
+                .finalize()
+        };
+        let mut rng = paillier_zk::rng::HashRng::new(hash);
+        Scalar::random(&mut rng)
+    };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     tracer.stage("Prove knowledge of `x_i`");
@@ -267,9 +272,17 @@ where
     tracer.stage("Validate schnorr proofs");
     let mut blame = vec![];
     for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
-        let challenge = Scalar::<E>::hash_concat(tag_htc, &[&j.to_be_bytes(), rid.as_ref()])
-            .map(|challenge| schnorr_pok::Challenge { nonce: challenge })
-            .map_err(Bug::HashToScalarError)?;
+        let challenge = {
+            let hash = |d: D| {
+                d.chain_update(sid)
+                    .chain_update(j.to_be_bytes())
+                    .chain_update(rid.as_ref())
+                    .finalize()
+            };
+            let mut rng = paillier_zk::rng::HashRng::new(hash);
+            Scalar::random(&mut rng)
+        };
+        let challenge = schnorr_pok::Challenge { nonce: challenge };
         if sch_proof
             .sch_proof
             .verify(&decommitment.sch_commit, &challenge, &decommitment.X)

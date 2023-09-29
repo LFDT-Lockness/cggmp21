@@ -1,6 +1,6 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case))]
 mod generic {
-    use generic_ec::{hash_to_curve::FromHash, Curve, Point, Scalar};
+    use generic_ec::{Curve, Point};
     use rand::{seq::SliceRandom, Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rand_dev::DevRng;
@@ -18,10 +18,7 @@ mod generic {
     #[test_case::case(10, false; "n10")]
     #[test_case::case(10, true; "n10-reliable")]
     #[tokio::test]
-    async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool)
-    where
-        Scalar<E>: FromHash,
-    {
+    async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool) {
         let mut rng = DevRng::new();
 
         let mut simulation = Simulation::<NonThresholdMsg<E, ReasonablySecure, Sha256>>::new();
@@ -65,10 +62,7 @@ mod generic {
     #[test_case::case(5, 7, false; "t5n7")]
     #[test_case::case(5, 7, true; "t5n7-reliable")]
     #[tokio::test]
-    async fn threshold_keygen_works<E: Curve>(t: u16, n: u16, reliable_broadcast: bool)
-    where
-        Scalar<E>: FromHash,
-    {
+    async fn threshold_keygen_works<E: Curve>(t: u16, n: u16, reliable_broadcast: bool) {
         let mut rng = DevRng::new();
 
         let mut simulation = Simulation::<ThresholdMsg<E, ReasonablySecure, Sha256>>::new();
@@ -118,4 +112,6 @@ mod generic {
     mod secp256k1 {}
     #[instantiate_tests(<cggmp21::supported_curves::Secp256r1>)]
     mod secp256r1 {}
+    #[instantiate_tests(<cggmp21::supported_curves::Stark>)]
+    mod stark {}
 }

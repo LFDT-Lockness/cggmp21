@@ -6,7 +6,7 @@ mod aux_only;
 mod non_threshold;
 
 use digest::Digest;
-use generic_ec::{hash_to_curve::FromHash, Curve, Scalar};
+use generic_ec::Curve;
 use rand_core::{CryptoRng, RngCore};
 use round_based::Mpc;
 use thiserror::Error;
@@ -153,7 +153,6 @@ where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = NonThresholdMsg<E, D, L>>,
         E: Curve,
-        Scalar<E>: FromHash,
         L: SecurityLevel,
         D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
     {
@@ -289,12 +288,8 @@ enum Reason {
 /// Unexpected error in operation not caused by other parties
 #[derive(Debug, Error)]
 enum Bug {
-    #[error("`Tag` appears to be invalid `generic_ec::hash_to_curve::Tag`")]
-    InvalidHashToCurveTag,
     #[error("Unexpected error when creating paillier decryption key")]
     PaillierKeyError,
-    #[error("hash to scalar returned error")]
-    HashToScalarError(#[source] generic_ec::errors::HashError),
     #[error("paillier enctyption failed")]
     PaillierEnc,
     #[error("Attempting to run protocol with too many parties")]
