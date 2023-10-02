@@ -310,6 +310,8 @@ enum Bug {
     SpawnBlocking(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("couldn't build multiexp tables")]
     BuildMultiexpTables(#[source] crate::key_share::InvalidKeyShare),
+    #[error("couldn't build CRT")]
+    BuildCrt,
 }
 
 /// Error indicating that protocol was aborted by malicious party

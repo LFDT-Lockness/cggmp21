@@ -4,3 +4,6 @@ members = [
     "cggmp21",
     "tests",
 ]
+
+[patch."https://github.com/dfns-labs/fast-paillier".fast-paillier]
+path = "../fast-paillier"

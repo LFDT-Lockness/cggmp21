@@ -244,23 +244,30 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
                 s,
                 t,
                 multiexp: None,
+                crt: None,
             })
         })
         .collect::<Result<Vec<_>, Reason>>()?;
 
     pregenerated_primes
         .into_iter()
-        .map(|(p, q)| {
+        .enumerate()
+        .map(|(i, (p, q))| {
+            let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q)
+                .ok_or(Reason::BuildCrt)?;
+            let mut public_aux_data = public_aux_data.clone();
+            public_aux_data[i].crt = Some(crt);
+
             DirtyAuxInfo {
                 p,
                 q,
-                parties: public_aux_data.clone(),
+                parties: public_aux_data,
                 security_level: PhantomData,
             }
             .try_into()
+            .map_err(Reason::InvalidKeyShare)
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(Reason::InvalidKeyShare)
         .map_err(TrustedDealerError)
 }
 
@@ -277,4 +284,6 @@ enum Reason {
     PowMod,
     #[error("deriving key share index failed")]
     DeriveKeyShareIndex,
+    #[error("couldn't build a CRT")]
+    BuildCrt,
 }

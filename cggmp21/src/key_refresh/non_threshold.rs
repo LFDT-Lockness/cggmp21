@@ -461,6 +461,7 @@ where
                 t: d.t.clone(),
                 rsa_modulo: d.N.clone(),
                 multiexp: None,
+                crt: None,
             },
             π_fac::Data {
                 n: &N,
@@ -603,11 +604,15 @@ where
 
     tracer.stage("Validate ф_j (П_fac)");
     // verify fac proofs
+
+    // note: `crt` contains private information
+    let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q).ok_or(Bug::BuildCrt)?;
     let phi_common_aux = π_fac::Aux {
         s: s.clone(),
         t: t.clone(),
         rsa_modulo: N.clone(),
         multiexp: None,
+        crt: Some(crt.clone()),
     };
     let blame = collect_blame(
         &decommitments,
@@ -663,15 +668,17 @@ where
     .try_into()
     .map_err(Bug::InvalidShareGenerated)?;
     tracer.stage("Assemble auxiliary info");
-    let party_auxes = decommitments
+    let mut party_auxes = decommitments
         .iter_including_me(&decommitment)
         .map(|d| PartyAux {
             N: d.N.clone(),
             s: d.s.clone(),
             t: d.t.clone(),
             multiexp: None,
+            crt: None,
         })
-        .collect();
+        .collect::<Vec<_>>();
+    party_auxes[usize::from(i)].crt = Some(crt);
     let mut aux: AuxInfo<L> = DirtyAuxInfo {
         p,
         q,

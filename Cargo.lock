@@ -703,7 +703,6 @@ dependencies = [
 [[package]]
 name = "fast-paillier"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/fast-paillier?branch=m#2fcc31352601616b1c1bdf7eeae3dcbc5a9afaa8"
 dependencies = [
  "bytemuck",
  "rand_core",
@@ -888,7 +887,7 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.0.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#bb2e7109058e8c650cdb1469ecf1f7c486634aef"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#8ada31817aab087a58f1dc66efe50a09f49e322f"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -905,7 +904,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#bb2e7109058e8c650cdb1469ecf1f7c486634aef"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#8ada31817aab087a58f1dc66efe50a09f49e322f"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -917,7 +916,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#bb2e7109058e8c650cdb1469ecf1f7c486634aef"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#8ada31817aab087a58f1dc66efe50a09f49e322f"
 dependencies = [
  "crypto-bigint",
  "elliptic-curve",
@@ -1405,7 +1404,7 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#ffdddb74e63ba338500593f5fb722194a7c2b1bd"
+source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#17212a3b57f19e521e464163073ccbc2ae7cfb9c"
 dependencies = [
  "digest",
  "fast-paillier",

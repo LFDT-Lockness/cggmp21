@@ -100,6 +100,10 @@ pub struct PartyAux {
     pub t: Integer,
     /// Precomputed table for faster multiexponentiation
     pub multiexp: Option<Arc<paillier_zk::multiexp::MultiexpTable>>,
+    /// Enables faster modular exponentiation when factorization of `N` is known
+    ///
+    /// Note that it is extreamly sensitive! Leaking `crt` exposes Paillier private key.
+    pub crt: Option<paillier_zk::fast_paillier::utils::CrtExp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -527,6 +531,7 @@ impl From<&PartyAux> for π_enc::Aux {
             t: aux.t.clone(),
             rsa_modulo: aux.N.clone(),
             multiexp: aux.multiexp.clone(),
+            crt: aux.crt.clone(),
         }
     }
 }
