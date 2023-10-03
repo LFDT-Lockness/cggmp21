@@ -111,6 +111,7 @@ where
     tracer: Option<&'a mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
     precompute_multiexp_tables: bool,
+    precompute_crt: bool,
     _digest: std::marker::PhantomData<D>,
 }
 
@@ -143,6 +144,7 @@ where
             tracer: None,
             enforce_reliable_broadcast: true,
             precompute_multiexp_tables: false,
+            precompute_crt: false,
             _digest: std::marker::PhantomData,
         }
     }
@@ -164,6 +166,7 @@ where
             self.tracer,
             self.enforce_reliable_broadcast,
             self.precompute_multiexp_tables,
+            self.precompute_crt,
             self.target.0,
         )
         .await
@@ -191,6 +194,7 @@ where
             tracer: None,
             enforce_reliable_broadcast: true,
             precompute_multiexp_tables: false,
+            precompute_crt: false,
             _digest: std::marker::PhantomData,
         }
     }
@@ -213,6 +217,7 @@ where
             self.tracer,
             self.enforce_reliable_broadcast,
             self.precompute_multiexp_tables,
+            self.precompute_crt,
         )
         .await
     }
@@ -232,6 +237,7 @@ where
             tracer: self.tracer,
             enforce_reliable_broadcast: self.enforce_reliable_broadcast,
             precompute_multiexp_tables: self.precompute_multiexp_tables,
+            precompute_crt: self.precompute_crt,
             _digest: std::marker::PhantomData,
         }
     }
@@ -257,6 +263,18 @@ where
     /// in RAM and on disk (after serialization).
     pub fn precompute_multiexp_tables(mut self, v: bool) -> Self {
         self.precompute_multiexp_tables = v;
+        self
+    }
+
+    /// Precomputes CRT parameters
+    ///
+    /// Enables optimization of modular exponentiation in Zero-Knowledge proofs validation. Precomputation
+    /// should be relatively fast. It increases size of key share in RAM and on disk, but not noticeably.
+    ///
+    /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
+    /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
+    pub fn precompute_crt(mut self, v: bool) -> Self {
+        self.precompute_crt = v;
         self
     }
 }

@@ -117,6 +117,7 @@ pub async fn run_refresh<R, M, E, L, D>(
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
     build_multiexp_tables: bool,
+    build_crt: bool,
     core_share: &DirtyIncompleteKeyShare<E>,
 ) -> Result<KeyShare<E, L>, KeyRefreshError>
 where
@@ -606,13 +607,17 @@ where
     // verify fac proofs
 
     // note: `crt` contains private information
-    let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q).ok_or(Bug::BuildCrt)?;
+    let crt = if build_crt {
+        Some(paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q).ok_or(Bug::BuildCrt)?)
+    } else {
+        None
+    };
     let phi_common_aux = π_fac::Aux {
         s: s.clone(),
         t: t.clone(),
         rsa_modulo: N.clone(),
         multiexp: None,
-        crt: Some(crt.clone()),
+        crt: crt.clone(),
     };
     let blame = collect_blame(
         &decommitments,
@@ -678,7 +683,7 @@ where
             crt: None,
         })
         .collect::<Vec<_>>();
-    party_auxes[usize::from(i)].crt = Some(crt);
+    party_auxes[usize::from(i)].crt = crt;
     let mut aux: AuxInfo<L> = DirtyAuxInfo {
         p,
         q,
