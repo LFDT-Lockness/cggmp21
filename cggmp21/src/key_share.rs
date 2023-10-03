@@ -262,6 +262,7 @@ impl<L: SecurityLevel> AuxInfo<L> {
         // as any modification can make the aux info invalid. However, assuming that CRT
         // computation is correct, the CRT computation cannot make aux info invalid. Note that
         // invalid `i` cannot make the aux info invalid as well as it's validated.
+        #[allow(clippy::needless_borrow)]
         (&mut self.0).precompute_crt(i)
     }
 }
@@ -429,6 +430,7 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
         // as any modification can make the key share invalid. However, assuming that CRT
         // computation is correct, the CRT computation cannot make key share invalid.
         let i = self.core.i;
+        #[allow(clippy::needless_borrow)]
         (&mut self.0).aux.precompute_crt(i)
     }
 }
