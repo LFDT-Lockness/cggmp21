@@ -20,6 +20,7 @@ use crate::security_level::SecurityLevel;
 #[doc = include_str!("../docs/key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
+#[doc = include_str!("../docs/validated_key_share_disclaimer.md")]
 pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyShare<E, L>>;
 
 /// Incomplete (core) key share

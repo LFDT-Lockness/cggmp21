@@ -272,7 +272,7 @@ where
     /// should be relatively fast. It increases size of key share in RAM and on disk, but not noticeably.
     ///
     /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
-    /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
+    /// [`AuxInfo::parties`](crate::key_share::DirtyAuxInfo::parties) secret (as well as rest of the key share).
     pub fn precompute_crt(mut self, v: bool) -> Self {
         self.precompute_crt = v;
         self
