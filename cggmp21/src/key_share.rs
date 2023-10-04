@@ -253,7 +253,7 @@ impl<L: SecurityLevel> AuxInfo<L> {
     /// Takes an index of the signer `i` that it occupied at key generation.
     ///
     /// Returns error if provided index `i` does not correspond to an index of the signer, or if precomputation
-    /// failed. In this case, the key share stays unmodified. On success, CRT parameters are saved into the
+    /// key share (old params, if present, are overwritten)
     /// key share (old paras, if present, are overwritten)
     ///
     /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
