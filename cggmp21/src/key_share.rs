@@ -422,7 +422,7 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     /// should be relatively fast. It increases size of key share in RAM and on disk, but not noticeably.
     ///
     /// Returns error if precomputation failed. In this case, the key share stays unmodified. On success,
-    /// CRT parameters are saved into the key share (old paras, if present, are overwritten)
+    /// CRT parameters are saved into the key share (old params, if present, are overwritten)
     ///
     /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
     /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
