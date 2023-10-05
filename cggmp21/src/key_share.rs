@@ -20,6 +20,7 @@ use crate::security_level::SecurityLevel;
 #[doc = include_str!("../docs/key_share.md")]
 ///
 #[doc = include_str!("../docs/validated_key_share_note.md")]
+#[doc = include_str!("../docs/validated_key_share_disclaimer.md")]
 pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyShare<E, L>>;
 
 /// Incomplete (core) key share
@@ -99,7 +100,13 @@ pub struct PartyAux {
     /// Ring-Perdesten parameter $t_i$
     pub t: Integer,
     /// Precomputed table for faster multiexponentiation
+    #[serde(default)]
     pub multiexp: Option<Arc<paillier_zk::multiexp::MultiexpTable>>,
+    /// Enables faster modular exponentiation when factorization of `N` is known
+    ///
+    /// Note that it is extreamly sensitive! Leaking `crt` exposes Paillier private key.
+    #[serde(default)]
+    pub crt: Option<paillier_zk::fast_paillier::utils::CrtExp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -237,6 +244,28 @@ impl<L: SecurityLevel> AuxInfo<L> {
             .for_each(|(aux_i, table_i)| aux_i.multiexp = Some(table_i));
         Ok(())
     }
+
+    /// Precomputes CRT parameters
+    ///
+    /// Enables optimization of modular exponentiation in Zero-Knowledge proofs validation. Precomputation
+    /// should be relatively fast. It increases size of key share in RAM and on disk, but not noticeably.
+    ///
+    /// Takes an index of the signer `i` that it occupied at key generation.
+    ///
+    /// Returns error if provided index `i` does not correspond to an index of the signer, or if precomputation
+    /// key share (old params, if present, are overwritten)
+    /// key share (old paras, if present, are overwritten)
+    ///
+    /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
+    /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
+    pub fn precompute_crt(&mut self, i: u16) -> Result<(), InvalidKeyShare> {
+        // Note: we take mutable access to internal aux info which normally does not happen
+        // as any modification can make the aux info invalid. However, assuming that CRT
+        // computation is correct, the CRT computation cannot make aux info invalid. Note that
+        // invalid `i` cannot make the aux info invalid as well as it's validated.
+        #[allow(clippy::needless_borrow)]
+        (&mut self.0).precompute_crt(i)
+    }
 }
 
 impl<L: SecurityLevel> DirtyAuxInfo<L> {
@@ -281,6 +310,23 @@ impl<L: SecurityLevel> DirtyAuxInfo<L> {
                     .unwrap_or(0)
             })
             .sum()
+    }
+
+    /// Precomputes CRT parameters
+    ///
+    /// Refer to [`AuxInfo::precompute_crt`] for the docs.
+    pub fn precompute_crt(&mut self, i: u16) -> Result<(), InvalidKeyShare> {
+        let aux_i = self
+            .parties
+            .get_mut(usize::from(i))
+            .ok_or(InvalidKeyShareReason::CrtINotInRange)?;
+        if (&self.p * &self.q).complete() != aux_i.N {
+            return Err(InvalidKeyShareReason::CrtINotInRange.into());
+        }
+        let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&self.p, &self.q)
+            .ok_or(InvalidKeyShareReason::BuildCrt)?;
+        aux_i.crt = Some(crt);
+        Ok(())
     }
 }
 
@@ -368,6 +414,25 @@ impl<E: Curve, L: SecurityLevel> KeyShare<E, L> {
     /// Returns public key shared by signers
     pub fn shared_public_key(&self) -> Point<E> {
         AnyKeyShare::shared_public_key(self)
+    }
+
+    /// Precomputes CRT parameters
+    ///
+    /// Enables optimization of modular exponentiation in Zero-Knowledge proofs validation. Precomputation
+    /// should be relatively fast. It increases size of key share in RAM and on disk, but not noticeably.
+    ///
+    /// Returns error if precomputation failed. In this case, the key share stays unmodified. On success,
+    /// CRT parameters are saved into the key share (old params, if present, are overwritten)
+    ///
+    /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
+    /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
+    pub fn precompute_crt(&mut self) -> Result<(), InvalidKeyShare> {
+        // Note: we take mutable access to internal key share which normally does not happen
+        // as any modification can make the key share invalid. However, assuming that CRT
+        // computation is correct, the CRT computation cannot make key share invalid.
+        let i = self.core.i;
+        #[allow(clippy::needless_borrow)]
+        (&mut self.0).aux.precompute_crt(i)
     }
 }
 
@@ -527,6 +592,7 @@ impl From<&PartyAux> for π_enc::Aux {
             t: aux.t.clone(),
             rsa_modulo: aux.N.clone(),
             multiexp: aux.multiexp.clone(),
+            crt: aux.crt.clone(),
         }
     }
 }
@@ -645,6 +711,10 @@ enum InvalidKeyShareReason {
     PaillierPkTooSmall { required: u32, actual: u32 },
     #[error("couldn't build a multiexp table")]
     BuildMultiexpTable,
+    #[error("provided index `i` does not correspond to an index of the signer at key generation")]
+    CrtINotInRange,
+    #[error("couldn't build CRT parameters")]
+    BuildCrt,
 }
 
 /// Error indicating that [key reconstruction](reconstruct_secret_key) failed

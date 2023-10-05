@@ -98,6 +98,7 @@ pub async fn run_aux_gen<R, M, L, D>(
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
     compute_multiexp_table: bool,
+    compute_crt: bool,
 ) -> Result<AuxInfo<L>, KeyRefreshError>
 where
     R: RngCore + CryptoRng,
@@ -358,6 +359,7 @@ where
                 t: d.t.clone(),
                 rsa_modulo: d.N.clone(),
                 multiexp: None,
+                crt: None,
             },
             π_fac::Data {
                 n: &N,
@@ -419,11 +421,19 @@ where
 
     tracer.stage("Validate ф_j (П_fac)");
     // verify fac proofs
+
+    let crt = if compute_crt {
+        // note: `crt` contains private information
+        Some(paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q).ok_or(Bug::BuildCrt)?)
+    } else {
+        None
+    };
     let phi_common_aux = π_fac::Aux {
         s: s.clone(),
         t: t.clone(),
         rsa_modulo: N.clone(),
         multiexp: None,
+        crt: crt.clone(),
     };
     let blame = collect_blame(
         &decommitments,
@@ -452,15 +462,17 @@ where
     // verifications passed, compute final key shares
 
     tracer.stage("Assemble auxiliary info");
-    let party_auxes = decommitments
+    let mut party_auxes = decommitments
         .iter_including_me(&decommitment)
         .map(|d| PartyAux {
             N: d.N.clone(),
             s: d.s.clone(),
             t: d.t.clone(),
             multiexp: None,
+            crt: None,
         })
-        .collect();
+        .collect::<Vec<_>>();
+    party_auxes[usize::from(i)].crt = crt;
     let mut aux: AuxInfo<L> = DirtyAuxInfo {
         p,
         q,
