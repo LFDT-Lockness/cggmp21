@@ -57,6 +57,8 @@ pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
     n: u16,
     shared_secret_key: Option<SecretScalar<E>>,
     pregenerated_primes: Option<Vec<(Integer, Integer)>>,
+    enable_mulitexp: bool,
+    enable_crt: bool,
     _ph: PhantomData<L>,
 }
 
@@ -70,6 +72,8 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             n,
             shared_secret_key: None,
             pregenerated_primes: None,
+            enable_mulitexp: false,
+            enable_crt: false,
             _ph: PhantomData,
         }
     }
@@ -106,6 +110,27 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     pub fn set_pregenerated_primes(self, primes: Vec<(Integer, Integer)>) -> Self {
         Self {
             pregenerated_primes: Some(primes),
+            ..self
+        }
+    }
+
+    /// Enables multiexp optimization
+    ///
+    /// It takes additional time to precompute multiexp tables, and it makes the key shares larger,
+    /// but it makes the signing and presignature generation protocols faster
+    pub fn enable_multiexp(self, v: bool) -> Self {
+        Self {
+            enable_mulitexp: v,
+            ..self
+        }
+    }
+
+    /// Enables CRT optimization
+    ///
+    /// CRT optimization makes ZK proofs verification faster, and by doing so it makes the overall performance better
+    pub fn enable_crt(self, v: bool) -> Self {
+        Self {
+            enable_crt: v,
             ..self
         }
     }
@@ -184,13 +209,15 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
         let n = self.n;
+        let enable_multiexp = self.enable_mulitexp;
+        let enable_crt = self.enable_crt;
 
         let primes = self.pregenerated_primes.take();
         let core_key_shares = self.generate_core_shares(rng)?;
         let aux_data = if let Some(primes) = primes {
-            generate_aux_data_with_primes(rng, primes)?
+            generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)?
         } else {
-            generate_aux_data(rng, n)?
+            generate_aux_data(rng, n, enable_multiexp, enable_crt)?
         };
 
         let key_shares = core_key_shares
@@ -207,24 +234,34 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
 /// Generates auxiliary data for `n` signers
 ///
 /// Auxiliary data can be used to "complete" core key share using [`KeyShare::make`] constructor.
+///
+/// `enable_multiexp` and `enable_crt` flags configure whether to enable [multiexp](TrustedDealerBuilder::enable_multiexp)
+/// and [CRT](TrustedDealerBuilder::enable_crt) optimizations.
 pub fn generate_aux_data<L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
     n: u16,
+    enable_multiexp: bool,
+    enable_crt: bool,
 ) -> Result<Vec<AuxInfo<L>>, TrustedDealerError> {
     let primes =
         iter::repeat_with(|| crate::key_refresh::PregeneratedPrimes::<L>::generate(rng).split())
             .take(n.into())
             .collect::<Vec<_>>();
 
-    generate_aux_data_with_primes(rng, primes)
+    generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)
 }
 
 /// Generates auxiliary data for `n` signers using provided pregenerated primes
 ///
 /// `pregenerated_primes` should have exactly `n` pairs of primes.
+///
+/// `enable_multiexp` and `enable_crt` flags configure whether to enable [multiexp](TrustedDealerBuilder::enable_multiexp)
+/// and [CRT](TrustedDealerBuilder::enable_crt) optimizations.
 pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
     rng: &mut R,
     pregenerated_primes: Vec<(Integer, Integer)>,
+    enable_multiexp: bool,
+    enable_crt: bool,
 ) -> Result<Vec<AuxInfo<L>>, TrustedDealerError> {
     let public_aux_data = pregenerated_primes
         .iter()
@@ -239,13 +276,18 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
             let t = r.square().modulo(&N);
             let s = t.pow_mod_ref(&λ, &N).ok_or(Reason::PowMod)?.into();
 
-            Ok(PartyAux {
+            let mut aux = PartyAux {
                 N,
                 s,
                 t,
                 multiexp: None,
                 crt: None,
-            })
+            };
+            if enable_multiexp {
+                aux.precompute_multiexp_table::<L>()
+                    .map_err(Reason::BuildMultiexp)?;
+            }
+            Ok(aux)
         })
         .collect::<Result<Vec<_>, Reason>>()?;
 
@@ -253,10 +295,12 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
         .into_iter()
         .enumerate()
         .map(|(i, (p, q))| {
-            let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q)
-                .ok_or(Reason::BuildCrt)?;
             let mut public_aux_data = public_aux_data.clone();
-            public_aux_data[i].crt = Some(crt);
+            if enable_crt {
+                public_aux_data[i]
+                    .precompute_crt(&p, &q)
+                    .map_err(Reason::BuildCrt)?;
+            }
 
             DirtyAuxInfo {
                 p,
@@ -285,5 +329,7 @@ enum Reason {
     #[error("deriving key share index failed")]
     DeriveKeyShareIndex,
     #[error("couldn't build a CRT")]
-    BuildCrt,
+    BuildCrt(#[source] InvalidKeyShare),
+    #[error("couldn't build multiexp tables")]
+    BuildMultiexp(#[source] InvalidKeyShare),
 }

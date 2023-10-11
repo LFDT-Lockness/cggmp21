@@ -253,8 +253,7 @@ impl<L: SecurityLevel> AuxInfo<L> {
     /// Takes an index of the signer `i` that it occupied at key generation.
     ///
     /// Returns error if provided index `i` does not correspond to an index of the signer, or if precomputation
-    /// key share (old params, if present, are overwritten)
-    /// key share (old paras, if present, are overwritten)
+    /// failed. On success, updates CRT params within the key share (old params, if present, are overwritten)
     ///
     /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
     /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
@@ -320,12 +319,56 @@ impl<L: SecurityLevel> DirtyAuxInfo<L> {
             .parties
             .get_mut(usize::from(i))
             .ok_or(InvalidKeyShareReason::CrtINotInRange)?;
-        if (&self.p * &self.q).complete() != aux_i.N {
-            return Err(InvalidKeyShareReason::CrtINotInRange.into());
+        aux_i.precompute_crt(&self.p, &self.q)
+    }
+}
+
+impl PartyAux {
+    /// Precompute multiexponentiation table
+    ///
+    /// Enables optimization that makes signing and presigning faster. Precomputation may take a while.
+    /// It noticebly increases size of aux data both in RAM and on disk (after serialization).
+    ///
+    /// Returns error if building a multiexp table failed. On success, multiexp tables are saved (old
+    /// tables, if present, are overwritten).
+    ///
+    /// Note that provided security level must match the actual security level being used in the
+    /// protocol. Otherwise, optimization won't work, and it actually will make the protocol slower.
+    pub fn precompute_multiexp_table<L: SecurityLevel>(&mut self) -> Result<(), InvalidKeyShare> {
+        let (x_bits, y_bits) = crate::security_level::max_exponents_size::<L>();
+        let multiexp = paillier_zk::multiexp::MultiexpTable::build(
+            &self.s,
+            &self.t,
+            x_bits,
+            y_bits,
+            self.N.clone(),
+        )
+        .map(Arc::new)
+        .ok_or(InvalidKeyShareReason::BuildMultiexpTable)?;
+        self.multiexp = Some(multiexp);
+        Ok(())
+    }
+
+    /// Precomputes CRT parameters
+    ///
+    /// Enables optimization of modular exponentiation in Zero-Knowledge proofs validation. Precomputation
+    /// should be relatively fast. It increases size of key share in RAM and on disk, but not noticeably.
+    ///
+    /// Takes primes `p`, `q` as input that correspond to signer Paillier secret key.
+    ///
+    /// Returns error if provided primes do not correspond to a Paillier secret key of the signer, or if
+    /// precomputation failed. On success, updates CRT params stored within the structure (old params, if
+    /// present, are overwritten)
+    ///
+    /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
+    /// [`AuxInfo::parties`](DirtyAuxInfo::parties) secret (as well as rest of the key share).
+    pub fn precompute_crt(&mut self, p: &Integer, q: &Integer) -> Result<(), InvalidKeyShare> {
+        if (p * q).complete() != self.N {
+            return Err(InvalidKeyShareReason::CrtInvalidPq.into());
         }
-        let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&self.p, &self.q)
+        let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(p, q)
             .ok_or(InvalidKeyShareReason::BuildCrt)?;
-        aux_i.crt = Some(crt);
+        self.crt = Some(crt);
         Ok(())
     }
 }
@@ -713,6 +756,8 @@ enum InvalidKeyShareReason {
     BuildMultiexpTable,
     #[error("provided index `i` does not correspond to an index of the signer at key generation")]
     CrtINotInRange,
+    #[error("provided primes `p`, `q` do not correspond to signer Paillier public key")]
+    CrtInvalidPq,
     #[error("couldn't build CRT parameters")]
     BuildCrt,
 }
