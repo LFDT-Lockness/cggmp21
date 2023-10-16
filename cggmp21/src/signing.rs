@@ -1106,6 +1106,10 @@ where
 }
 
 impl<E: Curve> Signature<E> {
+    /// Create signature struct from `r` and `s` values
+    pub fn from_raw_parts(r: NonZero<Scalar<E>>, s: NonZero<Scalar<E>>) -> Self {
+        Self { r, s }
+    }
     /// Normilizes the signature
     ///
     /// Given that $(r, s)$ is valid signature, $(r, -s)$ is also a valid signature. Some applications (like Bitcoin)
@@ -1133,6 +1137,28 @@ impl<E: Curve> Signature<E> {
         let scalar_size = Scalar::<E>::serialized_len();
         out[0..scalar_size].copy_from_slice(&self.r.to_be_bytes());
         out[scalar_size..2 * scalar_size].copy_from_slice(&self.s.to_be_bytes());
+    }
+
+    /// Reads serialized signature from the bytes buffer.
+    ///
+    /// Bytes buffer size must be equal to [`Signature::serialized_len()`] and
+    /// none of the signature parts should be 0. If this doesn't hold, returns
+    /// `None`
+    pub fn read_from_slice(inp: &[u8]) -> Option<Self> {
+        if inp.len() != Self::serialized_len() {
+            return None;
+        }
+        let r_bytes = &inp[0..inp.len() / 2];
+        let s_bytes = &inp[inp.len() / 2..];
+        let r = generic_ec::Scalar::from_be_bytes(r_bytes)
+            .ok()?
+            .try_into()
+            .ok()?;
+        let s = generic_ec::Scalar::from_be_bytes(s_bytes)
+            .ok()?
+            .try_into()
+            .ok()?;
+        Some(Self::from_raw_parts(r, s))
     }
 
     /// Returns size of bytes buffer that can fit serialized signature
@@ -1289,3 +1315,33 @@ enum BugSource {
 #[derive(Debug, Error)]
 #[error("signature is not valid")]
 pub struct InvalidSignature;
+
+#[cfg(test)]
+mod test {
+    fn read_write_signature<E: generic_ec::Curve>() {
+        let mut rng = rand_dev::DevRng::new();
+        for _ in 0..10 {
+            let r = generic_ec::NonZero::<generic_ec::Scalar<E>>::random(&mut rng);
+            let s = generic_ec::NonZero::<generic_ec::Scalar<E>>::random(&mut rng);
+            let signature = super::Signature::from_raw_parts(r, s);
+            let mut bytes = Vec::new();
+            bytes.resize(super::Signature::<E>::serialized_len(), 0);
+            signature.write_to_slice(&mut bytes);
+            let signature2 = super::Signature::read_from_slice(&bytes).unwrap();
+            assert!(signature == signature2, "signatures equal");
+        }
+    }
+
+    #[test]
+    fn read_write_signature_secp256k1() {
+        read_write_signature::<crate::supported_curves::Secp256k1>()
+    }
+    #[test]
+    fn read_write_signature_secp256r1() {
+        read_write_signature::<crate::supported_curves::Secp256r1>()
+    }
+    #[test]
+    fn read_write_signature_stark() {
+        read_write_signature::<crate::supported_curves::Stark>()
+    }
+}
