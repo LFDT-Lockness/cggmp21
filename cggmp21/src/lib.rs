@@ -75,7 +75,7 @@
 //! ### Distributed Key Generation
 //! ```rust,no_run
 //! # async fn doc() -> Result<(), cggmp21::KeygenError> {
-//! # type Msg = cggmp21::keygen::msg::threshold::Msg<cggmp21::supported_curves::Secp256k1, cggmp21::security_level::ReasonablySecure, sha2::Sha256>;
+//! # type Msg = cggmp21::keygen::msg::threshold::Msg<cggmp21::supported_curves::Secp256k1, cggmp21::security_level::SecurityLevel128, sha2::Sha256>;
 //! # let incoming = futures::stream::pending::<Result<round_based::Incoming<Msg>, std::convert::Infallible>>();
 //! # let outgoing = futures::sink::drain::<round_based::Outgoing<Msg>>();
 //! # let delivery = (incoming, outgoing);
@@ -106,7 +106,7 @@
 //! the same indexes as at keygen.
 //! ```rust,no_run
 //! # async fn doc() -> Result<(), cggmp21::KeyRefreshError> {
-//! # type Msg = cggmp21::key_refresh::msg::aux_only::Msg<sha2::Sha256, cggmp21::security_level::ReasonablySecure>;
+//! # type Msg = cggmp21::key_refresh::msg::aux_only::Msg<sha2::Sha256, cggmp21::security_level::SecurityLevel128>;
 //! # let incoming = futures::stream::pending::<Result<round_based::Incoming<Msg>, std::convert::Infallible>>();
 //! # let outgoing = futures::sink::drain::<round_based::Outgoing<Msg>>();
 //! # let delivery = (incoming, outgoing);
@@ -269,7 +269,6 @@ pub use self::{
 /// (where $n$ is amount of parties in the protocol).
 ///
 /// [KeygenBuilder]: keygen::KeygenBuilder
-/// [ReasonablySecure]: security_level::ReasonablySecure
 /// [`set_threshold`]: keygen::GenericKeygenBuilder::set_threshold
 pub fn keygen<E>(eid: ExecutionId, i: u16, n: u16) -> keygen::KeygenBuilder<E>
 where

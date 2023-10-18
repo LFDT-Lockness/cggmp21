@@ -10,12 +10,12 @@
 //! ```rust,no_run
 //! # use rand::rngs::OsRng;
 //! # let mut rng = OsRng;
-//! use cggmp21::{supported_curves::Secp256k1, security_level::ReasonablySecure};
+//! use cggmp21::{supported_curves::Secp256k1, security_level::SecurityLevel128};
 //! use cggmp21::generic_ec::SecretScalar;
 //!
 //! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut OsRng);
 //!
-//! let key_shares = cggmp21::trusted_dealer::builder::<Secp256k1, ReasonablySecure>(5)
+//! let key_shares = cggmp21::trusted_dealer::builder::<Secp256k1, SecurityLevel128>(5)
 //!     .set_threshold(Some(3))
 //!     .set_shared_secret_key(secret_key_to_be_imported)
 //!     .generate_shares(&mut rng)?;
