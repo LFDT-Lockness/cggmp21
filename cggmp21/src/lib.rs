@@ -252,7 +252,7 @@ pub mod trusted_dealer;
 /// Defines default choice for digest and security level used across the crate
 mod default_choice {
     pub type Digest = sha2::Sha256;
-    pub type SecurityLevel = crate::security_level::ReasonablySecure;
+    pub type SecurityLevel = crate::security_level::SecurityLevel128;
 }
 
 pub use self::execution_id::ExecutionId;

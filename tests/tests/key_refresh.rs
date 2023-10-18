@@ -6,7 +6,7 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::{security_level::ReasonablySecure, ExecutionId};
+    use cggmp21::{security_level::SecurityLevel128, ExecutionId};
 
     #[test_case::case(3, false; "n3")]
     #[test_case::case(5, false; "n5")]
@@ -19,7 +19,7 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E, ReasonablySecure>(None, n)
+            .get_shares::<E, SecurityLevel128>(None, n)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
@@ -28,7 +28,7 @@ mod generic {
         let eid: [u8; 32] = rng.gen();
         let eid = ExecutionId::new(&eid);
         let mut simulation =
-            Simulation::<cggmp21::key_refresh::NonThresholdMsg<E, Sha256, ReasonablySecure>>::new();
+            Simulation::<cggmp21::key_refresh::NonThresholdMsg<E, Sha256, SecurityLevel128>>::new();
         let outputs = shares.iter().map(|share| {
             let party = simulation.add_party();
             let mut party_rng = rng.fork();
@@ -115,14 +115,14 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E, ReasonablySecure>(Some(t), n)
+            .get_shares::<E, SecurityLevel128>(Some(t), n)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
         // Perform refresh
 
         let mut simulation =
-            Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, ReasonablySecure>>::new();
+            Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, SecurityLevel128>>::new();
 
         let eid: [u8; 32] = rng.gen();
         let eid = ExecutionId::new(&eid);

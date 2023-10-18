@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use cggmp21::supported_curves::{Secp256k1, Secp256r1, Stark};
 use cggmp21::{
-    security_level::{ReasonablySecure, SecurityLevel},
+    security_level::{SecurityLevel, SecurityLevel128},
     trusted_dealer,
 };
 use cggmp21_tests::{generate_blum_prime, PrecomputedKeyShares, PregeneratedPrimes};
@@ -48,7 +48,7 @@ fn precompute_shares() -> Result<()> {
 
 fn precompute_primes() -> Result<()> {
     let mut rng = OsRng;
-    let json = PregeneratedPrimes::generate::<_, ReasonablySecure>(10, &mut rng).to_serialized()?;
+    let json = PregeneratedPrimes::generate::<_, SecurityLevel128>(10, &mut rng).to_serialized()?;
     println!("{json}");
     Ok(())
 }
@@ -65,13 +65,13 @@ fn precompute_shares_for_curve<E: Curve, R: RngCore + CryptoRng>(
         {
             eprintln!("t={t:?},n={n},curve={}", E::CURVE_NAME);
             let primes = std::iter::repeat_with(|| {
-                let p = generate_blum_prime(rng, ReasonablySecure::SECURITY_BITS * 4);
-                let q = generate_blum_prime(rng, ReasonablySecure::SECURITY_BITS * 4);
+                let p = generate_blum_prime(rng, SecurityLevel128::SECURITY_BITS * 4);
+                let q = generate_blum_prime(rng, SecurityLevel128::SECURITY_BITS * 4);
                 (p, q)
             })
             .take(n.into())
             .collect();
-            let shares = trusted_dealer::builder::<E, ReasonablySecure>(n)
+            let shares = trusted_dealer::builder::<E, SecurityLevel128>(n)
                 .set_threshold(t)
                 .set_pregenerated_primes(primes)
                 .generate_shares(rng)
