@@ -186,7 +186,7 @@ pub use define_security_level;
 
 /// 128-bits security level
 ///
-/// This security level is intended to provide 128 bits of security for the protocols with up to 128 participants.
+/// This security level is intended to provide 128 bits of security for the protocol when run with up to 128 participants.
 #[derive(Clone)]
 pub struct SecurityLevel128;
 define_security_level!(SecurityLevel128{
