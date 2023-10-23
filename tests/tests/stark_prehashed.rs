@@ -1,4 +1,4 @@
-use cggmp21::{security_level::ReasonablySecure, signing::msg::Msg};
+use cggmp21::{security_level::SecurityLevel128, signing::msg::Msg};
 use cggmp21_tests::{convert_from_stark_scalar, convert_stark_scalar};
 use generic_ec::{coords::HasAffineX, curves::Stark};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
@@ -13,7 +13,7 @@ async fn sign_transaction() {
     let n = 3;
 
     let shares = cggmp21_tests::CACHED_SHARES
-        .get_shares::<Stark, ReasonablySecure>(t, n)
+        .get_shares::<Stark, SecurityLevel128>(t, n)
         .expect("retrieve cached shares");
 
     let mut simulation = Simulation::<Msg<Stark, Sha256>>::new();

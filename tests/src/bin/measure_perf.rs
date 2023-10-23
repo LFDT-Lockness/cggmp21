@@ -1,7 +1,7 @@
 use anyhow::Context;
 use cggmp21::{
     progress::PerfProfiler,
-    security_level::{ReasonablySecure, SecurityLevel},
+    security_level::{SecurityLevel, SecurityLevel128},
     signing::DataToSign,
     ExecutionId,
 };
@@ -60,7 +60,7 @@ async fn main() {
     if args.custom_sec_level {
         do_becnhmarks::<CustomSecLevel>(args).await
     } else {
-        do_becnhmarks::<ReasonablySecure>(args).await
+        do_becnhmarks::<SecurityLevel128>(args).await
     }
 }
 

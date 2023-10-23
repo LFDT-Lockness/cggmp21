@@ -9,7 +9,7 @@ mod generic {
     use cggmp21::keygen::ThresholdMsg;
     use cggmp21::{
         key_share::{IncompleteKeyShare, KeyShare},
-        security_level::ReasonablySecure,
+        security_level::SecurityLevel128,
         ExecutionId,
     };
 
@@ -33,7 +33,7 @@ mod generic {
     where
         E: Curve,
     {
-        let mut simulation = Simulation::<ThresholdMsg<E, ReasonablySecure, Sha256>>::new();
+        let mut simulation = Simulation::<ThresholdMsg<E, SecurityLevel128, Sha256>>::new();
 
         let eid: [u8; 32] = rng.gen();
         let eid = ExecutionId::new(&eid);
@@ -64,7 +64,7 @@ mod generic {
         let n = shares.len().try_into().unwrap();
 
         let mut simulation =
-            Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, ReasonablySecure>>::new();
+            Simulation::<cggmp21::key_refresh::AuxOnlyMsg<Sha256, SecurityLevel128>>::new();
 
         let eid: [u8; 32] = rng.gen();
         let eid = ExecutionId::new(&eid);

@@ -1324,8 +1324,7 @@ mod test {
             let r = generic_ec::NonZero::<generic_ec::Scalar<E>>::random(&mut rng);
             let s = generic_ec::NonZero::<generic_ec::Scalar<E>>::random(&mut rng);
             let signature = super::Signature::from_raw_parts(r, s);
-            let mut bytes = Vec::new();
-            bytes.resize(super::Signature::<E>::serialized_len(), 0);
+            let mut bytes = vec![0; super::Signature::<E>::serialized_len()];
             signature.write_to_slice(&mut bytes);
             let signature2 = super::Signature::read_from_slice(&bytes).unwrap();
             assert!(signature == signature2, "signatures equal");

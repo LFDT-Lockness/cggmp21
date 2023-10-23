@@ -10,7 +10,7 @@ mod generic {
     use sha2::Sha256;
 
     use cggmp21::signing::{msg::Msg, DataToSign};
-    use cggmp21::{security_level::ReasonablySecure, ExecutionId};
+    use cggmp21::{security_level::SecurityLevel128, ExecutionId};
 
     #[test_case::case(None, 2, false; "n2")]
     #[test_case::case(None, 2, true; "n2-reliable")]
@@ -27,7 +27,7 @@ mod generic {
         let mut rng = DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E, ReasonablySecure>(t, n)
+            .get_shares::<E, SecurityLevel128>(t, n)
             .expect("retrieve cached shares");
 
         let mut simulation = Simulation::<Msg<E, Sha256>>::new();

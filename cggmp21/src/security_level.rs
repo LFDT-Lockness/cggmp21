@@ -3,7 +3,7 @@
 //! Security level is defined as set of parameters in the CGGMP paper. Higher security level gives more
 //! security but makes protocol execution slower.
 //!
-//! We provide a predefined default [ReasonablySecure] security level which should be sufficient for $n \le 128$.
+//! We provide a predefined default [SecurityLevel128].
 //!
 //! You can define your own security level using macro [define_security_level]. Be sure that you properly
 //! analyzed the CGGMP paper and you understand implications. Inconsistent security level may cause unexpected
@@ -184,12 +184,12 @@ macro_rules! define_security_level {
 #[doc(inline)]
 pub use define_security_level;
 
-/// Reasonably secure security level
+/// 128-bits security level
 ///
-/// This security level should be sufficient for $n \le 128$.
+/// This security level is intended to provide 128 bits of security for the protocol when run with up to 128 participants.
 #[derive(Clone)]
-pub struct ReasonablySecure;
-define_security_level!(ReasonablySecure{
+pub struct SecurityLevel128;
+define_security_level!(SecurityLevel128{
     security_bits = 384,
     epsilon = 230,
     ell = 256,

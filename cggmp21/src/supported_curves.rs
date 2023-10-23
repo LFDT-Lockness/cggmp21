@@ -3,7 +3,7 @@
 //! This crate re-exports curves that are checked to work correctly with our CGGMP implementation.
 //! Generally, this crate can work with any curve as long as it satisfies constraints (check out
 //! [`SigningBuilder`](crate::signing::SigningBuilder) generic constraints), but it might have
-//! unexpected consequences: for instance, [default security level](crate::security_level::ReasonablySecure)
+//! unexpected consequences: for instance, [default security level](crate::security_level::SecurityLevel128)
 //! might not be compatible with another curve, which might result into unexpected runtime error or
 //! reduced security of the protocol.
 

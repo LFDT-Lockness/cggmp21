@@ -9,7 +9,7 @@ mod generic {
 
     use cggmp21::keygen::{NonThresholdMsg, ThresholdMsg};
     use cggmp21::{
-        key_share::reconstruct_secret_key, security_level::ReasonablySecure, ExecutionId,
+        key_share::reconstruct_secret_key, security_level::SecurityLevel128, ExecutionId,
     };
 
     #[test_case::case(3, false; "n3")]
@@ -21,7 +21,7 @@ mod generic {
     async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool) {
         let mut rng = DevRng::new();
 
-        let mut simulation = Simulation::<NonThresholdMsg<E, ReasonablySecure, Sha256>>::new();
+        let mut simulation = Simulation::<NonThresholdMsg<E, SecurityLevel128, Sha256>>::new();
 
         let eid: [u8; 32] = rng.gen();
         let eid = ExecutionId::new(&eid);
@@ -65,7 +65,7 @@ mod generic {
     async fn threshold_keygen_works<E: Curve>(t: u16, n: u16, reliable_broadcast: bool) {
         let mut rng = DevRng::new();
 
-        let mut simulation = Simulation::<ThresholdMsg<E, ReasonablySecure, Sha256>>::new();
+        let mut simulation = Simulation::<ThresholdMsg<E, SecurityLevel128, Sha256>>::new();
 
         let eid: [u8; 32] = rng.gen();
         let eid = ExecutionId::new(&eid);
