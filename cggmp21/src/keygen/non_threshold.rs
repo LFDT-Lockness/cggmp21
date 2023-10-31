@@ -1,10 +1,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{Curve, Point, Scalar, SecretScalar};
-use generic_ec_zkp::{
-    hash_commitment::{self, HashCommit},
-    schnorr_pok,
-};
+use generic_ec_zkp::schnorr_pok;
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
@@ -17,8 +14,7 @@ use crate::{
     errors::IoError,
     key_share::{DirtyIncompleteKeyShare, IncompleteKeyShare},
     security_level::SecurityLevel,
-    utils::{hash_message, xor_array},
-    ExecutionId,
+    utils, ExecutionId,
 };
 
 use super::{Bug, KeygenAborted, KeygenError};
@@ -32,31 +28,39 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     /// Reliability check message (optional additional round)
     ReliabilityCheck(MsgReliabilityCheck<D>),
     /// Round 2 message
-    Round2(MsgRound2<E, L, D>),
+    Round2(MsgRound2<E, L>),
     /// Round 3 message
     Round3(MsgRound3<E>),
 }
 
 /// Message from round 1
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
+#[udigest(bound = "")]
+#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round1")]
 pub struct MsgRound1<D: Digest> {
     /// $V_i$
-    pub commitment: HashCommit<D>,
+    #[udigest(as_bytes)]
+    pub commitment: digest::Output<D>,
 }
 /// Message from round 2
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
-pub struct MsgRound2<E: Curve, L: SecurityLevel, D: Digest> {
+#[udigest(bound = "")]
+#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round2")]
+pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     /// `rid_i`
     #[serde(with = "hex::serde")]
+    #[udigest(as_bytes)]
     pub rid: L::Rid,
     /// $X_i$
     pub X: Point<E>,
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
     /// $u_i$
-    pub decommit: hash_commitment::DecommitNonce<D>,
+    #[serde(with = "hex::serde")]
+    #[udigest(as_bytes)]
+    pub decommit: L::Rid,
 }
 /// Message from round 3
 #[derive(Clone, Serialize, Deserialize)]
@@ -69,6 +73,14 @@ pub struct MsgRound3<E: Curve> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+
+#[derive(udigest::Digestable)]
+#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.Tag")]
+struct Tag<'a> {
+    party_index: u16,
+    #[udigest(as_bytes)]
+    sid: &'a [u8],
+}
 
 pub async fn run_keygen<E, R, M, L, D>(
     mut tracer: Option<&mut dyn Tracer>,
@@ -95,7 +107,7 @@ where
     let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
-    let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L, D>>::broadcast(i, n));
+    let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(i, n));
     let mut rounds = rounds.listen(incomings);
 
@@ -104,6 +116,13 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
+    let tag = |j| {
+        udigest::Tag::<D>::new_structured(&Tag {
+            party_index: j,
+            sid,
+        })
+    };
+    let tag_i = tag(i);
 
     tracer.stage("Sample x_i, rid_i");
     let x_i = SecretScalar::<E>::random(rng);
@@ -116,15 +135,17 @@ where
     let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
 
     tracer.stage("Commit to public data");
-    let (hash_commit, decommit) = HashCommit::<D>::builder()
-        .mix_bytes(sid)
-        .mix(n)
-        .mix(i)
-        .mix_bytes(&rid)
-        .mix(X_i)
-        .mix(sch_commit.0)
-        .commit(rng);
-
+    let my_decommitment = MsgRound2 {
+        rid,
+        X: X_i,
+        sch_commit,
+        decommit: {
+            let mut nonce = L::Rid::default();
+            rng.fill_bytes(nonce.as_mut());
+            nonce
+        },
+    };
+    let hash_commit = tag_i.clone().digest(&my_decommitment);
     let my_commitment = MsgRound1 {
         commitment: hash_commit,
     };
@@ -150,11 +171,7 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = commitments
-            .iter()
-            .try_fold(D::new(), hash_message)
-            .map_err(Bug::HashMessage)?
-            .finalize();
+        let h_i = udigest::Tag::<D>::new(sid).digest_iter(commitments.iter());
 
         tracer.send_msg();
         outgoings
@@ -185,12 +202,6 @@ where
         }
     }
 
-    let my_decommitment = MsgRound2 {
-        rid,
-        X: X_i,
-        sch_commit,
-        decommit,
-    };
     tracer.send_msg();
     outgoings
         .send(Outgoing::broadcast(Msg::Round2(my_decommitment.clone())))
@@ -214,15 +225,8 @@ where
         .zip(&commitments)
         .zip(&decommitments)
         .filter(|((j, commitment), decommitment)| {
-            HashCommit::<D>::builder()
-                .mix_bytes(sid)
-                .mix(n)
-                .mix(j)
-                .mix_bytes(&decommitment.rid)
-                .mix(decommitment.X)
-                .mix(decommitment.sch_commit.0)
-                .verify(&commitment.commitment, &decommitment.decommit)
-                .is_err()
+            let com_expected = tag(*j).digest(&decommitment);
+            commitment.commitment != com_expected
         })
         .map(|((j, _), _)| j)
         .collect::<Vec<_>>();
@@ -234,7 +238,7 @@ where
     let rid = decommitments
         .iter()
         .map(|d| &d.rid)
-        .fold(L::Rid::default(), xor_array);
+        .fold(L::Rid::default(), utils::xor_array);
     let challenge = {
         let hash = |d: D| {
             d.chain_update(sid)
