@@ -85,11 +85,19 @@ pub struct MsgRound3<E: Curve> {
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 #[derive(udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.keygen.threshold.Tag")]
-struct Tag<'a> {
-    party_index: u16,
-    #[udigest(as_bytes)]
-    sid: &'a [u8],
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.tag")]
+enum Tag<'a> {
+    /// Tag that includes the prover index
+    Indexed {
+        party_index: u16,
+        #[udigest(as_bytes)]
+        sid: &'a [u8],
+    },
+    /// Tag w/o party index
+    Unindexed {
+        #[udigest(as_bytes)]
+        sid: &'a [u8],
+    },
 }
 
 pub async fn run_threshold_keygen<E, R, M, L, D>(
@@ -129,7 +137,7 @@ where
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
     let tag = |j| {
-        udigest::Tag::<D>::new_structured(&Tag {
+        udigest::Tag::<D>::new_structured(&Tag::Indexed {
             party_index: j,
             sid,
         })
@@ -188,8 +196,8 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i =
-            udigest::Tag::<D>::new(sid).digest_iter(commitments.iter_including_me(&my_commitment));
+        let h_i = udigest::Tag::<D>::new_structured(&Tag::Unindexed { sid })
+            .digest_iter(commitments.iter_including_me(&my_commitment));
 
         tracer.send_msg();
         outgoings
