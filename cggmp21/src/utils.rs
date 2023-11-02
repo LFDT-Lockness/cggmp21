@@ -214,6 +214,29 @@ pub fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) ->
     }
 }
 
+/// Unambiguous encoding for different types for which it was not defined
+pub mod encoding {
+    use paillier_zk::rug;
+
+    pub fn integer<B: udigest::Buffer>(
+        x: &rug::Integer,
+        encoder: udigest::encoding::EncodeValue<B>,
+    ) {
+        encoder
+            .encode_leaf()
+            .chain(x.to_digits(rug::integer::Order::Msf));
+    }
+
+    pub fn integers_list<B: udigest::Buffer>(
+        list: &[rug::Integer],
+        encoder: udigest::encoding::EncodeValue<B>,
+    ) {
+        let mut encoder = encoder.encode_list();
+        for x in list {
+            integer(x, encoder.add_item())
+        }
+    }
+}
 #[cfg(test)]
 mod test {
     use paillier_zk::rug::Complete;
