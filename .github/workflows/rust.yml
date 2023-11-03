@@ -27,6 +27,7 @@ jobs:
           ${{ secrets.PAILLIER_ZK_KEY }}
           ${{ secrets.FAST_PAILLIER_KEY }}
           ${{ secrets.STARK_CURVE_KEY }}
+          ${{ secrets.UDIGEST_KEY }}
     - name: Build
       run: cargo build --release
     - uses: actions/upload-artifact@v3
