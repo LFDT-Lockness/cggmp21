@@ -173,7 +173,7 @@ where
     tracer.stage("Precompute execution id and shared state");
     let sid = execution_id.as_bytes();
     let tag = |j| {
-        udigest::Tag::<D>::new_structured(&Tag::Indexed {
+        udigest::Tag::<D>::new_structured(Tag::Indexed {
             party_index: j,
             sid,
         })
@@ -335,7 +335,7 @@ where
     // validate decommitments
     tracer.stage("Validate round 1 decommitments");
     let blame = collect_blame(&decommitments, &commitments, |j, decomm, comm| {
-        tag(j).digest(&decomm) != comm.commitment
+        tag(j).digest(decomm) != comm.commitment
     });
     if !blame.is_empty() {
         return Err(ProtocolAborted::invalid_decommitment(blame).into());

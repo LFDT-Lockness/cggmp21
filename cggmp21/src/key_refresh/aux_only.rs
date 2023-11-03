@@ -152,7 +152,7 @@ where
     tracer.stage("Precompute execution id and shared state");
     let sid = execution_id.as_bytes();
     let tag = |j| {
-        udigest::Tag::<D>::new_structured(&Tag::Indexed {
+        udigest::Tag::<D>::new_structured(Tag::Indexed {
             party_index: j,
             sid,
         })

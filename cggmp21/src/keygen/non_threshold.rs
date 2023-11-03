@@ -125,7 +125,7 @@ where
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
     let tag = |j| {
-        udigest::Tag::<D>::new_structured(&Tag::Indexed {
+        udigest::Tag::<D>::new_structured(Tag::Indexed {
             party_index: j,
             sid,
         })
@@ -234,7 +234,7 @@ where
         .zip(&commitments)
         .zip(&decommitments)
         .filter(|((j, commitment), decommitment)| {
-            let com_expected = tag(*j).digest(&decommitment);
+            let com_expected = tag(*j).digest(decommitment);
             commitment.commitment != com_expected
         })
         .map(|((j, _), _)| j)
