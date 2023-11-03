@@ -322,8 +322,6 @@ enum Bug {
     PowMod,
     #[error("couldn't prove prm statement")]
     PiPrm(#[source] crate::zk::ring_pedersen_parameters::ZkError),
-    #[error("couldn't hash a message")]
-    HashMessage(#[source] crate::utils::HashMessageError),
     #[error("spawned blocking routine panicked")]
     SpawnBlocking(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("couldn't build multiexp tables")]

@@ -198,7 +198,6 @@ where
 
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
-    let order = rug::integer::Order::Msf;
     let decommitment = MsgRound2 {
         N: N.clone(),
         s: s.clone(),
