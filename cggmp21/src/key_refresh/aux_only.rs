@@ -3,7 +3,7 @@ use futures::SinkExt;
 use paillier_zk::{
     no_small_factor::non_interactive as π_fac,
     paillier_blum_modulus as π_mod,
-    rug::{self, Complete, Integer},
+    rug::{Complete, Integer},
     IntegerExt,
 };
 use rand_core::{CryptoRng, RngCore};

@@ -322,10 +322,10 @@ dependencies = [
  "rand_dev",
  "round-based",
  "serde",
- "serde_json",
  "serde_with 2.3.3",
  "sha2",
  "thiserror",
+ "udigest",
 ]
 
 [[package]]
@@ -888,7 +888,6 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.0.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#8ada31817aab087a58f1dc66efe50a09f49e322f"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -899,13 +898,13 @@ dependencies = [
  "serde",
  "serde_with 2.3.3",
  "subtle",
+ "udigest",
  "zeroize",
 ]
 
 [[package]]
 name = "generic-ec-core"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#8ada31817aab087a58f1dc66efe50a09f49e322f"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -917,7 +916,6 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#8ada31817aab087a58f1dc66efe50a09f49e322f"
 dependencies = [
  "crypto-bigint",
  "elliptic-curve",
@@ -934,14 +932,13 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#bb2e7109058e8c650cdb1469ecf1f7c486634aef"
 dependencies = [
- "digest",
  "generic-array",
  "generic-ec",
  "rand_core",
  "serde",
  "subtle",
+ "udigest",
 ]
 
 [[package]]
@@ -2476,6 +2473,25 @@ name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
+
+[[package]]
+name = "udigest"
+version = "0.1.0"
+source = "git+https://github.com/dfns-labs/udigest?branch=version-0#0b5f41b73a2cf0279b6f8456a85c8d56ac03b61f"
+dependencies = [
+ "digest",
+ "udigest-derive",
+]
+
+[[package]]
+name = "udigest-derive"
+version = "0.1.0"
+source = "git+https://github.com/dfns-labs/udigest?branch=version-0#0b5f41b73a2cf0279b6f8456a85c8d56ac03b61f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.32",
+]
 
 [[package]]
 name = "uint"
