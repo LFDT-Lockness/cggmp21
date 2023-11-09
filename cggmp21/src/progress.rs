@@ -382,48 +382,52 @@ impl fmt::Display for PerfReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let total_computation =
             self.setup + self.rounds.iter().map(|r| r.computation).sum::<Duration>();
-        let total_send = self.rounds.iter().map(|r| r.sending).sum::<Duration>();
-        let total_recv = self.rounds.iter().map(|r| r.receiving).sum::<Duration>();
+        let total_send = if self.display_io {
+            self.rounds.iter().map(|r| r.sending).sum::<Duration>()
+        } else {
+            Duration::ZERO
+        };
+        let total_recv = if self.display_io {
+            self.rounds.iter().map(|r| r.receiving).sum::<Duration>()
+        } else {
+            Duration::ZERO
+        };
         let total_io = total_send + total_recv;
         let total = total_computation + total_io;
 
+        writeln!(f, "Protocol Performance:")?;
+        writeln!(f, "  - Protocol took {total:.2?} to complete")?;
         if self.display_io {
-            writeln!(f, "Protocol Performance:")?;
-            writeln!(f, "  - Protocol took {total:.2?} to complete")?;
-            writeln!(f, "    - Computation: {total_computation:?}")?;
-            writeln!(f, "    - I/O: {total_io:.2?}")?;
+            writeln!(
+                f,
+                "    - Computation: {total_computation:.2?} ({})",
+                percent(total_computation, total)
+            )?;
+            writeln!(
+                f,
+                "    - I/O: {total_io:.2?} ({})",
+                percent(total_io, total)
+            )?;
             writeln!(f, "      - Send: {total_send:.2?}")?;
             writeln!(f, "      - Recv: {total_recv:.2?}")?;
-            writeln!(f, "In particular:")?;
-            writeln!(f, "  - Setup: {:.2?}", self.setup)?;
+        }
 
-            for (i, round) in self.rounds.iter().enumerate() {
-                writeln!(
-                    f,
-                    "  - Round {}: {:.2?}",
-                    i + 1,
-                    round.computation + round.sending + round.receiving
-                )?;
-                writeln!(f, "    - Computation: {:.2?}", round.computation)?;
-                writeln!(f, "    - I/O: {:.2?}", round.sending + round.receiving)?;
-                writeln!(f, "      - Send: {:.2?}", round.sending)?;
-                writeln!(f, "      - Recv: {:.2?}", round.receiving)?;
-            }
-        } else {
-            writeln!(f, "Protocol Performance:")?;
-            writeln!(f, "  - Protocol took {total_computation:.2?} to complete")?;
-            writeln!(f, "In particular:")?;
-            writeln!(f, "  - Setup: {:.2?}", self.setup)?;
-            Self::fmt_stages(f, self.setup, &self.setup_stages)?;
+        writeln!(f, "In particular:")?;
+        Self::fmt_round(f, 0, Some("Stage"), &self.setup_stages, self.setup, None)?;
 
-            for (i, round) in self.rounds.iter().enumerate() {
-                if let Some(round_name) = round.round_name {
-                    writeln!(f, "  - {round_name}: {:.2?}", round.computation)?
+        for (i, round) in self.rounds.iter().enumerate() {
+            Self::fmt_round(
+                f,
+                i + 1,
+                round.round_name,
+                &round.stages,
+                round.computation,
+                if self.display_io {
+                    Some((round.sending, round.receiving))
                 } else {
-                    writeln!(f, "  - Round {}: {:.2?}", i + 1, round.computation)?
-                }
-                Self::fmt_stages(f, round.computation, &round.stages)?;
-            }
+                    None
+                },
+            )?;
         }
 
         Ok(())
@@ -431,25 +435,72 @@ impl fmt::Display for PerfReport {
 }
 
 impl PerfReport {
+    fn fmt_round(
+        f: &mut fmt::Formatter,
+        i: usize,
+        round_name: Option<&str>,
+        stages: &[StageDuration],
+        computation: Duration,
+        io: Option<(Duration, Duration)>, // (sending, receiving)
+    ) -> fmt::Result {
+        let total_duration = computation + io.map(|(s, r)| s + r).unwrap_or_default();
+        if let Some(round_name) = round_name {
+            writeln!(f, "  - {round_name}: {:.2?}", total_duration)?
+        } else {
+            writeln!(f, "  - Round {}: {:.2?}", i, total_duration)?
+        }
+
+        Self::fmt_stages(f, total_duration, stages)?;
+
+        if let Some((sending, receiving)) = io {
+            let total_io = sending + receiving;
+            writeln!(
+                f,
+                "    - I/O: {:.2?} ({})",
+                total_io,
+                percent(total_io, total_duration)
+            )?;
+            writeln!(f, "      - Send: {:.2?}", sending)?;
+            writeln!(f, "      - Recv: {:.2?}", receiving)?;
+        }
+
+        if !stages.is_empty() || io.is_some() {
+            let stages_total = stages.iter().map(|s| s.duration).sum::<Duration>();
+            let unstaged = computation - stages_total;
+            let percent = percent(unstaged, total_duration);
+            writeln!(f, "    - Unstaged: {unstaged:.2?} ({percent})")?;
+        }
+
+        Ok(())
+    }
+
     fn fmt_stages(
         f: &mut fmt::Formatter,
         total: Duration,
         stages: &[StageDuration],
     ) -> fmt::Result {
         for stage in stages {
-            let percent = stage.duration.as_secs_f64() / total.as_secs_f64() * 100.;
             writeln!(
                 f,
-                "    - {}: {:.2?} ({percent:.1}%)",
-                stage.name, stage.duration
+                "    - {}: {:.2?} ({})",
+                stage.name,
+                stage.duration,
+                percent(stage.duration, total),
             )?;
-        }
-        if !stages.is_empty() {
-            let stages_total = stages.iter().map(|s| s.duration).sum::<Duration>();
-            let unstaged = total - stages_total;
-            let percent = unstaged.as_secs_f64() / total.as_secs_f64() * 100.;
-            writeln!(f, "    - Unstaged: {unstaged:.2?} ({percent:.1}%)")?;
         }
         Ok(())
     }
+}
+
+fn percent(part: Duration, total: Duration) -> impl fmt::Display {
+    struct Percentage(Duration, Duration);
+
+    impl fmt::Display for Percentage {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let percent = self.0.as_secs_f64() / self.1.as_secs_f64() * 100.;
+            write!(f, "{percent:.1}%")
+        }
+    }
+
+    Percentage(part, total)
 }
