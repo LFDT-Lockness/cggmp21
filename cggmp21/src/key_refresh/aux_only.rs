@@ -8,7 +8,6 @@ use paillier_zk::{
 };
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    blocking::SpawnBlocking,
     rounds_router::{simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
 };
@@ -138,9 +137,7 @@ where
     tracer.stage("Retrieve auxiliary data");
 
     tracer.stage("Setup networking");
-    let MpcParty {
-        delivery, blocking, ..
-    } = party.into_party();
+    let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     let mut rounds = RoundsRouter::<Msg<D, L>>::builder();
@@ -484,14 +481,9 @@ where
 
     if compute_multiexp_table {
         tracer.stage("Precompute multiexp tables");
-        aux = blocking
-            .spawn(move || {
-                aux.precompute_multiexp_tables()?;
-                Ok(aux)
-            })
-            .await
-            .map_err(|err| Bug::SpawnBlocking(Box::new(err)))?
-            .map_err(Bug::BuildMultiexpTables)?
+
+        aux.precompute_multiexp_tables()
+            .map_err(Bug::BuildMultiexpTables)?;
     }
 
     tracer.protocol_ends();

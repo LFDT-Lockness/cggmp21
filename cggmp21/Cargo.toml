@@ -28,8 +28,6 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_with = "2"
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
-tokio = { version = "1", features = ["rt"] }
-
 [dev-dependencies]
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive", "dev"] }
 

@@ -14,6 +14,7 @@ use paillier_zk::{
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
+    runtime::AsyncRuntime,
     Delivery, Mpc, MpcParty, MsgId, Outgoing, PartyIndex,
 };
 use serde::{Deserialize, Serialize};
@@ -476,7 +477,9 @@ where
     R: RngCore + CryptoRng,
     NonZero<Point<E>>: AlwaysHasAffineX<E>,
 {
-    let MpcParty { delivery, .. } = party.into_party();
+    let MpcParty {
+        delivery, runtime, ..
+    } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     tracer.stage("Retrieve auxiliary data");
@@ -517,7 +520,7 @@ where
     let K_i = dec_i
         .encrypt_with(&utils::scalar_to_bignumber(&k_i), &rho_i)
         .map_err(|_| Bug::PaillierEnc(BugSource::K_i))?;
-    tokio::task::yield_now().await;
+    runtime.yield_now().await;
 
     tracer.send_msg();
     outgoings
@@ -640,7 +643,7 @@ where
             return Err(SigningAborted::EncProofOfK(faulty_parties).into());
         }
     }
-    tokio::task::yield_now().await;
+    runtime.yield_now().await;
 
     // Step 2
     let Gamma_i = Point::generator() * &gamma_i;
@@ -697,7 +700,7 @@ where
                 .oadd(&x_i_times_K_j, &neg_hat_beta_ij_enc)
                 .map_err(|_| Bug::PaillierOp(BugSource::hat_D))?
         };
-        tokio::task::yield_now().await;
+        runtime.yield_now().await;
 
         tracer.stage("Encrypt hat_F_ji");
         let hat_F_ji = dec_i
@@ -727,7 +730,7 @@ where
             &mut *rng,
         )
         .map_err(|e| Bug::PiAffG(BugSource::psi, e))?;
-        tokio::task::yield_now().await;
+        runtime.yield_now().await;
 
         tracer.stage("Prove psiˆ_ji");
         let hat_psi_ji = pi_aff::non_interactive::prove(
@@ -770,7 +773,7 @@ where
             &mut *rng,
         )
         .map_err(|e| Bug::PiLog(BugSource::psi_prime, e))?;
-        tokio::task::yield_now().await;
+        runtime.yield_now().await;
 
         tracer.send_msg();
         outgoings
@@ -873,7 +876,7 @@ where
                 (psi_invalid, hat_psi_invalid, psi_prime_invalid),
             ))
         }
-        tokio::task::yield_now().await;
+        runtime.yield_now().await;
     }
 
     if !faulty_parties.is_empty() {
@@ -908,7 +911,7 @@ where
 
     let delta_i = gamma_i.as_ref() * k_i.as_ref() + alpha_sum + beta_sum;
     let chi_i = x_i.as_ref() * k_i.as_ref() + hat_alpha_sum + hat_beta_sum;
-    tokio::task::yield_now().await;
+    runtime.yield_now().await;
 
     for j in utils::iter_peers(i, n) {
         tracer.stage("Prove psi_prime_prime");
@@ -985,7 +988,7 @@ where
             faulty_parties.push((j, ciphertext_id, msg_id))
         }
     }
-    tokio::task::yield_now().await;
+    runtime.yield_now().await;
 
     if !faulty_parties.is_empty() {
         return Err(SigningAborted::InvalidPsiPrimePrime(faulty_parties).into());

@@ -295,7 +295,6 @@ dependencies = [
  "serde_with 2.3.3",
  "sha2",
  "thiserror",
- "tokio",
  "udigest",
 ]
 
@@ -1683,7 +1682,7 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#f1a368c1da0251e5a792f7570c52a95478222500"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#6dddbf2780e356d0126000dab4ece94f9b89078d"
 dependencies = [
  "futures-util",
  "phantom-type 0.3.1",
@@ -1697,7 +1696,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#f1a368c1da0251e5a792f7570c52a95478222500"
+source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#6dddbf2780e356d0126000dab4ece94f9b89078d"
 dependencies = [
  "proc-macro2",
  "quote",
