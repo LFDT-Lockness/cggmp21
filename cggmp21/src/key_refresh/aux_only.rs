@@ -1,10 +1,9 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec_zkp::hash_commitment::{self, HashCommit};
 use paillier_zk::{
     no_small_factor::non_interactive as π_fac,
     paillier_blum_modulus as π_mod,
-    rug::{self, Complete, Integer},
+    rug::{Complete, Integer},
     IntegerExt,
 };
 use rand_core::{CryptoRng, RngCore};
@@ -20,7 +19,7 @@ use crate::{
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
-    utils::{collect_blame, hash_message, AbortBlame},
+    utils::{collect_blame, AbortBlame},
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
 };
@@ -36,7 +35,7 @@ pub enum Msg<D: Digest, L: SecurityLevel> {
     /// Round 1 message
     Round1(MsgRound1<D>),
     /// Round 2 message
-    Round2(MsgRound2<D, L>),
+    Round2(MsgRound2<L>),
     /// Round 3 message
     Round3(MsgRound3),
     /// Reliability check message (optional additional round)
@@ -44,21 +43,29 @@ pub enum Msg<D: Digest, L: SecurityLevel> {
 }
 
 /// Message from round 1
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
+#[udigest(tag = "dfns.cggmp21.aux_gen.round1")]
+#[udigest(bound = "")]
 #[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
     /// $V_i$
-    pub commitment: HashCommit<D>,
+    #[udigest(as_bytes)]
+    pub commitment: digest::Output<D>,
 }
 /// Message from round 2
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
+#[udigest(tag = "dfns.cggmp21.aux_gen.round2")]
+#[udigest(bound = "")]
 #[serde(bound = "")]
-pub struct MsgRound2<D: Digest, L: SecurityLevel> {
+pub struct MsgRound2<L: SecurityLevel> {
     /// $N_i$
+    #[udigest(with = utils::encoding::integer)]
     pub N: Integer,
     /// $s_i$
+    #[udigest(with = utils::encoding::integer)]
     pub s: Integer,
     /// $t_i$
+    #[udigest(with = utils::encoding::integer)]
     pub t: Integer,
     /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
@@ -66,9 +73,12 @@ pub struct MsgRound2<D: Digest, L: SecurityLevel> {
     /// $\rho_i$
     // ideally it would be [u8; L::SECURITY_BYTES], but no rustc support yet
     #[serde(with = "hex")]
+    #[udigest(as_bytes)]
     pub rho_bytes: L::Rid,
     /// $u_i$
-    pub decommit: hash_commitment::DecommitNonce<D>,
+    #[serde(with = "hex")]
+    #[udigest(as_bytes)]
+    pub decommit: L::Rid,
 }
 /// Unicast message of round 3, sent to each participant
 #[derive(Clone, Serialize, Deserialize)]
@@ -87,6 +97,22 @@ pub struct MsgRound3 {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+
+#[derive(udigest::Digestable)]
+#[udigest(tag = "dfns.cggmp21.aux_gen.tag")]
+enum Tag<'a> {
+    /// Tag that includes the prover index
+    Indexed {
+        party_index: u16,
+        #[udigest(as_bytes)]
+        sid: &'a [u8],
+    },
+    /// Tag w/o party index
+    Unindexed {
+        #[udigest(as_bytes)]
+        sid: &'a [u8],
+    },
+}
 
 pub async fn run_aux_gen<R, M, L, D>(
     i: u16,
@@ -119,12 +145,19 @@ where
     let mut rounds = RoundsRouter::<Msg<D, L>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
-    let round2 = rounds.add_round(RoundInput::<MsgRound2<D, L>>::broadcast(i, n));
+    let round2 = rounds.add_round(RoundInput::<MsgRound2<L>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
 
     tracer.stage("Precompute execution id and shared state");
     let sid = execution_id.as_bytes();
+    let tag = |j| {
+        udigest::Tag::<D>::new_structured(Tag::Indexed {
+            party_index: j,
+            sid,
+        })
+    };
+    let tag_i = tag(i);
     let parties_shared_state = D::new_with_prefix(D::digest(sid));
 
     // Round 1
@@ -165,19 +198,19 @@ where
 
     tracer.stage("Compute hash commitment and sample decommitment");
     // V_i and u_i in paper
-    // TODO: decommitment should be kappa bits
-    let order = rug::integer::Order::Msf;
-    let (hash_commit, decommit) = HashCommit::<D>::builder()
-        .mix_bytes(sid)
-        .mix(n)
-        .mix(i)
-        .mix_bytes(&N.to_digits::<u8>(order))
-        .mix_bytes(&s.to_digits::<u8>(order))
-        .mix_bytes(&t.to_digits::<u8>(order))
-        .mix_many_bytes(hat_psi.commitment.iter().map(|x| x.to_digits::<u8>(order)))
-        .mix_many_bytes(hat_psi.zs.iter().map(|x| x.to_digits::<u8>(order)))
-        .mix_bytes(&rho_bytes)
-        .commit(rng);
+    let decommitment = MsgRound2 {
+        N: N.clone(),
+        s: s.clone(),
+        t: t.clone(),
+        params_proof: hat_psi,
+        rho_bytes: rho_bytes.clone(),
+        decommit: {
+            let mut nonce = L::Rid::default();
+            rng.fill_bytes(nonce.as_mut());
+            nonce
+        },
+    };
+    let hash_commit = tag_i.clone().digest(&decommitment);
 
     tracer.send_msg();
     let commitment = MsgRound1 {
@@ -202,11 +235,8 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = commitments
-            .iter_including_me(&commitment)
-            .try_fold(D::new(), hash_message)
-            .map_err(Bug::HashMessage)?
-            .finalize();
+        let h_i = udigest::Tag::<D>::new_structured(&Tag::Unindexed { sid })
+            .digest_iter(commitments.iter_including_me(&commitment));
 
         tracer.send_msg();
         outgoings
@@ -238,14 +268,6 @@ where
     }
 
     tracer.send_msg();
-    let decommitment = MsgRound2 {
-        N: N.clone(),
-        s: s.clone(),
-        t: t.clone(),
-        params_proof: hat_psi,
-        rho_bytes: rho_bytes.clone(),
-        decommit,
-    };
     outgoings
         .send(Outgoing::broadcast(Msg::Round2(decommitment.clone())))
         .await
@@ -265,30 +287,7 @@ where
     // validate decommitments
     tracer.stage("Validate round 1 decommitments");
     let blame = collect_blame(&decommitments, &commitments, |j, decomm, comm| {
-        HashCommit::<D>::builder()
-            .mix_bytes(sid)
-            .mix(n)
-            .mix(j)
-            .mix_bytes(decomm.N.to_digits::<u8>(order))
-            .mix_bytes(decomm.s.to_digits::<u8>(order))
-            .mix_bytes(decomm.t.to_digits::<u8>(order))
-            .mix_many_bytes(
-                decomm
-                    .params_proof
-                    .commitment
-                    .iter()
-                    .map(|x| x.to_digits::<u8>(order)),
-            )
-            .mix_many_bytes(
-                decomm
-                    .params_proof
-                    .zs
-                    .iter()
-                    .map(|x| x.to_digits::<u8>(order)),
-            )
-            .mix_bytes(&decomm.rho_bytes)
-            .verify(&comm.commitment, &decomm.decommit)
-            .is_err()
+        tag(j).digest(decomm) != comm.commitment
     });
     if !blame.is_empty() {
         return Err(ProtocolAborted::invalid_decommitment(blame).into());

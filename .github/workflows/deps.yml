@@ -23,6 +23,7 @@ jobs:
           ${{ secrets.PAILLIER_ZK_KEY }}
           ${{ secrets.FAST_PAILLIER_KEY }}
           ${{ secrets.STARK_CURVE_KEY }}
+          ${{ secrets.UDIGEST_KEY }}
     - uses: actions/checkout@v3
       with:
         path: base_branch

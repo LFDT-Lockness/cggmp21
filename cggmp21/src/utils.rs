@@ -1,4 +1,3 @@
-use digest::Digest;
 use generic_ec::{Curve, Scalar};
 use paillier_zk::rug::{self, Integer};
 use paillier_zk::{
@@ -7,8 +6,6 @@ use paillier_zk::{
 };
 use round_based::rounds_router::simple_store::RoundMsgs;
 use round_based::{MsgId, PartyIndex};
-use serde::Serialize;
-use thiserror::Error;
 
 use crate::security_level::SecurityLevel;
 
@@ -47,30 +44,6 @@ impl SecurityParams {
         }
     }
 }
-
-pub fn hash_message<T, D>(digest: D, message: &T) -> Result<D, HashMessageError>
-where
-    T: Serialize,
-    D: Digest,
-{
-    struct Writer<D: Digest>(D);
-    impl<D: Digest> std::io::Write for Writer<D> {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.update(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-    let mut writer = Writer(digest);
-    serde_json::to_writer(&mut writer, message).map_err(HashMessageError)?;
-    Ok(writer.0)
-}
-
-#[derive(Debug, Error)]
-#[error("failed to hash message")]
-pub struct HashMessageError(#[source] serde_json::Error);
 
 pub fn xor_array<A, B>(mut a: A, b: B) -> A
 where
@@ -241,6 +214,29 @@ pub fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) ->
     }
 }
 
+/// Unambiguous encoding for different types for which it was not defined
+pub mod encoding {
+    use paillier_zk::rug;
+
+    pub fn integer<B: udigest::Buffer>(
+        x: &rug::Integer,
+        encoder: udigest::encoding::EncodeValue<B>,
+    ) {
+        encoder
+            .encode_leaf()
+            .chain(x.to_digits(rug::integer::Order::Msf));
+    }
+
+    pub fn integers_list<B: udigest::Buffer>(
+        list: &[rug::Integer],
+        encoder: udigest::encoding::EncodeValue<B>,
+    ) {
+        let mut encoder = encoder.encode_list();
+        for x in list {
+            integer(x, encoder.add_item())
+        }
+    }
+}
 #[cfg(test)]
 mod test {
     use paillier_zk::rug::Complete;

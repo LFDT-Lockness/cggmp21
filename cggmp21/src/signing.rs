@@ -22,7 +22,6 @@ use thiserror::Error;
 use crate::errors::IoError;
 use crate::key_share::{KeyShare, PartyAux, VssSetup};
 use crate::progress::Tracer;
-use crate::utils::{hash_message, iter_peers, subset, HashMessageError};
 use crate::{key_share::InvalidKeyShare, security_level::SecurityLevel, utils, ExecutionId};
 
 use self::msg::*;
@@ -119,6 +118,8 @@ pub mod msg {
     use round_based::ProtocolMessage;
     use serde::{Deserialize, Serialize};
 
+    use crate::utils;
+
     /// Signing protocol message
     ///
     /// Enumerates messages from all rounds
@@ -141,11 +142,14 @@ pub mod msg {
     }
 
     /// Message from round 1a
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
+    #[udigest(tag = "dfns.cggmp21.signing.round1")]
     pub struct MsgRound1a {
         /// $K_i$
+        #[udigest(with = utils::encoding::integer)]
         pub K: fast_paillier::Ciphertext,
         /// $G_i$
+        #[udigest(with = utils::encoding::integer)]
         pub G: fast_paillier::Ciphertext,
     }
 
@@ -337,6 +341,13 @@ where
     }
 }
 
+/// Tag w/o party index
+#[derive(udigest::Digestable)]
+#[udigest(tag = "dfns.cggmp21.signing.tag")]
+struct TagUnindexed<'a> {
+    sid: &'a [u8],
+}
+
 /// t-out-of-n signing
 ///
 /// CGGMP paper doesn't support threshold signing out of the box. However, threshold signing
@@ -391,8 +402,8 @@ where
     // Assemble x_i and \vec X
     let (x_i, X) = if let Some(VssSetup { I, .. }) = &key_share.core.vss_setup {
         // For t-out-of-n keys generated via VSS DKG scheme
-        let I = subset(S, I).ok_or(Bug::Subset)?;
-        let X = subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
+        let I = utils::subset(S, I).ok_or(Bug::Subset)?;
+        let X = utils::subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
 
         let lambda_i =
             lagrange_coefficient(Scalar::zero(), usize::from(i), &I).ok_or(Bug::LagrangeCoef)?;
@@ -408,14 +419,14 @@ where
         (x_i, X)
     } else {
         // For n-out-of-n keys generated using original CGGMP DKG
-        let X = subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
+        let X = utils::subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
         (key_share.core.x.clone(), X)
     };
     debug_assert_eq!(key_share.core.shared_public_key, X.iter().sum::<Point<E>>());
 
     // Assemble rest of the data
     let (p_i, q_i) = (&key_share.aux.p, &key_share.aux.q);
-    let R = subset(S, &key_share.aux.parties).ok_or(Bug::Subset)?;
+    let R = utils::subset(S, &key_share.aux.parties).ok_or(Bug::Subset)?;
 
     // t-out-of-t signing
     signing_n_out_of_n::<_, _, L, _, _>(
@@ -518,7 +529,7 @@ where
     tracer.msg_sent();
 
     let parties_shared_state = D::new_with_prefix(D::digest(sid));
-    for j in iter_peers(i, n) {
+    for j in utils::iter_peers(i, n) {
         tracer.stage("Prove ψ0_j");
         let R_j = &R[usize::from(j)];
 
@@ -564,14 +575,12 @@ where
     // Reliability check (if enabled)
     if enforce_reliable_broadcast {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = ciphertexts
-            .iter_including_me(&MsgRound1a {
+        let h_i = udigest::Tag::<D>::new_structured(&TagUnindexed { sid }).digest_iter(
+            ciphertexts.iter_including_me(&MsgRound1a {
                 K: K_i.clone(),
                 G: G_i.clone(),
-            })
-            .try_fold(D::new(), hash_message)
-            .map_err(Bug::HashMessage)?
-            .finalize();
+            }),
+        );
 
         tracer.send_msg();
         outgoings
@@ -894,7 +903,7 @@ where
     let delta_i = gamma_i.as_ref() * k_i.as_ref() + alpha_sum + beta_sum;
     let chi_i = x_i.as_ref() * k_i.as_ref() + hat_alpha_sum + hat_beta_sum;
 
-    for j in iter_peers(i, n) {
+    for j in utils::iter_peers(i, n) {
         tracer.stage("Prove psi_prime_prime");
         let R_j = &R[usize::from(j)];
         let psi_prime_prime = pi_log::non_interactive::prove(
@@ -1281,8 +1290,6 @@ enum Bug {
     ZeroR,
     #[error("unexpected protocol output")]
     UnexpectedProtocolOutput,
-    #[error("reliable broadcast")]
-    HashMessage(#[source] HashMessageError),
     #[error("derive lagrange coef")]
     LagrangeCoef,
     #[error("subset function returned error")]

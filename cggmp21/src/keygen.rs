@@ -16,7 +16,6 @@ use crate::{
     errors::IoError,
     key_share::{IncompleteKeyShare, InvalidKeyShare},
     security_level::SecurityLevel,
-    utils::HashMessageError,
     ExecutionId,
 };
 
@@ -271,8 +270,6 @@ enum KeygenAborted {
 enum Bug {
     #[error("resulting key share is not valid")]
     InvalidKeyShare(#[source] InvalidKeyShare),
-    #[error("hash message")]
-    HashMessage(#[source] HashMessageError),
     #[error("unexpected zero value")]
     NonZeroScalar,
 }

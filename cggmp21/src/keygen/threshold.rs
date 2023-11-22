@@ -1,11 +1,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
-use generic_ec_zkp::{
-    hash_commitment::{self, HashCommit},
-    polynomial::Polynomial,
-    schnorr_pok,
-};
+use generic_ec_zkp::{polynomial::Polynomial, schnorr_pok};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
@@ -19,9 +15,7 @@ use crate::{
     errors::IoError,
     key_share::{IncompleteKeyShare, VssSetup},
     security_level::SecurityLevel,
-    utils,
-    utils::{hash_message, xor_array},
-    ExecutionId,
+    utils, ExecutionId,
 };
 
 use super::{Bug, KeygenAborted, KeygenError};
@@ -33,7 +27,7 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     /// Round 1 message
     Round1(MsgRound1<D>),
     /// Round 2a message
-    Round2Broad(MsgRound2Broad<E, L, D>),
+    Round2Broad(MsgRound2Broad<E, L>),
     /// Round 2b message
     Round2Uni(MsgRound2Uni<E>),
     /// Round 3 message
@@ -43,25 +37,33 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
 }
 
 /// Message from round 1
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
+#[udigest(bound = "")]
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
 pub struct MsgRound1<D: Digest> {
     /// $V_i$
-    pub commitment: HashCommit<D>,
+    #[udigest(as_bytes)]
+    pub commitment: digest::Output<D>,
 }
 /// Message from round 2 broadcasted to everyone
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
-pub struct MsgRound2Broad<E: Curve, L: SecurityLevel, D: Digest> {
+#[udigest(bound = "")]
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
+pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// `rid_i`
     #[serde(with = "hex::serde")]
+    #[udigest(as_bytes)]
     pub rid: L::Rid,
     /// $\vec S_i$
     pub F: Polynomial<Point<E>>,
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
     /// $u_i$
-    pub decommit: hash_commitment::DecommitNonce<D>,
+    #[serde(with = "hex::serde")]
+    #[udigest(as_bytes)]
+    pub decommit: L::Rid,
 }
 /// Message from round 2 unicasted to each party
 #[derive(Clone, Serialize, Deserialize)]
@@ -81,6 +83,22 @@ pub struct MsgRound3<E: Curve> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+
+#[derive(udigest::Digestable)]
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.tag")]
+enum Tag<'a> {
+    /// Tag that includes the prover index
+    Indexed {
+        party_index: u16,
+        #[udigest(as_bytes)]
+        sid: &'a [u8],
+    },
+    /// Tag w/o party index
+    Unindexed {
+        #[udigest(as_bytes)]
+        sid: &'a [u8],
+    },
+}
 
 pub async fn run_threshold_keygen<E, R, M, L, D>(
     mut tracer: Option<&mut dyn Tracer>,
@@ -108,7 +126,7 @@ where
     let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
-    let round2_broad = rounds.add_round(RoundInput::<MsgRound2Broad<E, L, D>>::broadcast(i, n));
+    let round2_broad = rounds.add_round(RoundInput::<MsgRound2Broad<E, L>>::broadcast(i, n));
     let round2_uni = rounds.add_round(RoundInput::<MsgRound2Uni<E>>::p2p(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(i, n));
     let mut rounds = rounds.listen(incomings);
@@ -118,6 +136,13 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
+    let tag = |j| {
+        udigest::Tag::<D>::new_structured(Tag::Indexed {
+            party_index: j,
+            sid,
+        })
+    };
+    let tag_i = tag(i);
 
     tracer.stage("Sample rid_i, schnorr commitment, polynomial");
     let mut rid = L::Rid::default();
@@ -136,15 +161,17 @@ where
     debug_assert_eq!(sigmas.len(), usize::from(n));
 
     tracer.stage("Commit to public data");
-    let (hash_commit, decommit) = HashCommit::<D>::builder()
-        .mix_bytes(sid)
-        .mix(n)
-        .mix(i)
-        .mix(t)
-        .mix_bytes(&rid)
-        .mix_many(F.coefs())
-        .mix(h.0)
-        .commit(rng);
+    let my_decommitment = MsgRound2Broad {
+        rid,
+        F: F.clone(),
+        sch_commit: h,
+        decommit: {
+            let mut nonce = L::Rid::default();
+            rng.fill_bytes(nonce.as_mut());
+            nonce
+        },
+    };
+    let hash_commit = tag_i.clone().digest(&my_decommitment);
 
     tracer.send_msg();
     let my_commitment = MsgRound1 {
@@ -169,11 +196,8 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = commitments
-            .iter_including_me(&my_commitment)
-            .try_fold(D::new(), hash_message)
-            .map_err(Bug::HashMessage)?
-            .finalize();
+        let h_i = udigest::Tag::<D>::new_structured(&Tag::Unindexed { sid })
+            .digest_iter(commitments.iter_including_me(&my_commitment));
 
         tracer.send_msg();
         outgoings
@@ -205,12 +229,6 @@ where
     }
 
     tracer.send_msg();
-    let my_decommitment = MsgRound2Broad {
-        rid,
-        F: F.clone(),
-        sch_commit: h,
-        decommit,
-    };
     outgoings
         .send(Outgoing::broadcast(Msg::Round2Broad(
             my_decommitment.clone(),
@@ -248,16 +266,8 @@ where
         .iter_indexed()
         .zip(decommitments.iter())
         .filter(|((j, _, commitment), decommitment)| {
-            HashCommit::<D>::builder()
-                .mix_bytes(sid)
-                .mix(n)
-                .mix(j)
-                .mix(t)
-                .mix_bytes(&decommitment.rid)
-                .mix_many(decommitment.F.coefs())
-                .mix(decommitment.sch_commit.0)
-                .verify(&commitment.commitment, &decommitment.decommit)
-                .is_err()
+            let com_expected = tag(*j).digest(decommitment);
+            commitment.commitment != com_expected
         })
         .map(|t| t.0 .0)
         .collect::<Vec<_>>();
@@ -292,7 +302,7 @@ where
     let rid = decommitments
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
-        .fold(L::Rid::default(), xor_array);
+        .fold(L::Rid::default(), utils::xor_array);
     tracer.stage("Compute Ys");
     let polynomial_sum = decommitments
         .iter_including_me(&my_decommitment)

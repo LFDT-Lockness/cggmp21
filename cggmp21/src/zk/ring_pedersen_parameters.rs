@@ -28,11 +28,13 @@ pub struct Data<'a> {
 /// a correct proof for incorrect data is $2^{-M}$. You can use M defined here
 /// as [`SECURITY`]
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 pub struct Proof<const M: usize> {
     #[serde_as(as = "[_; M]")]
+    #[udigest(with = crate::utils::encoding::integers_list)]
     pub commitment: [Integer; M],
     #[serde_as(as = "[_; M]")]
+    #[udigest(with = crate::utils::encoding::integers_list)]
     pub zs: [Integer; M],
 }
 
