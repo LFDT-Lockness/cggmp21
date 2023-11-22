@@ -888,6 +888,7 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.0.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -905,6 +906,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.1.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -916,6 +918,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
 dependencies = [
  "crypto-bigint",
  "elliptic-curve",
@@ -932,6 +935,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.1.0"
+source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -2477,7 +2481,7 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "udigest"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/udigest?branch=version-0#0b5f41b73a2cf0279b6f8456a85c8d56ac03b61f"
+source = "git+https://github.com/dfns-labs/udigest?branch=m#8cd82dedc0f88ed0f5535d7f0f2bfdc3218a5642"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2486,7 +2490,7 @@ dependencies = [
 [[package]]
 name = "udigest-derive"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/udigest?branch=version-0#0b5f41b73a2cf0279b6f8456a85c8d56ac03b61f"
+source = "git+https://github.com/dfns-labs/udigest?branch=m#8cd82dedc0f88ed0f5535d7f0f2bfdc3218a5642"
 dependencies = [
  "proc-macro2",
  "quote",

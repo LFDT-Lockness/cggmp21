@@ -4,7 +4,3 @@ members = [
     "cggmp21",
     "tests",
 ]
-
-[patch."https://github.com/dfns-labs/generic-ec"]
-generic-ec = { path = "../generic-ec/generic-ec" }
-generic-ec-zkp = { path = "../generic-ec/generic-ec-zkp" }

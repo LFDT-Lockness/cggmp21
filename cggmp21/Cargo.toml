@@ -13,7 +13,7 @@ generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "m"
 round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
 
 paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "m", features = ["serde"] }
-udigest = { git = "https://github.com/dfns-labs/udigest", branch = "version-0", features = ["std", "derive"]}
+udigest = { git = "https://github.com/dfns-labs/udigest", branch = "m", features = ["std", "derive"]}
 
 digest = "0.10"
 sha2 = "0.10"
