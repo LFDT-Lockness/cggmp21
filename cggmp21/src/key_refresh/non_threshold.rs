@@ -158,9 +158,7 @@ where
     let n = u16::try_from(core_share.public_shares.len()).map_err(|_| Bug::TooManyParties)?;
 
     tracer.stage("Setup networking");
-    let MpcParty {
-        delivery, blocking, ..
-    } = party.into_party();
+    let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
 
     let mut rounds = RoundsRouter::<Msg<E, D, L>>::builder();
@@ -688,13 +686,8 @@ where
 
     if build_multiexp_tables {
         tracer.stage("Build multiexp tables");
-        aux = blocking
-            .spawn(move || {
-                aux.precompute_multiexp_tables()?;
-                Ok(aux)
-            })
-            .await
-            .map_err(|err| Bug::SpawnBlocking(Box::new(err)))?
+
+        aux.precompute_multiexp_tables()
             .map_err(Bug::BuildMultiexpTables)?;
     }
 

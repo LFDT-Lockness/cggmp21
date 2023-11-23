@@ -322,8 +322,6 @@ enum Bug {
     PowMod,
     #[error("couldn't prove prm statement")]
     PiPrm(#[source] crate::zk::ring_pedersen_parameters::ZkError),
-    #[error("spawned blocking routine panicked")]
-    SpawnBlocking(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("couldn't build multiexp tables")]
     BuildMultiexpTables(#[source] crate::key_share::InvalidKeyShare),
     #[error("couldn't build CRT")]
