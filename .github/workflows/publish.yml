@@ -1,0 +1,22 @@
+on:
+  push:
+    tags:        
+      - 'v*'
+  workflow_dispatch:
+
+name: Publish
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  publish-round-based:
+    name: Publish crate
+    environment: crates.io
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: cargo publish -p cggmp21 --token ${CRATES_TOKEN}
+      env:
+        CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
