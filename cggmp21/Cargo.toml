@@ -1,19 +1,23 @@
 [package]
 name = "cggmp21"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
-
 license = "MIT OR Apache-2.0"
+description = "TSS ECDSA implementation based on CGGMP21 paper"
+repository = "https://github.com/dfns/cggmp21"
+categories = ["algorithms", "cryptography"]
+keywords = ["mpc", "threshold-signatures", "tss", "ecdsa", "t-ecdsa"]
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "m", features = ["serde", "udigest"] }
-generic-ec-zkp = { git = "https://github.com/dfns-labs/generic-ec", branch = "m", features = ["serde", "udigest"] }
-round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive"] }
+generic-ec = { version = "0.1", features = ["serde", "udigest"] }
+generic-ec-zkp = { version = "0.1", features = ["serde", "udigest"] }
+round-based = { version = "0.2", features = ["derive"] }
 
-paillier-zk = { git = "https://github.com/dfns-labs/paillier-zk", branch = "m", features = ["serde"] }
-udigest = { git = "https://github.com/dfns-labs/udigest", branch = "m", features = ["std", "derive"]}
+paillier-zk = { version = "0.1", features = ["serde"] }
+udigest = { version = "0.1", features = ["std", "derive"]}
 
 digest = "0.10"
 sha2 = "0.10"
@@ -29,7 +33,7 @@ serde_with = "2"
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
-round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive", "dev"] }
+round-based = { version = "0.2", features = ["derive", "dev"] }
 
 rand = "0.8"
 rand_dev = "0.1"
