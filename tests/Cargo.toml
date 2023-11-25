@@ -2,6 +2,7 @@
 name = "cggmp21-tests"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,8 +20,8 @@ rand_chacha = "0.3"
 
 sha2 = "0.10"
 
-round-based = { git = "https://github.com/Zengo-X/round-based-protocol", branch = "round-based2", features = ["derive", "dev"] }
-generic-ec = { git = "https://github.com/dfns-labs/generic-ec", branch = "m", features = ["serde", "all-curves"] }
+round-based = { version = "0.2", features = ["derive", "dev"] }
+generic-ec = { version = "0.1", features = ["serde", "all-curves"] }
 
 tokio = { version = "1", features = ["macros"] }
 futures = "0.3"
@@ -39,3 +40,4 @@ url = "2.4"
 [dev-dependencies]
 generic-tests = "0.1"
 test-case = "2.2"
+
