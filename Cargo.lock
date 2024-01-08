@@ -277,7 +277,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.0.0"
+version = "0.1.1"
 dependencies = [
  "digest",
  "futures",
@@ -673,7 +673,8 @@ dependencies = [
 [[package]]
 name = "fast-paillier"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/fast-paillier?branch=m#b44b00a0eed5c46bcd0bfcdddd57ffbc510e2e18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8da6ffbfab3f6dc72b28f6f33dc76705c1a56b2c119680c936d239990beb5ae6"
 dependencies = [
  "bytemuck",
  "rand_core",
@@ -857,8 +858,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.0.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81960ce6c780f5a63f6ab4e94b3b34212f839ce7e7768b953413e4ee3c4d1438"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -875,8 +877,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-core"
-version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1193740c17f0324ea5d7db0635230f7538e5d33e0f9732af92d3f9fd4b87663e"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -887,8 +890,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-curves"
-version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15d2e666dc9d9ac12f101e119490ff6f6577a25c3a3e43ba901e51b18203d128"
 dependencies = [
  "crypto-bigint",
  "elliptic-curve",
@@ -904,8 +908,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.1.0"
-source = "git+https://github.com/dfns-labs/generic-ec?branch=m#31105a985d80cf08507444923b2c9f78e7819964"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f98645d68f62951789a4aec46ef4416878c2827b2353f5267cf96b096eae60d9"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -1370,7 +1375,8 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/paillier-zk?branch=m#17212a3b57f19e521e464163073ccbc2ae7cfb9c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4956496b1cb7ecf45e86844ae50a5c0ade430dd4d491de8d020adb95ca6f328"
 dependencies = [
  "digest",
  "fast-paillier",
@@ -1682,7 +1688,8 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#6dddbf2780e356d0126000dab4ece94f9b89078d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50a0cb1a40a115430c0d124ee305cf118208a37f921a744d41e84d3468a2c1d0"
 dependencies = [
  "futures-util",
  "phantom-type 0.3.1",
@@ -1696,7 +1703,8 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.0"
-source = "git+https://github.com/Zengo-X/round-based-protocol?branch=round-based2#6dddbf2780e356d0126000dab4ece94f9b89078d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0397bf224fdbcb3b286926e43bba90a96f81a82cc630ebfc9290d18e8b6331bd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2016,7 +2024,8 @@ dependencies = [
 [[package]]
 name = "stark-curve"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/stark-curve#a1de6cc130522565180e7d2fe8ac5520bde45049"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f357220731130667173ede5f8f9763eba482bdec60cd91a535156537635cdbcc"
 dependencies = [
  "ff",
  "hex-literal",
@@ -2441,7 +2450,8 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "udigest"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/udigest?branch=m#8cd82dedc0f88ed0f5535d7f0f2bfdc3218a5642"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8e4a5cb9599a5dc3d47f21ad605a5a14594e0b212c7627d68dd5ca9776ace2e"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2450,7 +2460,8 @@ dependencies = [
 [[package]]
 name = "udigest-derive"
 version = "0.1.0"
-source = "git+https://github.com/dfns-labs/udigest?branch=m#8cd82dedc0f88ed0f5535d7f0f2bfdc3218a5642"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b29f121da05aa0857e7b96cf2f8782bd4140911506518486d4a125b97d7d609"
 dependencies = [
  "proc-macro2",
  "quote",
