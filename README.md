@@ -1,3 +1,7 @@
+![License](https://img.shields.io/crates/l/cggmp21.svg)
+[![Docs](https://docs.rs/cggmp21/badge.svg)](https://docs.rs/cggmp21)
+[![Crates io](https://img.shields.io/crates/v/cggmp21.svg)](https://crates.io/crates/cggmp21)
+
 # Threshold ECDSA based on CGGMP21 paper
 
 [CGGMP21] is a state-of-art ECDSA TSS protocol that supports 1-round signing (requires preprocessing),
