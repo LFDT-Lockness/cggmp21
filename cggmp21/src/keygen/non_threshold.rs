@@ -179,7 +179,7 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::Tag::<D>::new_structured(&Tag::Unindexed { sid })
+        let h_i = udigest::Tag::<D>::new_structured(Tag::Unindexed { sid })
             .digest_iter(commitments.iter());
 
         tracer.send_msg();

@@ -579,7 +579,7 @@ where
     // Reliability check (if enabled)
     if enforce_reliable_broadcast {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::Tag::<D>::new_structured(&TagUnindexed { sid }).digest_iter(
+        let h_i = udigest::Tag::<D>::new_structured(TagUnindexed { sid }).digest_iter(
             ciphertexts.iter_including_me(&MsgRound1a {
                 K: K_i.clone(),
                 G: G_i.clone(),

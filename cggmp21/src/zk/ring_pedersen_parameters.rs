@@ -48,9 +48,9 @@ where
 {
     let order = rug::integer::Order::Msf;
     let mut digest = shared_state
-        .chain_update(&data.N.to_digits(order))
-        .chain_update(&data.s.to_digits(order))
-        .chain_update(&data.t.to_digits(order));
+        .chain_update(data.N.to_digits(order))
+        .chain_update(data.s.to_digits(order))
+        .chain_update(data.t.to_digits(order));
     for a in commitment.iter() {
         digest.update(a.to_digits(order));
     }
