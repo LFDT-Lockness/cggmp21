@@ -29,8 +29,10 @@ futures = "0.3"
 thiserror = "1"
 
 serde = { version = "1", features = ["derive", "rc"] }
-serde_with = "2"
+serde_with = { version = "2", features = ["hex"] }
 hex = { version = "0.4", default-features = false, features = ["serde"] }
+
+slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true }
 
 [dev-dependencies]
 round-based = { version = "0.2", features = ["derive", "dev"] }
@@ -46,6 +48,7 @@ all-curves = ["curve-secp256k1", "curve-secp256r1", "curve-stark"]
 curve-secp256k1 = ["generic-ec/curve-secp256k1"]
 curve-secp256r1 = ["generic-ec/curve-secp256r1"]
 curve-stark = ["generic-ec/curve-stark"]
+hd-wallets = ["dep:slip-10"]
 spof = []
 
 [package.metadata.docs.rs]

@@ -59,6 +59,8 @@ pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
     pregenerated_primes: Option<Vec<(Integer, Integer)>>,
     enable_mulitexp: bool,
     enable_crt: bool,
+    #[cfg(feature = "hd-wallets")]
+    enable_hd: bool,
     _ph: PhantomData<L>,
 }
 
@@ -74,6 +76,8 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             pregenerated_primes: None,
             enable_mulitexp: false,
             enable_crt: false,
+            #[cfg(feature = "hd-wallets")]
+            enable_hd: false,
             _ph: PhantomData,
         }
     }
@@ -135,6 +139,15 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         }
     }
 
+    /// Specifies that the key being generated shall support HD derivation
+    #[cfg(feature = "hd-wallets")]
+    pub fn hd_wallet(self, v: bool) -> Self {
+        Self {
+            enable_hd: v,
+            ..self
+        }
+    }
+
     /// Generates [`IncompleteKeyShare`]s
     ///
     /// Returns error if provided inputs are invalid, or if internal
@@ -183,6 +196,15 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         let mut rid = L::Rid::default();
         rng.fill_bytes(rid.as_mut());
 
+        #[cfg(feature = "hd-wallets")]
+        let chain_code = if self.enable_hd {
+            let mut code = slip_10::ChainCode::default();
+            rng.fill_bytes(&mut code);
+            Some(code)
+        } else {
+            None
+        };
+
         Ok((0u16..)
             .zip(secret_shares)
             .map(|(i, x_i)| {
@@ -193,6 +215,8 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
                     public_shares: public_shares.clone(),
                     x: x_i,
                     vss_setup: vss_setup.clone(),
+                    #[cfg(feature = "hd-wallets")]
+                    chain_code,
                 }
                 .try_into()
                 .map_err(Reason::InvalidKeyShare)

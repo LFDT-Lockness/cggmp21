@@ -8,6 +8,7 @@ use round_based::{
     Outgoing, ProtocolMessage,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 use crate::key_share::DirtyIncompleteKeyShare;
 use crate::progress::Tracer;
@@ -47,19 +48,25 @@ pub struct MsgRound1<D: Digest> {
     pub commitment: digest::Output<D>,
 }
 /// Message from round 2 broadcasted to everyone
+#[serde_as]
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
 #[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
 pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// `rid_i`
-    #[serde(with = "hex::serde")]
+    #[serde_as(as = "utils::serde::HexOrBin")]
     #[udigest(as_bytes)]
     pub rid: L::Rid,
     /// $\vec S_i$
     pub F: Polynomial<Point<E>>,
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
+    /// Party contribution to chain code
+    #[cfg(feature = "hd-wallets")]
+    #[serde_as(as = "Option<utils::serde::HexOrBin>")]
+    #[udigest(with = utils::encoding::maybe_bytes)]
+    pub chain_code: Option<slip_10::ChainCode>,
     /// $u_i$
     #[serde(with = "hex::serde")]
     #[udigest(as_bytes)]
@@ -109,6 +116,7 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
     execution_id: ExecutionId<'_>,
     rng: &mut R,
     party: M,
+    #[cfg(feature = "hd-wallets")] hd_enabled: bool,
 ) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
@@ -144,7 +152,7 @@ where
     };
     let tag_i = tag(i);
 
-    tracer.stage("Sample rid_i, schnorr commitment, polynomial");
+    tracer.stage("Sample rid_i, schnorr commitment, polynomial, chain_code");
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
 
@@ -160,11 +168,22 @@ where
         .collect::<Vec<_>>();
     debug_assert_eq!(sigmas.len(), usize::from(n));
 
+    #[cfg(feature = "hd-wallets")]
+    let chain_code_local = if hd_enabled {
+        let mut chain_code = slip_10::ChainCode::default();
+        rng.fill_bytes(&mut chain_code);
+        Some(chain_code)
+    } else {
+        None
+    };
+
     tracer.stage("Commit to public data");
     let my_decommitment = MsgRound2Broad {
         rid,
         F: F.clone(),
         sch_commit: h,
+        #[cfg(feature = "hd-wallets")]
+        chain_code: chain_code_local,
         decommit: {
             let mut nonce = L::Rid::default();
             rng.fill_bytes(nonce.as_mut());
@@ -262,17 +281,12 @@ where
     tracer.msgs_received();
 
     tracer.stage("Validate decommitments");
-    let blame = commitments
-        .iter_indexed()
-        .zip(decommitments.iter())
-        .filter(|((j, _, commitment), decommitment)| {
-            let com_expected = tag(*j).digest(decommitment);
-            commitment.commitment != com_expected
-        })
-        .map(|t| t.0 .0)
-        .collect::<Vec<_>>();
+    let blame = utils::collect_blame(&commitments, &decommitments, |j, com, decom| {
+        let com_expected = tag(j).digest(decom);
+        com.commitment != com_expected
+    });
     if !blame.is_empty() {
-        return Err(KeygenAborted::InvalidDecommitment { parties: blame }.into());
+        return Err(KeygenAborted::InvalidDecommitment(blame).into());
     }
 
     tracer.stage("Validate data size");
@@ -303,6 +317,25 @@ where
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), utils::xor_array);
+    #[cfg(feature = "hd-wallets")]
+    let chain_code = if hd_enabled {
+        tracer.stage("Compute chain_code");
+        let blame = utils::collect_simple_blame(&decommitments, |decom| decom.chain_code.is_none());
+        if !blame.is_empty() {
+            return Err(KeygenAborted::MissingChainCode(blame).into());
+        }
+        Some(decommitments.iter_including_me(&my_decommitment).try_fold(
+            slip_10::ChainCode::default(),
+            |acc, decom| {
+                Ok::<_, Bug>(utils::xor_array(
+                    acc,
+                    decom.chain_code.ok_or(Bug::NoChainCode)?,
+                ))
+            },
+        )?)
+    } else {
+        None
+    };
     tracer.stage("Compute Ys");
     let polynomial_sum = decommitments
         .iter_including_me(&my_decommitment)
@@ -354,34 +387,27 @@ where
     tracer.msgs_received();
 
     tracer.stage("Validate schnorr proofs");
-    let mut blame = vec![];
-    for ((j, decommitment), sch_proof) in utils::iter_peers(i, n)
-        .zip(decommitments.iter())
-        .zip(sch_proofs.iter())
-    {
+    let blame = utils::collect_blame(&decommitments, &sch_proofs, |j, decom, sch_proof| {
         let challenge = {
             let hash = |d: D| {
                 d.chain_update(sid)
                     .chain_update(j.to_be_bytes())
                     .chain_update(rid.as_ref())
                     .chain_update(&ys[usize::from(j)].to_bytes(true)) // y_i
-                    .chain_update(&decommitment.sch_commit.0.to_bytes(false)) // h
+                    .chain_update(&decom.sch_commit.0.to_bytes(false)) // h
                     .finalize()
             };
             let mut rng = paillier_zk::rng::HashRng::new(hash);
             Scalar::random(&mut rng)
         };
         let challenge = schnorr_pok::Challenge { nonce: challenge };
-        if sch_proof
+        sch_proof
             .sch_proof
-            .verify(&decommitment.sch_commit, &challenge, &ys[usize::from(j)])
+            .verify(&decom.sch_commit, &challenge, &ys[usize::from(j)])
             .is_err()
-        {
-            blame.push(j);
-        }
-    }
+    });
     if !blame.is_empty() {
-        return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
+        return Err(KeygenAborted::InvalidSchnorrProof(blame).into());
     }
 
     tracer.stage("Derive resulting public key and other data");
@@ -405,6 +431,8 @@ where
             min_signers: t,
             I: key_shares_indexes,
         }),
+        #[cfg(feature = "hd-wallets")]
+        chain_code,
         x: sigma,
     }
     .try_into()

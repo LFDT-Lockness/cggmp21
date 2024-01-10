@@ -12,6 +12,7 @@ use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
 
 use crate::progress::Tracer;
+use crate::utils;
 use crate::{
     errors::IoError,
     key_share::{IncompleteKeyShare, InvalidKeyShare},
@@ -66,6 +67,8 @@ pub struct GenericKeygenBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
     optional_t: M,
     execution_id: ExecutionId<'a>,
     tracer: Option<&'a mut dyn Tracer>,
+    #[cfg(feature = "hd-wallets")]
+    hd_enabled: bool,
     _params: std::marker::PhantomData<(E, L, D)>,
 }
 
@@ -91,6 +94,8 @@ where
             reliable_broadcast_enforced: true,
             execution_id: eid,
             tracer: None,
+            #[cfg(feature = "hd-wallets")]
+            hd_enabled: false,
             _params: std::marker::PhantomData,
         }
     }
@@ -111,6 +116,8 @@ where
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
             tracer: self.tracer,
+            #[cfg(feature = "hd-wallets")]
+            hd_enabled: self.hd_enabled,
             _params: std::marker::PhantomData,
         }
     }
@@ -126,6 +133,8 @@ where
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
             tracer: self.tracer,
+            #[cfg(feature = "hd-wallets")]
+            hd_enabled: self.hd_enabled,
             _params: std::marker::PhantomData,
         }
     }
@@ -142,6 +151,8 @@ where
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
             tracer: self.tracer,
+            #[cfg(feature = "hd-wallets")]
+            hd_enabled: self.hd_enabled,
             _params: std::marker::PhantomData,
         }
     }
@@ -158,6 +169,13 @@ where
             reliable_broadcast_enforced: enforce,
             ..self
         }
+    }
+
+    #[cfg(feature = "hd-wallets")]
+    /// Specifies whether HD derivation is enabled for a key
+    pub fn hd_wallet(mut self, v: bool) -> Self {
+        self.hd_enabled = v;
+        self
     }
 }
 
@@ -185,6 +203,8 @@ where
             self.execution_id,
             rng,
             party,
+            #[cfg(feature = "hd-wallets")]
+            self.hd_enabled,
         )
         .await
     }
@@ -215,6 +235,8 @@ where
             self.execution_id,
             rng,
             party,
+            #[cfg(feature = "hd-wallets")]
+            self.hd_enabled,
         )
         .await
     }
@@ -254,16 +276,19 @@ enum Reason {
 /// It _can be_ cryptographically proven, but we do not support it yet.
 #[derive(Debug, Error)]
 enum KeygenAborted {
-    #[error("party decommitment doesn't match commitment: {parties:?}")]
-    InvalidDecommitment { parties: Vec<u16> },
-    #[error("party provided invalid schnorr proof: {parties:?}")]
-    InvalidSchnorrProof { parties: Vec<u16> },
+    #[error("party decommitment doesn't match commitment: {0:?}")]
+    InvalidDecommitment(Vec<utils::AbortBlame>),
+    #[error("party provided invalid schnorr proof: {0:?}")]
+    InvalidSchnorrProof(Vec<utils::AbortBlame>),
     #[error("party secret share is not consistent: {parties:?}")]
     FeldmanVerificationFailed { parties: Vec<u16> },
     #[error("party data size is not suitable for threshold parameters: {parties:?}")]
     InvalidDataSize { parties: Vec<u16> },
     #[error("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
+    #[cfg(feature = "hd-wallets")]
+    #[error("party did not generate chain code: {0:?}")]
+    MissingChainCode(Vec<utils::AbortBlame>),
 }
 
 #[derive(Debug, Error)]
@@ -272,4 +297,7 @@ enum Bug {
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("unexpected zero value")]
     NonZeroScalar,
+    #[cfg(feature = "hd-wallets")]
+    #[error("chain code is missing although we checked that it should be present")]
+    NoChainCode,
 }

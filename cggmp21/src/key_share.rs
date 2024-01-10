@@ -55,6 +55,10 @@ pub struct DirtyIncompleteKeyShare<E: Curve> {
     pub public_shares: Vec<Point<E>>,
     /// Verifiable secret sharing setup, present if key was generated using VSS scheme
     pub vss_setup: Option<VssSetup<E>>,
+    /// Chain code generated at keygen if HD wallets support was enabled
+    #[cfg(feature = "hd-wallets")]
+    #[serde(with = "serde_with::As::<Option<crate::utils::serde::HexOrBin>>")]
+    pub chain_code: Option<slip_10::ChainCode>,
     /// Secret share $x_i$
     #[serde_as(as = "Compact")]
     pub x: SecretScalar<E>,
