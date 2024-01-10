@@ -276,7 +276,7 @@ where
 
     tracer.stage("Calculate challege rid");
     let rid = decommitments
-        .iter()
+        .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), utils::xor_array);
     let challenge = {
@@ -339,8 +339,14 @@ where
     Ok(DirtyIncompleteKeyShare {
         curve: Default::default(),
         i,
-        shared_public_key: decommitments.iter().map(|d| d.X).sum(),
-        public_shares: decommitments.iter().map(|d| d.X).collect(),
+        shared_public_key: decommitments
+            .iter_including_me(&my_decommitment)
+            .map(|d| d.X)
+            .sum(),
+        public_shares: decommitments
+            .iter_including_me(&my_decommitment)
+            .map(|d| d.X)
+            .collect(),
         x: x_i,
         vss_setup: None,
         #[cfg(feature = "hd-wallets")]
