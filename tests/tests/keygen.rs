@@ -12,13 +12,17 @@ mod generic {
         key_share::reconstruct_secret_key, security_level::SecurityLevel128, ExecutionId,
     };
 
-    #[test_case::case(3, false; "n3")]
-    #[test_case::case(5, false; "n5")]
-    #[test_case::case(7, false; "n7")]
-    #[test_case::case(10, false; "n10")]
-    #[test_case::case(10, true; "n10-reliable")]
+    #[test_case::case(3, false, false; "n3")]
+    #[test_case::case(5, false, false; "n5")]
+    #[test_case::case(7, false, false; "n7")]
+    #[test_case::case(10, false, false; "n10")]
+    #[test_case::case(10, true, false; "n10-reliable")]
+    #[test_case::case(3, false, true; "n3-hd")]
+    #[test_case::case(5, false, true; "n5-hd")]
+    #[test_case::case(7, false, true; "n7-hd")]
+    #[test_case::case(10, false, true; "n10-hd")]
     #[tokio::test]
-    async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool) {
+    async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool, hd_wallet: bool) {
         let mut rng = DevRng::new();
 
         let mut simulation = Simulation::<NonThresholdMsg<E, SecurityLevel128, Sha256>>::new();
@@ -34,6 +38,7 @@ mod generic {
             outputs.push(async move {
                 cggmp21::keygen(eid, i, n)
                     .enforce_reliable_broadcast(reliable_broadcast)
+                    .hd_wallet(hd_wallet)
                     .start(&mut party_rng, party)
                     .await
             })
@@ -56,13 +61,26 @@ mod generic {
             key_shares[0].shared_public_key,
             key_shares[0].public_shares.iter().sum::<Point<E>>()
         );
+        if hd_wallet {
+            assert!(key_shares[0].chain_code.is_some());
+            for key_share in &key_shares[1..] {
+                assert_eq!(key_share.chain_code, key_shares[0].chain_code);
+            }
+        }
     }
 
-    #[test_case::case(2, 3, false; "t2n3")]
-    #[test_case::case(5, 7, false; "t5n7")]
-    #[test_case::case(5, 7, true; "t5n7-reliable")]
+    #[test_case::case(2, 3, false, false; "t2n3")]
+    #[test_case::case(3, 5, false, false; "t3n5")]
+    #[test_case::case(3, 5, true, false; "t3n5-reliable")]
+    #[test_case::case(2, 3, false, true; "t2n3-hd")]
+    #[test_case::case(3, 5, false, true; "t3n5-hd")]
     #[tokio::test]
-    async fn threshold_keygen_works<E: Curve>(t: u16, n: u16, reliable_broadcast: bool) {
+    async fn threshold_keygen_works<E: Curve>(
+        t: u16,
+        n: u16,
+        reliable_broadcast: bool,
+        hd_wallet: bool,
+    ) {
         let mut rng = DevRng::new();
 
         let mut simulation = Simulation::<ThresholdMsg<E, SecurityLevel128, Sha256>>::new();
@@ -79,6 +97,7 @@ mod generic {
                 cggmp21::keygen(eid, i, n)
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .set_threshold(t)
+                    .hd_wallet(hd_wallet)
                     .start(&mut party_rng, party)
                     .await
             })
@@ -96,6 +115,12 @@ mod generic {
                 Point::<E>::generator() * &key_share.x,
                 key_share.public_shares[usize::from(i)]
             );
+        }
+        if hd_wallet {
+            assert!(key_shares[0].chain_code.is_some());
+            for key_share in &key_shares[1..] {
+                assert_eq!(key_share.chain_code, key_shares[0].chain_code);
+            }
         }
 
         // Choose `t` random key shares and reconstruct a secret key
