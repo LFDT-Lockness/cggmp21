@@ -164,3 +164,22 @@ pub fn convert_from_stark_scalar(
     let bytes = x.to_bytes_be();
     generic_ec::Scalar::from_be_bytes(bytes).context("Can't read bytes")
 }
+
+#[cfg(feature = "hd-wallets")]
+pub fn random_derivation_path<E: Curve>(
+    rng: &mut impl rand::RngCore,
+    epub: &cggmp21::slip_10::ExtendedPublicKey<E>,
+) -> (Vec<u32>, generic_ec::Point<E>) {
+    use rand::Rng;
+
+    let len = rng.gen_range(1..=3);
+    let path = std::iter::repeat_with(|| rng.gen_range(0..cggmp21::slip_10::H))
+        .take(len)
+        .collect::<Vec<_>>();
+    let child_epub = cggmp21::slip_10::try_derive_child_public_key_with_path(
+        epub,
+        path.iter().copied().map(TryInto::try_into),
+    )
+    .unwrap();
+    (path, child_epub.public_key)
+}

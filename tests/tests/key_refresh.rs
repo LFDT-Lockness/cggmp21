@@ -21,7 +21,10 @@ mod generic {
         let shares = cggmp21_tests::CACHED_SHARES
             .get_shares::<E, SecurityLevel128>(None, n, true)
             .expect("retrieve cached shares");
+
+        #[cfg(feature = "hd-wallets")]
         assert!(shares[0].chain_code.is_some());
+
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
         // Perform refresh
@@ -74,6 +77,8 @@ mod generic {
                 shares[0].core.shared_public_key
             );
         }
+
+        #[cfg(feature = "hd-wallets")]
         for key_share in &key_shares {
             assert_eq!(key_share.chain_code, shares[0].chain_code);
         }

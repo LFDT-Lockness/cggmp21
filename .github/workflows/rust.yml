@@ -5,8 +5,6 @@ on:
     branches: [ "m" ]
   pull_request:
     branches: [ "*" ]
-  # schedule:
-  #   - cron: '0 5 * * *'
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,15 +19,44 @@ jobs:
       with:
         cache-on-failure: "true"
     - name: Build
-      run: cargo build --release
+      run: cargo build --release --all-features
     - uses: actions/upload-artifact@v3
       with:
         name: benchmark-tool
         path: target/release/measure_perf
+  # Run tests without HD wallets support
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
     - name: Run tests
       run: cargo test -r
+  # Run tests including HD wallets support
+  test-hd:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Run tests
+      run: cargo test -r --all-features
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
     - name: Check formatting
       run: cargo fmt --all -- --check
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
     - name: Run clippy
       run: cargo clippy --all --lib --exclude cggmp21-tests -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
     - name: Run clippy tests

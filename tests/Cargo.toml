@@ -7,7 +7,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cggmp21 = { path = "../cggmp21", features = ["all-curves", "spof", "hd-wallets"] }
+cggmp21 = { path = "../cggmp21", features = ["all-curves", "spof"] }
 
 anyhow = "1"
 bpaf = "0.7"
@@ -39,5 +39,14 @@ url = "2.4"
 
 [dev-dependencies]
 generic-tests = "0.1"
-test-case = "2.2"
+test-case = "3"
 
+[features]
+hd-wallets = ["cggmp21/hd-wallets"]
+
+[[bin]]
+name = "precompute_shares"
+required-features = ["hd-wallets"]
+
+[[bin]]
+name = "measure_perf"
