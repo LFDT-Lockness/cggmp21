@@ -13,7 +13,7 @@ async fn sign_transaction() {
     let n = 3;
 
     let shares = cggmp21_tests::CACHED_SHARES
-        .get_shares::<Stark, SecurityLevel128>(t, n)
+        .get_shares::<Stark, SecurityLevel128>(t, n, false)
         .expect("retrieve cached shares");
 
     let mut simulation = Simulation::<Msg<Stark, Sha256>>::new();

@@ -226,6 +226,8 @@
 #![cfg_attr(not(test), forbid(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+#[cfg(feature = "hd-wallets")]
+pub use slip_10;
 pub use {
     generic_ec, paillier_zk,
     paillier_zk::{fast_paillier, rug},

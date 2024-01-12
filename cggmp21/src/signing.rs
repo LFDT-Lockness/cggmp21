@@ -296,23 +296,21 @@ where
     pub fn set_derivation_path<Index>(
         mut self,
         path: impl IntoIterator<Item = Index>,
-    ) -> Result<Self, SetDerivationPathError<<Index as TryInto<slip_10::NonHardenedIndex>>::Error>>
+    ) -> Result<Self, crate::key_share::HdError<<Index as TryInto<slip_10::NonHardenedIndex>>::Error>>
     where
         slip_10::NonHardenedIndex: TryFrom<Index>,
     {
-        let mut public_key = slip_10::ExtendedPublicKey {
-            public_key: self.key_share.shared_public_key,
-            chain_code: self
-                .key_share
-                .chain_code
-                .ok_or(SetDerivationPathError::DisabledHd)?,
-        };
+        use crate::key_share::HdError;
+
+        let mut public_key = self
+            .key_share
+            .extended_public_key()
+            .ok_or(HdError::DisabledHd)?;
         let mut additive_shift = Scalar::<E>::zero();
 
         for child_index in path {
-            let child_index: slip_10::NonHardenedIndex = child_index
-                .try_into()
-                .map_err(SetDerivationPathError::InvalidPath)?;
+            let child_index: slip_10::NonHardenedIndex =
+                child_index.try_into().map_err(HdError::InvalidPath)?;
             let shift = slip_10::derive_public_shift(&public_key, child_index);
 
             additive_shift += shift.shift;
@@ -1394,15 +1392,6 @@ enum BugSource {
 #[derive(Debug, Error)]
 #[error("signature is not valid")]
 pub struct InvalidSignature;
-
-/// Error indicating why [`set_derivation_path`](SigningBuilder::set_derivation_path)
-/// failed
-pub enum SetDerivationPathError<E> {
-    /// HD derivation is disabled for the key
-    DisabledHd,
-    /// Derivation path is not valid
-    InvalidPath(E),
-}
 
 #[cfg(test)]
 mod test {

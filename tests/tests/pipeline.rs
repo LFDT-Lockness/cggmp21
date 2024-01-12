@@ -16,20 +16,21 @@ mod generic {
     type Share<E> = KeyShare<E>;
     type Incomplete<E> = IncompleteKeyShare<E>;
 
-    #[test_case::case(2, 3; "t2n3")]
-    #[test_case::case(4, 7; "t4n7")]
+    #[test_case::case(2, 3, false; "t2n3")]
+    #[test_case::case(3, 5, false; "t3n5")]
+    #[test_case::case(3, 5, true; "t3n5-hd")]
     #[tokio::test]
-    async fn full_pipeline_works<E: Curve>(t: u16, n: u16)
+    async fn full_pipeline_works<E: Curve>(t: u16, n: u16, hd_enabled: bool)
     where
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         let mut rng = DevRng::new();
-        let incomplete_shares = run_keygen(t, n, &mut rng).await;
-        let shares = run_refresh(incomplete_shares, &mut rng).await;
-        run_signing(&shares, &mut rng).await;
+        let incomplete_shares = run_keygen(t, n, hd_enabled, &mut rng).await;
+        let shares = run_aux_gen(incomplete_shares, &mut rng).await;
+        run_signing(&shares, hd_enabled, &mut rng).await;
     }
 
-    async fn run_keygen<E>(t: u16, n: u16, rng: &mut DevRng) -> Vec<Incomplete<E>>
+    async fn run_keygen<E>(t: u16, n: u16, hd_enabled: bool, rng: &mut DevRng) -> Vec<Incomplete<E>>
     where
         E: Curve,
     {
@@ -46,6 +47,7 @@ mod generic {
             outputs.push(async move {
                 cggmp21::keygen(eid, i, n)
                     .set_threshold(t)
+                    .hd_wallet(hd_enabled)
                     .start(&mut party_rng, party)
                     .await
             })
@@ -56,7 +58,7 @@ mod generic {
             .expect("keygen failed")
     }
 
-    async fn run_refresh<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
+    async fn run_aux_gen<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
     where
         E: Curve,
     {
@@ -91,7 +93,7 @@ mod generic {
             .collect()
     }
 
-    async fn run_signing<E>(shares: &[Share<E>], rng: &mut DevRng)
+    async fn run_signing<E>(shares: &[Share<E>], random_derivation_path: bool, rng: &mut DevRng)
     where
         E: Curve,
         Point<E>: generic_ec::coords::HasAffineX<E>,
@@ -100,6 +102,20 @@ mod generic {
 
         let t = shares[0].min_signers();
         let n = shares.len().try_into().unwrap();
+
+        let (derivation_path, public_key) = if random_derivation_path {
+            let len = rng.gen_range(1..=3);
+            let path = std::iter::repeat_with(|| rng.gen_range(0..=cggmp21::slip_10::H))
+                .take(len)
+                .collect::<Vec<u32>>();
+            let public_key = shares[0]
+                .derive_child_public_key(path.iter().copied())
+                .unwrap()
+                .public_key;
+            (Some(path), public_key)
+        } else {
+            (None, shares[0].shared_public_key)
+        };
 
         let mut simulation = Simulation::<cggmp21::signing::msg::Msg<E, Sha256>>::new();
 
@@ -122,11 +138,17 @@ mod generic {
         for (i, share) in (0..).zip(participants_shares) {
             let party = simulation.add_party();
             let mut party_rng = rng.fork();
+            let derivation_path = derivation_path.clone();
 
             outputs.push(async move {
-                cggmp21::signing(eid, i, participants, share)
-                    .sign(&mut party_rng, party, message_to_sign)
-                    .await
+                let signing = cggmp21::signing(eid, i, participants, share);
+                let signing = if let Some(derivation_path) = derivation_path {
+                    signing.set_derivation_path(derivation_path).unwrap()
+                } else {
+                    signing
+                };
+
+                signing.sign(&mut party_rng, party, message_to_sign).await
             });
         }
 
@@ -135,7 +157,7 @@ mod generic {
             .expect("signing failed");
 
         signatures[0]
-            .verify(&shares[0].core.shared_public_key, &message_to_sign)
+            .verify(&public_key, &message_to_sign)
             .expect("signature is not valid");
 
         assert!(signatures.iter().all(|s_i| signatures[0] == *s_i));

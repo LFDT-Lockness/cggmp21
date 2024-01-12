@@ -19,8 +19,9 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E, SecurityLevel128>(None, n)
+            .get_shares::<E, SecurityLevel128>(None, n, true)
             .expect("retrieve cached shares");
+        assert!(shares[0].chain_code.is_some());
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 
         // Perform refresh
@@ -73,6 +74,9 @@ mod generic {
                 shares[0].core.shared_public_key
             );
         }
+        for key_share in &key_shares {
+            assert_eq!(key_share.chain_code, shares[0].chain_code);
+        }
 
         // attempt to sign with new shares and verify the signature
 
@@ -115,7 +119,7 @@ mod generic {
         let mut rng = rand_dev::DevRng::new();
 
         let shares = cggmp21_tests::CACHED_SHARES
-            .get_shares::<E, SecurityLevel128>(Some(t), n)
+            .get_shares::<E, SecurityLevel128>(Some(t), n, false)
             .expect("retrieve cached shares");
         let mut primes = cggmp21_tests::CACHED_PRIMES.iter();
 

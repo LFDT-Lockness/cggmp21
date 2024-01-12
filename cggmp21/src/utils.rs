@@ -322,14 +322,8 @@ pub mod serde {
                         ));
                     }
 
-                    let bytes = hex::decode(v).map_err(E::custom)?;
+                    hex::decode_to_slice(v, self.out.as_mut()).map_err(E::custom)?;
 
-                    let out_len = self.out.as_mut().len();
-                    if out_len != v.len() {
-                        return Err(E::invalid_length(v.len(), &ExpectedLen(out_len)));
-                    }
-
-                    self.out.as_mut().copy_from_slice(&bytes);
                     Ok(self.out)
                 }
             }

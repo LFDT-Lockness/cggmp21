@@ -63,20 +63,28 @@ fn precompute_shares_for_curve<E: Curve, R: RngCore + CryptoRng>(
             .into_iter()
             .filter(|t| t.map(|t| t <= n).unwrap_or(true))
         {
-            eprintln!("t={t:?},n={n},curve={}", E::CURVE_NAME);
-            let primes = std::iter::repeat_with(|| {
-                let p = generate_blum_prime(rng, SecurityLevel128::SECURITY_BITS * 4);
-                let q = generate_blum_prime(rng, SecurityLevel128::SECURITY_BITS * 4);
-                (p, q)
-            })
-            .take(n.into())
-            .collect();
-            let shares = trusted_dealer::builder::<E, SecurityLevel128>(n)
-                .set_threshold(t)
-                .set_pregenerated_primes(primes)
-                .generate_shares(rng)
-                .context("generate shares")?;
-            cache.add_shares(t, n, &shares).context("add shares")?;
+            for hd_enabled in [false, true] {
+                eprintln!(
+                    "t={t:?},n={n},curve={},hd_enabled={hd_enabled}",
+                    E::CURVE_NAME
+                );
+                let primes = std::iter::repeat_with(|| {
+                    let p = generate_blum_prime(rng, SecurityLevel128::SECURITY_BITS * 4);
+                    let q = generate_blum_prime(rng, SecurityLevel128::SECURITY_BITS * 4);
+                    (p, q)
+                })
+                .take(n.into())
+                .collect();
+                let shares = trusted_dealer::builder::<E, SecurityLevel128>(n)
+                    .set_threshold(t)
+                    .set_pregenerated_primes(primes)
+                    .hd_wallet(hd_enabled)
+                    .generate_shares(rng)
+                    .context("generate shares")?;
+                cache
+                    .add_shares(t, n, hd_enabled, &shares)
+                    .context("add shares")?;
+            }
         }
     }
     Ok(())
