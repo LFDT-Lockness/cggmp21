@@ -36,6 +36,8 @@ jobs:
       run: cargo clippy --tests --lib -- -D clippy::all
   bench:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     needs: build
     steps:
     - uses: actions/checkout@v3
@@ -49,7 +51,6 @@ jobs:
         ./measure_perf -n 3 --no-bench-primes-gen > perf_output
         sed -e '/PERF_OUTPUT/{r perf_output' -e 'd}' .github/pr-comment.tpl > pr-comment
     - name: Leave PR comment
-      continue-on-error: true
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         header: bench

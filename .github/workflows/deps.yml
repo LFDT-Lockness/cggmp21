@@ -52,7 +52,6 @@ jobs:
           | sed -e '/ALL_DEPS_DIFF/{r all-deps-diff' -e 'd}' \
           > pr-comment
     - name: Publish PR comment
-      continue-on-error: true
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         header: deps-diff
