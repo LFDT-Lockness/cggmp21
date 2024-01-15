@@ -199,14 +199,14 @@ We include a description of the algorithms that constitute the Paillier encrypti
     
     
     \item 
-		$\enc_N(M; r)$ 
-		encrypts a message $M \in \{-(N-1)/2, \ldots,  (N-1)/2\}$ 
-		using randomness $r \in \Z_N^*$ 
-		and Paillier public key~$N$. 
-		This produces a ciphertext $C \in \Z^*_{N^2}$.
-		Encryption checks that $\gcd(r, N)=1$ (and raises an error if not), and then computes
+    $\enc_N(M; r)$ 
+    encrypts a message $M \in \{-(N-1)/2, \ldots,  (N-1)/2\}$ 
+    using randomness $r \in \Z_N^*$ 
+    and Paillier public key~$N$. 
+    This produces a ciphertext $C \in \Z^*_{N^2}$.
+    Encryption checks that $\gcd(r, N)=1$ (and raises an error if not), and then computes
     
-		$$\enc_N(M; r) := (1 + M \cdot N) \cdot r^N \bmod N^2$$ 
+    $$\enc_N(M; r) := (1 + M \cdot N) \cdot r^N \bmod N^2$$ 
 
         We also provide a function $\enc_N(M)$ that samples uniform $r \in \Z_N^*$ and returns~$\enc_N(M; r)$.
 
