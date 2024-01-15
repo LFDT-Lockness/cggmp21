@@ -163,7 +163,7 @@ There are other differences in the implementation compared to original paper (mo
 they are all documented in [the spec].
 
 [CGGMP21]: https://ia.cr/2021/060
-[the spec]: https://github.com/dfns-labs/cggmp21/tree/m/docs/spec.pdf
+[the spec]: https://dfns.github.io/cggmp21/cggmp21-spec.pdf
 [security guidelines]: #security-guidelines
 
 ## Timing attacks

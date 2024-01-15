@@ -3,10 +3,6 @@ name: Build CGGMP21 Spec & Docs
 on:
   pull_request:
     branches: [ "*" ]
-    paths:
-    - 'cggmp21/**'
-    - 'spec/**'
-    - '.github/workflows/docs.yml'
   push:
     branches: [ "m" ]
 
