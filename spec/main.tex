@@ -198,11 +198,17 @@ We include a description of the algorithms that constitute the Paillier encrypti
     \item $\textsf{keygen}$ generates a private key $\sk$ consisting of two safe primes, with the public key being their product~$N$.
     
     
-    \item $\enc_N(M; r)$ encrypts a message $M \in \{-(N-1)/2, \ldots,  (N-1)/2\}$ using randomness $r \in \Z_N^*$ and Paillier public key~$N$. This produces a ciphertext $C \in \Z^*_{N^2}$.
-Encryption checks that $\gcd(r, N)=1$ (and raises an error if not), and then 
-computes
-    \[\enc_N(M; r) := (1 + N)^{[M \bmod N]} \cdot r^N \bmod N^2.\] 
-    We also provide a function $\enc_N(M)$ that samples uniform $r \in \Z_N^*$ and returns~$\enc_N(M; r)$.
+    \item 
+		$\enc_N(M; r)$ 
+		encrypts a message $M \in \{-(N-1)/2, \ldots,  (N-1)/2\}$ 
+		using randomness $r \in \Z_N^*$ 
+		and Paillier public key~$N$. 
+		This produces a ciphertext $C \in \Z^*_{N^2}$.
+		Encryption checks that $\gcd(r, N)=1$ (and raises an error if not), and then computes
+    
+		$$\enc_N(M; r) := (1 + M \cdot N) \cdot r^N \bmod N^2$$ 
+
+        We also provide a function $\enc_N(M)$ that samples uniform $r \in \Z_N^*$ and returns~$\enc_N(M; r)$.
 
     Functions $\enc^{{\sf crt}}_{\sk}(M;r)$ and $\enc^{{\sf crt}}_{\sk}(M)$ are analogous but achieve better performance by using the technique from Section~\ref{sec:CRT} when the factorization of $N$
     is known.
