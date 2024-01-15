@@ -1,4 +1,4 @@
-#[generic_tests::define(attrs(tokio::test, test_case::case))]
+#[generic_tests::define(attrs(tokio::test, test_case::case, cfg_attr))]
 mod generic {
     use generic_ec::{Curve, Point};
     use rand::{seq::SliceRandom, Rng, RngCore};
@@ -18,7 +18,7 @@ mod generic {
 
     #[test_case::case(2, 3, false; "t2n3")]
     #[test_case::case(3, 5, false; "t3n5")]
-    #[test_case::case(3, 5, true; "t3n5-hd")]
+    #[cfg_attr(feature = "hd-wallets", test_case::case(3, 5, true; "t3n5-hd"))]
     #[tokio::test]
     async fn full_pipeline_works<E: Curve>(t: u16, n: u16, hd_enabled: bool)
     where
