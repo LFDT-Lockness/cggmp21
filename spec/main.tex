@@ -1,0 +1,1398 @@
+\documentclass[11pt]{article}
+%\usepackage[utf8]{inputenc}
+\usepackage[noend]{algpseudocode}
+\usepackage{algorithm}
+\usepackage{fullpage}
+\usepackage{amsmath,amsfonts,amssymb}
+%\usepackage{geometry}
+%\usepackage{appendix,url}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{graphicx,etoolbox}
+\usepackage{hyperref,url}
+
+\newtoggle{darkMode}
+% \toggletrue{darkMode}
+\togglefalse{darkMode}
+
+\definecolor{DfnsPurple}{RGB}{19,7,34}
+\definecolor{DfnsWhite}{RGB}{254,249,239}
+
+\iftoggle{darkMode}{
+    \pagecolor{DfnsPurple}
+    \color{DfnsWhite}
+}{
+    \pagecolor{DfnsWhite}
+    \color{DfnsPurple}
+}
+
+\def\crt{{\sf crt}}
+\def\tmp{{\sf tmp}}
+\def\res{{\sf res}}
+\newcommand{\ignore}[1]{}
+\newcommand{\jnote}[1]{{\textcolor{blue}{Jon's note: #1}}}
+\newcommand{\dnote}[1]{{\textcolor{Orange}{Denis: #1}}}
+\newcommand{\nnote}[1]{{\textcolor{purple}{Mikito: #1}}}
+
+%\newgeometry{vmargin={8mm,16mm}, hmargin={12mm,12mm}}
+
+\def\state{{\sf state}}
+\def\eps{\varepsilon}
+%\def\order{{\tt curve}\verb+_+{\tt order}}
+\newcommand{\threshold}{\ensuremath{\mathtt{min\_signers}}}
+\newcommand{\fvss}{\ensuremath{\mathtt{vss}}}
+\newcommand{\enc}{\ensuremath{\mathtt{enc}}}
+\newcommand{\enci}[1]{\ensuremath{\mathtt{enc}_{N_{#1}}}}
+\newcommand{\dec}{\ensuremath{\mathtt{dec}}}
+\newcommand{\deci}{\ensuremath{\mathtt{dec}}_{\sk_i}}
+\newcommand{\encCrt}
+{{\ensuremath{\mathtt{enc}}^\crt_{\sk_i}}}
+\newcommand{\encCrti}[1]{{\ensuremath{\mathtt{enc}}^\crt_{\sk_{#1}}}}
+\newcommand{\sid}{\ensuremath{\mathtt{sid}}}
+\newcommand{\proof}[1]{\ensuremath{\Pi^{\mathtt{#1}}}}
+\newcommand{\commit}[1]{\ensuremath{\mathtt{Commit}_{\mathtt{#1}}}}
+\newcommand{\challenge}[1]{\ensuremath{\mathtt{Challenge}_{\mathtt{#1}}}}
+\newcommand{\challengeni}[1]{\ensuremath{\mathtt{ChallengeNI}_{\mathtt{#1}}}}
+\newcommand{\prove}[1]{\ensuremath{\mathtt{Prove}_{\mathtt{#1}}}}
+\newcommand{\proveni}[1]{\ensuremath{\mathtt{ProveNI}_{\mathtt{#1}}}}
+\newcommand{\verify}[1]{\ensuremath{\mathtt{Verify}_{\mathtt{#1}}}}
+\newcommand{\verifyni}[1]{\ensuremath{\mathtt{VerifyNI}_{\mathtt{#1}}}}
+\newcommand{\ou}{\text{\;or\;}} % \or is prohibited in latex for some reason
+
+\newcommand{\changedt}[1]{\colorbox{Salmon}{#1}}
+\newcommand{\changed}[1]{\colorbox{Salmon}{$\displaystyle #1$}}
+\newcommand{\note}[1]{\colorbox{Goldenrod}{$\displaystyle #1$}}
+
+\newcommand{\affineX}[1]{#1|_{\textit{x}}}
+
+\newcommand{\sk}{\textsf{sk}}
+\newcommand{\pk}{\textsf{pk}}
+\newcommand{\rid}{\textsf{rid}}
+
+\newcommand{\Fq}{\mathbb{F}_q}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Z}{\mathbb{Z}}
+
+\newcommand{\?}[1]{\stackrel{?}{#1}}
+
+\newcommand{\todo}[1]{\textbf{\color{Red}{TBD: #1}}}
+
+\renewcommand{\labelitemi}{--}
+
+\title{{\bf CGGMP Specification}}
+\author{
+\iftoggle{darkMode}{
+    \includegraphics[width=60pt]{images/dfns_offwhite_small.png}
+}{
+    \includegraphics[width=50pt]{images/DFNS_logo_negative.png}
+}}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+We provide a specification for our implementation of the CGGMP threshold signing protocol~\cite{cggmp21}. 
+
+\section{Notation and Preliminaries}
+$\E$ denotes an elliptic-curve group of prime order\footnote{The curve order is denoted by {\tt curve}\_{\tt order} in the code. Note that $q$ is also used for the verifier's challenge space in~\cite{cggmp21}, but we use $Q$ for that instead.}~$q$ with generator $G$. %(Note we write $\E$ additively, whereas multiplicative notation is used in~\cite{cggmp21}.) 
+If $P \in \E$ is a point on the curve, then $\affineX{P}$ denotes the $x$-coordinate of~$P$. We let $\Z_n=[n]=\{0, \dots, n-1\}$, and let $\Z_n^*$ be the subset of elements of~$\Z_n$ co-prime to~$n$, i.e., $\Z^*_n=\{i \mid i \in \Z_n \land \gcd(i, n) = 1\}$. 
+For integers $a, b, \ell$, we set 
+$[a; b)=\{a, \ldots, b-1\}$
+and
+$\pm \ell=\{-\ell, \dots, 0, \dots, \ell\}$. 
+We write $x \gets X$ to denote sampling a uniform element $x$ from a set~$X$.
+%, and $x \stackrel{s}{\gets} X$ to denote the process of deterministically mapping a seed $s$ to an element of $X$ that is computationally indistinguishable from uniform (assuming $s$ is uniform and unknown).
+
+\def\isprime{{\sf IsPrime}}
+
+\subsection{Safe-Prime Generation}
+\label{sec:safe-prime}
+A safe prime $p$ has the form $p=2p'+1$ where $p'$ is also prime. 
+Assuming a primality test $\isprime$, 
+a trivial way to generate a (random) safe prime is 
+to repeatedly sample $p'$ in the appropriate range, test $p'$ for primality, and then (if $p'$ is prime) test $2p'+1$ for primality.
+(We ignore here the possibility of error in $\isprime$.)
+
+\ignore{
+\begin{algorithm}
+\caption{Generating a (random) safe prime}\label{alg:primegen-trivial}
+\begin{algorithmic}[1]
+\While{(1)}
+\State Choose (random) $p'$ in the appropriate range
+\State if $(!\isprime(p'))$ {\sf continue}
+\State if $(\isprime(2p'+1))$ \Return $p=2p'+1$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+}
+
+Primality testing is expensive, and the trivial algorithm is wasteful in the sense that it tests $p'$ for primality even when it is clear that $p=2p'+1$ will not be prime (e.g., if $p'=1 \bmod 3$).
+We can avoid this by using simple sieving, as in Algorithm~\ref{alg:primegen} (following~\cite{safe-primes}).
+
+\begin{algorithm}
+\caption{Generating a (random) safe prime}\label{alg:primegen}
+\begin{algorithmic}[1]
+\State Let $B$ be a set containing the first $n$ odd primes \;\;\; // $n$ is a parameter
+\While{(1)}
+\State Choose (random) $p'$ in the appropriate range
+\State If $p' \bmod q \in \{0, (q-1)/2\}$ for some $q \in B$ {\sf continue}
+\State If $(!\isprime(p'))$ {\sf continue}
+\State If $(\isprime(2p'+1))$ \Return $p=2p'+1$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+The number of primes $n$ to use for sieving is a parameter that can be heuristically optimized. Note that as $n$ increases, the marginal benefit of sieving decreases while the cost of sieving increases.
+
+\subsection{Using the Chinese Remainder Theorem}
+\label{sec:CRT}
+Arithmetic modulo $N$ can be optimized when the (partial) factorization of $N$ is known.
+Say $N=N_1\cdot N_2$ where $N_1, N_2 > 1$ and $\gcd(N_1, N_2)=1$. (Note that $N_1, N_2$ need not be prime.)
+Then a computation modulo $N$ can be optimized by (1)~separately carrying out the computation modulo~$N_1$ and~$N_2$, and then (2)~combining the results.
+We illustrate the for the particular case of exponentiation (i.e., computing
+$s^x \bmod N$), but the same idea can be applied for multiplication, multiexponentiation, etc.
+
+\medskip\noindent{\bf Exponentiation modulo $N_1, N_2$.}
+Computing $s^x \bmod N_1$ and $s^x \bmod N_2$ will, in general, be faster than computing $s^x \bmod N$ directly because (1)~$N_1, N_2$ are shorter than~$N$, and (2)~assuming the factorizations of $N_1, N_2$ are known, we can reduce the exponent~$x$ modulo $\phi(N_1)$ (resp.,~$\phi(N_2)$) before performing the respective exponentiations.
+Namely, we can use the fact that, e.g., 
+\[s^x \bmod N_1 = s^{x \bmod \phi(N_1)} \bmod N_1\]
+(assuming $\gcd(s, N_1)=1$.)
+
+\medskip\noindent{\bf Combining the results.}
+Let $\beta=N_1^{-1} \bmod N_2$. %(Note this can be computed as part of a preprocessing step.) 
+If we have computed $r_1=s^x \bmod N_1$ and $r_2=s^x \bmod N_2$, we can compute $s^x \bmod N$ as
+\[r_1+\left((r_2-r_1) \cdot \beta \bmod N_2\right) \cdot N_1 .\]
+(Note that no reduction modulo $N$ is needed, and the result will already be in the correct range.)
+To see that this gives the correct answer, note that 
+\begin{eqnarray*}
+& r_1+\left((r_2-r_1) \cdot \beta \bmod N_2\right) \cdot N_1 =  r_1 \bmod N_1 &\\
+& r_1+\left((r_2-r_1) \cdot \beta \bmod N_2\right) \cdot N_1 = r_1+\left((r_2-r_1) \cdot N_1^{-1} \right) \cdot N_1 = r_2 \bmod N_2. &
+\end{eqnarray*}
+%then apply the Chinese remainder theorem.
+
+
+\medskip
+In our context, the case of interest is when the modulus is $N^2=p^2 q^2$ and the factors $p, q$ are known.
+Algorithm~\ref{alg:CRT} shows a complete algorithm for exponentiation modulo~$N^2$ in that case.
+
+\begin{algorithm}
+\caption{Computing $s^x \bmod N^2$, where $N^2=p^2q^2$ with $p, q$ distinct primes and $\gcd(s,N^2)=1$}\label{alg:CRT}
+\begin{algorithmic}[1]
+\State $\beta:=p^{-2} \bmod q^2$ \;\;\; //  this can be computed in a preprocessing step
+\State $\phi_1 = p \cdot (p-1), \; \phi_2 := q \cdot (q-1)$
+\State $x_1:= x \bmod \phi_1, \; x_2:=x \bmod \phi_2$
+\State $s_1 := s \bmod p^2, \; s_2 := s \bmod q^2$
+\State $r_1:= s_1^{x_1} \bmod p^2, \; 
+r_2 := s_2^{x_2} \bmod q^2$
+\State $\res := r_1+((r_2-r_1)\cdot \beta \bmod q^2) \cdot p^2$
+\State \Return \res
+\end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Paillier Encryption Scheme}
+We include a description of the algorithms that constitute the Paillier encryption scheme. 
+%Note, however, that we call an external library for these algorithms, and do not implement them ourselves.
+\begin{enumerate}
+    \item $\textsf{keygen}$ generates a private key $\sk$ consisting of two safe primes, with the public key being their product~$N$.
+    
+    
+    \item 
+    $\enc_N(M; r)$ 
+    encrypts a message $M \in \{-(N-1)/2, \ldots,  (N-1)/2\}$ 
+    using randomness $r \in \Z_N^*$ 
+    and Paillier public key~$N$. 
+    This produces a ciphertext $C \in \Z^*_{N^2}$.
+    Encryption checks that $\gcd(r, N)=1$ (and raises an error if not), and then computes
+    
+    $$\enc_N(M; r) := (1 + M \cdot N) \cdot r^N \bmod N^2$$ 
+
+        We also provide a function $\enc_N(M)$ that samples uniform $r \in \Z_N^*$ and returns~$\enc_N(M; r)$.
+
+    Functions $\enc^{{\sf crt}}_{\sk}(M;r)$ and $\enc^{{\sf crt}}_{\sk}(M)$ are analogous but achieve better performance by using the technique from Section~\ref{sec:CRT} when the factorization of $N$
+    is known.
+
+    \item $\dec_{\sk}(C)$ decrypts a ciphertext $C \in \Z^*_{N^2}$ to a plaintext $M \in \{-(N-1)/2, \ldots,  (N-1)/2\}$.
+
+    \item $C_1 \oplus C_2$ denotes homomorphic addition of ciphertexts $C_1, C_2 \in \Z^*_{N^2}$ encrypted under the same Paillier public key~$N$. It is computed as $C_1 \oplus C_2 = C_1 \cdot C_2 \bmod N^2$. Note that 
+$\dec(C_1 \oplus C_2) = [\dec(C_1) + \dec(C_2) \bmod N]$. 
+
+    
+
+    \item $k \odot C$ denotes homomorphic multiplication of a ciphertext $C \in \Z^*_{N^2}$ by $k \in \Z$. It is computed as $k \odot C = C^k \bmod N^2$. Note that $\dec(k \odot C) = [k \cdot \dec(C) \bmod N]$.
+
+    
+\end{enumerate}
+
+\subsection{Speeding up Fixed-Based Multiexponentiation Using Preprocessing}
+\label{sec:multiexp}
+Execution of the protocol involves many computations of the form $s^x t^y \bmod N$, where $s, t, N$ are fixed (and known in advance) but the exponents $x, y$ vary. 
+For the purposes of this section we view this as a multiexponentiation with respect to the bases $s, t$ in a generic group, and so ignore~$N$.
+Efficiency of these multiexponentiations can be improved by using \emph{one-time preprocessing} to generate a small amount of state that is used to speed up subsequent computations.
+
+Say $-\ell_x < x < \ell_x$ and $-\ell_y < y < \ell_y$, where typically $\ell_x, \ell_y$ are powers of~2.
+In describing the algorithm, we assume $x, y$ are nonnegative; 
+we can handle negative exponents by also
+pre-computing $s^{-\ell_x}$ and $t^{-\ell_y}$ and then, e.g., when $x$ is negative write $s^xt^y = \left(s^{-\ell_x}\right) \cdot \left(s^{x+\ell_x}t^y\right)$ with \mbox{$x+\ell_x> 0$}.
+The algorithm is parameterized by a value $B$ which is also typically a power of~2 (in practice, taking $B\in\{2^4,2^8\}$ is a good choice); it stores $T_B \approx (\log \ell_x + \log \ell_y)/\lg B$ group elements and requires 
+$\approx B+T_B$ group operations to compute a multiexponentiation.
+See Algorithm~\ref{alg:multiexp-preprocess2a}.
+
+\begin{algorithm}
+\caption{Computing $s^xt^y$; parameterized by $B\geq 2$; let $k'_x=\lceil |x|/\lg B\rceil$, $k'_y=\lceil |y|/\lg B\rceil$}\label{alg:multiexp-preprocess2a}
+\begin{algorithmic}[1]
+%\Require $x,y \geq 0$
+\State in preprocessing step, compute $s_{i} := s^{B^i}$ for $i\in \{0, \ldots, k_x'-1\}$ 
+\State in a preprocessing step, compute $t_i := t^{B^i}$ for $i\in \{0, \ldots, k_y'-1\}$
+%\If{$x<0$}
+%\State $\neg:=1$, $x:=-x$
+%\Else \State $\neg:=0$
+%\EndIf
+\State let $x_{k_x'-1} \cdots x_0$ and $y_{k'_y-1}\cdots y_0$ be the base-$B$ representations of~$x$ and~$y$, respectively
+\State $\res := 1$, $\tmp:=1$
+\For{$b=B-1, \ldots, 1$}
+  \For{all $i$ such that $y_i=b$}
+    \State $\tmp:= \tmp \cdot t_i$
+   \EndFor
+   \For{all $i$ such that $x_i=b$}
+     %\If{$\neg=0$}
+    \State $\tmp:= \tmp \cdot s_i$
+    %\Else \State $\tmp:=\tmp \cdot s_i^{-1}$
+    %\EndIf
+   \EndFor
+   \State $\res:=\res\cdot \tmp$
+\EndFor
+\State \Return \res
+\end{algorithmic}
+\end{algorithm}
+
+%\jnote{Use signed-digit representation?Storage $2(k_x+k_y)/\lg B$, time $B/2+(k_x+k_y)/\lg B$}
+
+We refer to $(\{s_i\}_{i=0}^{k'_x}, \{t_i\}_{i=0}^{k'_y})$ as a \emph{table}~$T_i$.
+Precomputation of a table is only done once, so the efficiency of doing so is not critical; nevertheless, 
+for completeness, we describe an algorithm for computing the $\{s_i\}_{i \in \{0, \ldots, k'_x-1\}}$. (The same algorithm can be used for computing the $\{t_i\}$ as well.)
+
+\begin{algorithm}
+\caption{Computing $\{s_i\}_{i=0}^k$, where $s_i = s^{B^i}$}
+\begin{algorithmic}[1]
+\State $s_0:=s$
+\For{$i=1, \ldots, k$}
+    \State $s_i:=s_{i-1}^B$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\noindent
+Assuming $B$ is a power of~2, the exponentiation in line~3 requires $\lg B$ squarings; the algorithm thus uses only $k\lg B$ squarings overall.
+
+\subsection{Security Parameters}
+The protocol relies on several user-defined parameters that determine its security. Note  these do not include the curve order~$q$, which is fixed by the underlying signature scheme  rather than by the threshold protocol itself.
+We let $\lambda$ denote the bit length of the curve order (so $2^\lambda \leq q < 2^{\lambda+1}$) and assume $\lambda\geq 256$ (which is the case for the signature schemes we support).
+
+The security parameters of the protocol are denoted collectively by $L = (\kappa, \varepsilon, \ell, \ell', m, Q)$. 
+These parameters are used in the following ways:
+\begin{itemize}
+    \item $\kappa$ determines the length of the primes used for Paillier private keys. Specifically, the primes are chosen to be of length~$4\kappa$ and so the Paillier modulus has length~$8\kappa$.
+
+    \item $\ell, \ell'$ correspond to bounds on the ranges of certain plaintexts that are encrypted, while %Parameters should be set so that $2^\ell \leq 2^{8\kappa-1}$.
+    $\eps$ is a slack parameter. (Honest parties choose plaintexts in a range determined by $\ell$ or $\ell'$; the zero-knowledge proofs, however, only prove that a party chose plaintexts in a range determined by $\ell+\eps$ or $\ell'+\eps$.)
+
+    \item $m$ denotes the number of iterations of some underlying zero-knowledge protocol to run; the soundness error will be~$2^{-m}$.
+
+    \item $Q$ determines the challenge space for some of the zero-knowledge proofs.
+\end{itemize}
+For correctness, we require
+$\ell \geq \lambda$,
+    $\epsilon \geq 8 + \log Q$, and
+    $\ell' \leq 8\kappa$.
+We also recommend $Q=2^m$ since it can only hurt efficiency (while not improving security) otherwise. %(We could even hardcode this, and allow the user to set~$m$ but not~$Q$.)
+
+\subsubsection{Security Guidelines}
+Let $s\leq 256$ be a statistical security parameter, so the goal is to achieve roughly $2^{-s}$ 
+``privacy loss'' in one execution of the protocol. %(Roughly speaking, this relates to the statistical difference between real and simulated executions.) 
+Parameters can be set using the following guidelines: 
+% CGGMP paper uses m=80, \ell=\lambda, \ell'=5\lambda, \epsilon=2\lambda
+\begin{itemize}
+    \item $\kappa$ should be set based on current estimates regarding hardness of factoring. 
+    Setting $\kappa=384$ (so moduli are 3072-bits long) matches NIST recommendations for achieving 128-bit computational security, which is consistent with the security obtained by using~$\lambda=256$.
+    
+    \item $\ell$ needs to be set such that $2^{\ell+1}\geq q$; setting $\ell \geq \lambda$ ensures this.
+Some of the zero-knowledge proofs have privacy loss and soundness error at least~$2^{-\ell}$, but since $\ell = \lambda \geq s$ that is fine.
+    
+    \item $Q$ and $m$ determine the soundness error of several of the zero-knowledge proofs, with some of the proofs having soundness error at least~$1/Q$ and others having soundness error at least~$2^{-m}$. It thus makes sense to set $Q=2^m$ (as recommended above).    
+    Setting $Q=2^{128}$ (and $m=128$) suffices for 128-bit security.  {\bf Note:} while it is possible to increase $Q$ without any significant direct impact on efficiency, increasing $Q$ requires increasing $\epsilon, \ell'$, which does impact efficiency. 
+    
+    \item $\epsilon$ affects both the completeness error and the privacy loss of several of the zero-knowledge proofs. 
+    %For correctness, we minimally require $\epsilon \geq 2+\log Q$. Moreover, 
+    Since 
+    some proofs have privacy loss at least~$4Q/2^\epsilon$, this requires $\epsilon \geq 2+s+\log Q$.
+
+    \item $\ell'$ needs to be set large enough so that adding noise from $\pm 2^{\ell'}$ statistically hides a $(2\lambda+\epsilon)$-bit value. This requires $\ell' \geq 2\lambda + \epsilon + s$.
+\end{itemize}
+If the above guidelines are used, 
+the interaction between one honest party and one malicious party during an execution of the signing protocol has privacy loss upper-bounded by $8 \cdot 2^{-s}$ (this accounts for all the zero-knowledge proofs as well as the noise used for statistically hiding different values). 
+If we assume $t-1$ malicious parties and $n-t+1$ honest parties, the overall privacy loss in an execution of the protocol is at most $8\cdot (n-t+1)\cdot (t-1) \cdot 2^{-s}$.
+%If we assume any particular key is used at most $2^{20}>10^6$ times over its lifetime, then the aggregate privacy loss for any particular key is at most $2^{23-s} \cdot (t-1) (n-t+1)$.
+%Bounding the aggregate privacy by $2^{-64}$ is reasonable.
+
+\section{Zero-Knowledge Proofs}
+In this section we describe the various zero-knowledge proofs that are used as sub-routines in the protocol. In each case we first describe an interactive version of the proof; we then describe how we implement a non-interactive version of the proof using the Fiat-Shamir transform.
+
+\subsection{$\proof{enc}$: Paillier Encryption in Range}
+
+We assume the prover and verifier agree on shared state $\state$, auxiliary data $R_j = (N_j, s_j, t_j)$ with $s_j, t_j \in \Z^*_{N_j}$, and a security level~$L$. 
+The prover and verifier have common input $(N_i, K)$, and the prover additionally has 
+secret input $(k, \rho)$ such that $k \in \pm 2^\ell$ and $K = \enc_{N_0}(k; \rho)$.
+%\hat N => N_j
+%N_0 => N_i
+In all the cases where this proof is used in the protocol, the prover knows the factorization of~$N_i$ (and thus knows~$\sk_i$) and the verifier knows the factorization of~$N_j$ (and thus knows $\sk_j$).
+  %  \item Proof guarantees: $k \in \pm 2^{\ell + \varepsilon}$ 
+ %   \item Implicit constraints: $2^{\ell + \varepsilon} \le N_0/2$ 
+%\end{itemize}
+
+\subsubsection{Interactive Version of the Proof}
+
+\begin{enumerate}
+    \item In the first round of the protocol, the prover does the following:
+    %$\commit{enc}^{L,R}((N_0, K); (k, \rho)) \to ((S, A, C); (\alpha, \mu, r, \gamma))$:
+    \begin{itemize}
+        \item The prover  samples the following values:
+        \[\alpha \gets \pm 2^{\ell + \varepsilon}, \;\;\;
+        \mu \gets \pm (2^\ell \cdot N_j), \;\;\;
+        r \gets \Z_{N_i}^*, \;\;\;
+        \gamma \gets \pm (2^{\ell + \varepsilon} \cdot N_j).\]
+
+        \item The prover then computes:
+\begin{itemize}
+        \item $S = s_j^k t_j^\mu \bmod N_j$ 
+            \item $A = \enc_{N_i}(\alpha; r)$  (this is computed as $\enc^\crt_{\sk_i}(\alpha; r)$ if $\sk_i$ is known)
+            \item $C = s_j^\alpha t_j^\gamma \bmod N_j$.
+\end{itemize}
+      Note that $S$ and $C$ are computed using fixed-based multiexponentiations.
+        
+
+        \item The prover sends first message $(S, A, C)$, and maintains local (secret) state $(\alpha, \mu, r, \gamma)$.
+    \end{itemize}
+
+    \item The verifier chooses $e \gets \pm Q$ and sends $e$ to the prover.
+
+    \item On input $(N_i, K)$, challenge $e$, and local state including $(k, \rho), (\alpha, \mu, r, \gamma)$, the prover computes:
+\begin{itemize}
+\item    $z_1 = \alpha + e k $
+\item    $z_2 = r \cdot \rho^e \bmod N_i $
+\item    $z_3 = \gamma + e \mu$.
+\end{itemize}
+    It then sends $(z_1, z_2, z_3)$ to the verifier.
+
+    \item Given $(N_i, K)$, initial message $(S, A, C)$, challenge $e$, and response $(z_1, z_2, z_3)$, the verifier accepts if and only if all the following are true:
+\begin{itemize}
+\item $A \oplus (e \odot K) = \enc_{N_i}(z_1; z_2) \bmod N_i^2$ %(the latter is computed as $\enc^\crt_{\sk_i}(z_1; z_2)$ if $\sk_i$ is known)
+\item    $s_j^{z_1} t_j^{z_3} = C \cdot S^e \bmod N_j$  
+\item    $z_1 \in \pm 2^{\ell + \varepsilon}$.
+\end{itemize}
+Note the second computation involves a fixed-based multiexponentiation.
+\end{enumerate}
+
+\subsubsection{Non-Interactive Version of the Proof}
+
+\begin{itemize}
+    \item We deterministically derive a challenge by applying a hash function to inputs that include $\state$, auxiliary data~$R_j$, the common input~$(N_i, K)$, and the initial protocol message $(S, A, C)$.    
+    We write the resulting function as 
+    $e = \challengeni{enc}^{L}(\state, R_j, (N_i, K), (S, A, C))$.
+
+%    $\text{seed} = H(\sid \| R \| N_0 \| K \| S \| A \| C) \\ e \stackrel{\text{seed}}{\gets} \pm Q $ 
+    
+%    \jnote{Would be good to include the prover's ID in the hash. Also $\sid$ (since $s, t, \hat N$ might be shared across many sessions).} \dnote{This is a typo, $\sid$ must be in the hash. Added it. $\sid$ should include prover's ID (it's probably better to call it ctx or CST (context-separation tag)} \jnote{$\sid$ may include the prover's ID among all parties' IDs, but that is not enough: you want the distinguish the prover so the proof can't be replayed by another party} \dnote{Yes I understand that. It's going to work like that: we have $\sid_1$ defined at protocol level (e.g. at presigning) and $\sid_2$ defined at proof level. When proof is invoked, we set $\sid_2 = \sid_1 \| i \| \dots$ where $i$ is party index. I see that it's not taken into account in described presigning below, I will address that (added TBD in presigning section)}
+
+    
+    \item The prover generates a proof as follows: first it computes $(S, A, C)$ as described above; then it computes $e = \challengeni{enc}^{L}(\state, R_j, (N_i, K), (S, A, C))$; next, it computes $(z_1, z_2, z_3)$ as described above, using the challenge~$e$. Finally, it outputs the proof $((S, A, C), (z_1, z_2, z_3))$. We write the resulting function as $\proveni{enc}^{L}(\state, R_j, (N_i, K), (k, \rho))$.
+    
+  %  $\proveni{enc}^{L,R}(\sid, (N_0, K); (k, \rho)) \to ((S, A, C), (z_1, z_2, z_3)):$
+   % \begin{enumerate}
+    %    \item Prover commits on input:
+        
+     %   $((S, A, C), (\alpha, \mu, r, \gamma)) = \commit{enc}^{L,R}((N_0, K); (k, \rho))$
+
+      %  \item Derives challenge:
+
+       % $e = \challengeni{enc}^{L,R}(\sid, (N_0, K), (S, A, C))$
+
+       % \item Computes the proof: 
+
+        %$(z_1, z_2, z_3) = \prove{enc}^{L,R}((N_0, K), e; (k, \rho), (\alpha, \mu, r, \gamma))$
+
+%        \item Returns $((S, A, C), (z_1, z_2, z_3))$
+ %   \end{enumerate}
+
+    \item A party verifies a proof $\psi=((S, A, C), (z_1, z_2, z_3))$ by first computing \[e = \challengeni{enc}^{L}(\state, R_j, (N_i, K), (S, A, C))\] and then verifying as described above, using the challenge~$e$. We write the resulting function as $\verifyni{enc}^{L}(\state, R_j, (N_i, K), \psi)$.
+    
+ %   $\verifyni{enc}^{L,R}(\sid, (N_0, K), ((S, A, C), (z_1, z_2, z_3))):$
+  %  \begin{enumerate}
+   %     \item Derives challenge:
+
+%        $e = \challengeni{enc}^{L,R}(\sid, (N_0, K), (S, A, C))$
+
+ %       \item Asserts $\verify{enc}^{L,R}((N_0, K), (S, A, C), e, (z_1, z_2, z_3))$
+  %  \end{enumerate}
+\end{itemize}
+
+\subsection{\proof{aff\mbox{-}g}: Paillier Affine Operation with Group Commitment in Range}
+
+%\hat N => N_j
+% N_0 => N_j
+% N_1 => N_i
+
+We assume the prover and verifier agree on shared state $\state$, auxiliary data\footnote{In \cite{cggmp21}, the auxiliary data is an arbitrary modulus $\hat N$. In the protocol, however, it always holds that $\hat N=N_j$.} $R_j = (N_j, s_j, t_j)$ with $s_j, t_j \in \Z^*_{N_j}$,
+an elliptic curve~$\E$ of prime order~$q$ with generator~$G$,
+and a security level~$L$.
+For this proof, the prover and verifier have common input 
+$(N_j, N_i, C, D, Y, X)$ 
+where $C, D \in \Z^*_{N_j^2}$, 
+$Y \in \Z^*_{N_i^2}$, and
+$X \in \E$, and the prover additionally has secret input 
+$(x, y, \rho, \rho_y)$ such that 
+$x \in \pm 2^\ell$, 
+$y \in \pm 2^{\ell'}$, 
+$\rho \in \Z^*_{N_j}$, 
+$\rho_y \in \Z^*_{N_i}$,  
+$D = (x \odot C) \oplus \enc_{N_j}(y; \rho)$, 
+$Y = \enc_{N_i}(y; \rho_y)$,
+and $X = x \cdot G$.
+In all the cases where this proof is used in the protocol, the prover knows the factorization of~$N_i$ (and hence knows~$\sk_i$) and the verifier knows the factorization of~$N_j$ (and hence knows~$\sk_j$).
+%    \item Proof guarantees: $x \in \pm 2^{\ell + \varepsilon}$ and $y \in \pm 2^{\ell' + \varepsilon}$
+%    \item Implicit constraints: $2^{\ell' + \varepsilon} < N_0/2, N_1/2$
+
+\subsubsection{Interactive Version of the Proof}
+\begin{enumerate}
+    \item In the first round of the protocol, the prover does the following:
+   % $\commit{aff\mbox{-}g}^{L,R}((N_j, N_i, C, D, Y, X); (x, y, \rho, \rho_y)) \to ((A,B_x,B_y,E,S,F,T); (\alpha,\beta,r,r_y,\gamma,\delta,m,\mu))$:
+    \begin{itemize}
+        \item The prover samples the following values: 
+
+        $\begin{aligned}
+            \alpha &\gets \pm 2^{\ell+\varepsilon},   & r   &\gets \Z^*_{N_j}, & \gamma, \delta &\gets \pm (2^{\ell + \varepsilon} \cdot N_j)\\
+            \beta &\gets \pm 2^{\ell' + \varepsilon}, & r_y &\gets \Z^*_{N_i}, & m, \mu         &\gets \pm (2^\ell \cdot N_j).
+        \end{aligned}$
+
+        \item The prover then computes:
+\begin{itemize}
+        \item $A = (\alpha \odot C) \oplus \enc_{N_j}(\beta; r)$
+          \item  $B_x = \alpha \cdot G $
+          \item  $B_y = \enc_{N_i}(\beta; r_y)$ (this is computed as $\enc^\crt_{\sk_i}(\beta; r_y)$ if $\sk_i$ is known)
+            \item $E = s_j^\alpha t_j^\gamma \bmod N_j, \; S = s_j^x t_j^m \bmod N_j$ 
+            \item $F = s_j^\beta t_j^\delta \bmod N_j, \; T = s_j^y t_j^\mu \bmod N_j$.
+        \end{itemize}
+        Note that the final two sets of computations are fixed-based multiexponentiations.
+
+        \item The prover sends first message $(A,B_x,B_y,E,S,F,T)$, and maintains local (secret) state $(\alpha, \beta, r, r_y, \gamma, \delta, m, \mu)$.
+    \end{itemize}
+
+    \item The verifier chooses $e \leftarrow \pm Q$ and sends $e$ to the prover.
+
+    \item On input $(N_j, N_i, C, D, Y, X)$, the challenge $e$, and local state that includes $(x, y, \rho, \rho_y)$, $(\alpha,\beta,r,r_y,\gamma,\delta,m,\mu)$, the prover computes:
+
+    $\begin{aligned}
+        & z_1 = \alpha + e x \\
+        & z_2 = \beta + e y \\
+        & z_3 = \gamma + e m \\ 
+        & z_4 = \delta + e \mu \\
+        & w = r \cdot \rho^e \bmod N_j \\
+        & w_y = r_y \cdot \rho_y^e \bmod N_i,
+    \end{aligned}$
+    
+    and sends $(z_1, z_2, z_3, z_4, w, w_y)$ to the verifier.
+
+    \item Given $(N_j,N_i,C,D,Y,X)$, initial message $(A,B_x,B_y,E,S,F,T)$, challenge $e$, and response $(z_1, z_2, z_3, z_4, w, w_y)$, the verifier accepts if and only if all the following are true:
+    
+$\begin{aligned}
+    &  A \oplus (e \odot D)  = (z_1 \odot C) \oplus \enc^\crt_{\sk_j}(z_2; w)\bmod N_j^2\\
+    &  z_1 \cdot G = B_x + e \cdot X \\
+    &  B_y \oplus (e \odot Y)  = \enc_{N_i}(z_2; w_y) \bmod N_i^2\\
+    &  s_j^{z_1} t_j^{z_3} = E \cdot S^e \bmod N_j
+                                            \\
+    &  s_j^{z_2} t_j^{z_4} = F \cdot T^e \bmod N_j \\
+    &  z_1 \in \pm 2^{\ell + \varepsilon} \\
+    &  z_2 \in \pm 2^{\ell' + \varepsilon}.
+    \end{aligned}$
+    
+Note that two of the above computations involve fixed-base multiexponentiations.
+   
+\end{enumerate}
+
+\subsubsection{Non-Interactive Version of the Proof}
+\begin{itemize}
+    \item We deterministically derive a challenge by applying a hash function to inputs that include $\state$, the auxiliary data~$R_j$, the common input~$(N_j,N_i,C,D,Y,X)$, and the initial protocol message $(A,B_x,B_y,E,S,F,T)$.    
+We write the resulting function as \[e = \challengeni{aff\mbox{-}g}^{L}(\state,R_j,(N_j,N_i,C,D,Y,X),(A,B_x,B_y,E,S,F,T)).\]
+
+    \item The prover generates a proof as follows: it computes its initial message $(A,B_x,B_y,E,S,F,T)$ as described above; then it computes \[e = \challengeni{aff\mbox{-}g}^{L}(\state,R_j,(N_j,N_i,C,D,Y,X),(A,B_x,B_y,E,S,F,T));\] next, it computes $(z_1,z_2,z_3,z_4,w,w_y)$ as described above, using the challenge~$e$. Finally, it outputs the proof $((A,B_x,B_y,E,S,F,T), (z_1,z_2,z_3,z_4,w,w_y))$. We write the resulting function as $\proveni{aff\mbox{-}g}^{\E,L}(\state, R_j, (N_j, N_i, C, D, Y, C); (x,y,\rho,\rho_y))$. 
+  
+    \item A party verifies a proof $\psi=((A,B_x,B_y,E,S,F,T), (z_1,z_2,z_3,z_4,w,w_y))$ by first computing 
+    \[e = \challengeni{aff\mbox{-}g}^{L}(\state,R_j,(N_j,N_i,C,D,Y,X),(A,B_x,B_y,E,S,F,T))\]
+    and then verifying as described above, using the challenge~$e$. We write the resulting function as $\verifyni{aff\mbox{-}g}^{\E,L}(\state,R_j, (N_j,N_i,C,D,Y,X), \psi)$.
+\end{itemize}
+
+\subsection{$\proof{mod}$: Paillier-Blum Modulus}
+The prover and verifier agree on shared state $\state$ and a security level~$L$ (which determines~$m$). For this proof, the prover and verifier have common input~$N$, and the prover additionally has as secret input primes $p, q=3 \bmod 4$ such that~$N=pq$.
+
+\subsubsection{Interactive Version of the Proof}
+
+\begin{enumerate} 
+\item In the first round of the protocol, the prover samples uniform 
+$w \in \mathbb{Z}_N$
+    with Jacobi symbol $\left( \frac{w}{N} \right) = -1$. It sends $w$ to the verifier and maintains local state~$w$.
+
+  \item The verifier chooses uniform $y_i \in \mathbb{Z}_N$ for $i=1,\ldots, m$.
+
+  \item Given $N$, the challenge $y_1, \ldots, y_m$, and local state that includes $p, q, w$, the prover does the following for $i=1,\ldots,m$:
+    \begin{enumerate}
+      \item Compute $a_i, b_i \in \{0,1\}$ such that $y'_i = (-1)^{a_i} w^{b_i} y_i \bmod N$ is a quadratic residue  modulo~$N$.
+      \item Let $x_i$ be the principal\footnote{This means that $x_i$ is itself a quadratic residue.} 4th root of $y'_i$ modulo~$N$.
+      \item Compute $N' = N^{-1} \bmod \phi(N)$ and set $z_i = y_i ^ {N'} \bmod N$.
+    \end{enumerate}
+Send $\{(x_i, a_i, b_i, z_i)\}_{i=1}^m$ to the verifier. 
+    
+  \item Given $N$, initial message $w$, challenge $\{y_i\}_{i=1}^m$, and response 
+  $\{(x_i, a_i, b_i, z_i)\}_{i=1}^m$, the verifier accepts if and only if all the following are true:
+    \begin{enumerate}
+      \item $N$ is an odd non-prime.
+      \item For $i \in \{1, \ldots, m\}$: \begin{itemize}
+          \item $z_i^N = y_i \bmod N$.
+          \item $x_i^4 = (-1)^{a_i} w^{b_i} y_i \bmod N$.
+      \end{itemize} 
+    \end{enumerate}
+
+\end{enumerate}
+
+\subsubsection{Non-Interactive Version of the Proof}
+
+\begin{itemize}
+  \item We deterministically derive a challenge by applying a hash function to inputs that include $\state$, the common input~$N$, and the initial protocol message~$w$.   
+  We write the resulting function as $(y_1, \ldots, y_m)=\challengeni{mod}^L(\state, N, w)$.
+
+  \item The prover generates a proof by first computing its initial message $w$ as described above; then it computes 
+        $(y_1, \ldots, y_m) = \challengeni{mod}^L(\state, N, w)$; next, it computes $\{(x_i, a_i, b_i, z_i)\}_{i=1}^m$ as described above, using the challenge $\{y_i\}_{i=1}^m$. It outputs the proof $(w, \{(x_i, a_i, b_i, z_i)\}_{i=1}^m)$. We write the resulting function as $\proveni{mod}^L((\state, N), (p, q))$.
+
+  \item A party verifies a proof  $(w, \{(x_i, a_i, b_i, z_i)\}_{i=1}^m)$ by first computing \[(y_1, \ldots, y_m) = \challengeni{mod}^L(\state, N, w)\] and then verifying as described above, using the challenge~$\{y_i\}_{i=1}^m$.
+\end{itemize}
+
+\subsection{$\proof{prm}$: Ring-Pedersen Parameters}
+The prover and verifier agree on shared state $\state$ and security level~$L$ (which determines~$m$). 
+For this proof, the prover and verifier have common input $(N, s, t)$ with $s, t \in {\mathbb Z}_N^*$, and the prover additionally has secret input $\lambda$ such that $s=t^\lambda \bmod N$, along with the factorization of~$N$.
+
+\subsubsection{Interactive Version of the Proof}
+\begin{enumerate} 
+  \item In the first round of the protocol, the prover first does the following for $i =1, \ldots, m$:
+    \begin{itemize}
+      \item The prover samples $a_i \gets \Z_{\phi(N)}$.
+      \item The prover computes $A_i = t^{a_i} \bmod N$.
+    \end{itemize}
+The prover then sends first message $\{A_i\}_{i=1}^m$ and maintains local (secret) state $\{a_i\}_{i=1}^m$.
+
+  \item For $i=1, \ldots, m$, the verifier chooses $e_i \leftarrow \{0,1\}$, and sends $\{e_i\}_{i=1}^m$ to the prover.
+
+  \item On input $N, s, t$, the challenge $\{e_i\}_{i=1}^m$, and local state including $\phi(N), \lambda$, and the $\{a_i\}_{i=1}^m$, for $i=1, \ldots, m$ the prover computes $z_i= a_i + e_i \cdot \lambda \bmod \phi(N)$. It sends $\{z_i\}_{i=1}^m$ to the verifier.
+
+  \item Given $N, s, t$, initial message $\{A_i\}_{i=1}^m$, challenge $\{e_i\}_{i=1}^m$, and response $\{z_i\}_{i=1}^m$, the verifier accepts if and only if 
+$t^{z_i} = A_i s^{e_i} \bmod N$ for $i=1, \ldots, m$. 
+\end{enumerate}
+
+\subsubsection{Non-Interactive Version of the Proof}
+\begin{itemize}
+  \item We deterministically derive a challenge by hashing inputs that include $\state$, the common input~$(N,s,t)$, and the initial protocol message~$\{A_i\}_{i=1}^m$.   
+  We write the resulting function as
+  $\{e_i\}_{i=1}^m = \challengeni{prm}^L(\state, N, s, t, \{A_i\}_{i=1}^m)$.
+
+  \item The prover generates a proof as follows: first, it computes its initial message $\{A_i\}_{i=1}^m$ as described above; then it computes $\{e_i\}_{i=1}^m = \challengeni{prm}^L(\state, N, s, t, \{A_i\}_{i=1}^m)$; next, it computes $\{z_i\}_{i=1}^m$ as described above, using the challenge $\{e_i\}_{i=1}^m$. Finally, it outputs the proof $(\{A_i\}_{i=1}^m, \{z_i\}_{i=1}^m)$. We write the resulting function as $\proveni{prm}^L(\state, (N, s, t), (\phi, \lambda))$.
+  
+  \item A party verifies a proof $\psi=(\{A_i\}_{i=1}^m, \{z_i\}_{i=1}^m)$ for $(N, s, t)$ by  setting \[\{e_i\}_{i=1}^m = \challengeni{prm}^L(\state, N, s, t, \{A_i\}_{i=1}^m)\] and then verifying as described above, using the challenge~$\{e_i\}_{i=1}^m$. We write the resulting function as $\verifyni{prm}^L(\state, (N, s, t), \psi)$.
+  \end{itemize}
+
+\subsection{$\proof{log*}$: Group Element vs.\ Paillier Encryption in Range}
+The prover and verifier agree on shared state $\state$, auxiliary data $R_j=(N_j, s_j, t_j)$ with $s_j, t_j \in {\mathbb Z}^*_{N_j}$, 
+an elliptic curve~$\E$ of prime order~$q$ with generator~$G$,
+and a security level~$L$. For this proof, the prover and verifier have common input $(N_i, C, X, B)$ with $C \in {\mathbb Z}^*_{N_i^2}$ and $X, B \in \E$, and the prover additionally has secret input $(x, \rho)$ such that $x \in \pm 2^\ell$, $C=\enc_{N_i}(x; \rho)$, and $X = x \cdot B$.
+In all the cases where this proof is used in the protocol, the prover knows the factorization of $N_i$ (and hence knows~$\sk_i$) and the verifier knows the factorization of $N_j$ (and hence knows~$\sk_j$).
+
+%    \item Proof guarantees: $x \in \pm 2^{\ell + \varepsilon}$
+ %   \item Implicit constraints: $2^{\ell + \varepsilon} < N_0/2$
+
+
+\subsubsection{Interactive Version of the Proof}
+
+\begin{enumerate}
+\item In the first round of the protocol, the prover does the following:
+    \begin{itemize}
+        \item The prover samples the following values:
+
+        $\begin{aligned}
+            \alpha &\gets \pm 2^{\ell + \varepsilon} \\
+            \mu &\gets \pm (2^\ell \cdot N_j) \\
+            r &\gets \Z^*_{N_0} \\
+            \gamma &\gets \pm (2^{\ell + \varepsilon} \cdot N_j).
+        \end{aligned}$
+
+        \item The prover then computes:
+\begin{itemize}
+\item        $
+            S = s_j^x t_j^\mu \bmod N_j$ 
+\item            $A = \enc_{N_i}(\alpha; r)$ (this is computed as $\enc^\crt_{\sk_i}(\alpha; r)$ when $\sk_i$ is known) 
+\item            $Y = \alpha \cdot B$ 
+\item            $D = s_j^\alpha t_j^\gamma \bmod N_j.$ 
+\end{itemize}
+Note that $S$ and $D$ are computed using fixed-base multiexponentiations.
+        \item The prover sends first message $(S,A,Y,D)$ and maintains local (secret) state $(\alpha,\mu,r,\gamma)$.
+    \end{itemize}
+
+    \item The verifier chooses $e \leftarrow \pm Q$ and sends $e$ to the prover.
+
+    \item On input $(N_i, C, X, B)$, the challenge $e$, and local state that includes $(x,\rho), (\alpha,\mu,r,\gamma)$, the prover computes:
+
+    $\begin{aligned}
+        z_1 &= \alpha + e x \\
+        z_2 &= r \cdot \rho^e \bmod N_i \\
+        z_3 &= \gamma + e \mu,
+    \end{aligned}$
+    
+and sends $(z_1, z_2, z_3)$ to the verifier.
+
+    \item Given $(N_i,C,X,B)$, initial message $(S,A,Y,D)$, challenge $e$, and response $(z_1,z_2,z_3)$, the verifier accepts if and only if the following are true:
+
+    $\enc_{N_i}(z_1; z_2)  = A \oplus (e \odot C) \bmod N_i^2\\
+    z_1 \cdot B = Y + e \cdot X \\
+    s_j^{z_1} t_j^{z_3} = D \cdot S^e \bmod N_j$  \\
+    $z_1 \in \pm 2^{\ell + \varepsilon}$.
+\end{enumerate}
+
+\subsubsection{Non-Interactive Version of the Proof}
+
+\begin{itemize}
+    \item We deterministically derive a challenge by hashing inputs that include $\state$, the auxiliary data~$R_j$, the common input~$(N_i,C,X, B)$, and the initial protocol message~$(S,A,Y,D)$.   
+    We write the resulting function as 
+    $e=\challengeni{log*}^{\E,L}(\state, R_j, (N_i,C,X, B), (S,A,Y,D))$.
+
+ %   $\text{seed} = H(\sid \| \E \| L \| R \| N_0 \| C \| X \| S \| A \| Y \| D) \\ e \stackrel{\text{seed}}{\gets} \pm Q$ 
+
+    \item The prover generates a proof by first computing its initial message $(S, A, Y, D)$ as described above, then computing $e = \challengeni{log*}^{\E,L}(\state, R_j,(N_i,C,X, B), (S,A,Y,D))$, and next computing $(z_1,z_2,z_3)$ as described above, using challenge~$e$. It outputs the proof $((S, A, Y, D)$, $(z_1, z_2, z_3))$. We write the resulting function as $\proveni{log*}^{\E,L}(\state,R_j, (N_i, C, X, B); (x,\rho))$.
+
+    \item A party verifies a proof $\psi-((S, A, Y, D), (z_1, z_2, z_3))$ by first computing \[e = \challengeni{log*}^{\E,L}(\state, R_j, (N_i,C,X, B), (S,A,Y,D))\] and then verifying as described above, using the challenge~$e$. We write the resulting function as $\verifyni{log*}^{\E,L}(\state, R_j, (N_i, C, X, B), \psi)$.
+\end{itemize}
+
+\subsection{$\proof{fac}$: No Small Factor Proof}
+The prover and verifier agree on shared state $\state$, auxiliary data $R_j=(N_j, s_j, t_j)$ with $s_j, t_j \in {\mathbb Z}_{N_j}^*$, and a security level~$L$. 
+For this proof, the prover and verifier have common input~$N_i$, and the prover additionally has primes $2^\ell < p, q < \pm 2^\ell \cdot \sqrt{N_i}$ with $N_i=pq$. 
+In all the cases where this proof is used in the protocol, the verifier knows the factorization of $N_j$ (and hence knows~$\sk_j$).
+
+%  \item Proof guarantees: $p_0, q_0 > 2^\ell$
+%  \item Implicit constraints:   $2^{2\ell + \varepsilon} \approx \sqrt{N_0}$ \jnote{Would be good to formalize exactly what this means} \nnote{I aped it from the paper. It seems they mention it to reconcile the fact that sometimes they mention this proof with $2^l$ as the lower limit, and sometimes with $2^l \sqrt{N_0}$ as the upper - this way they are the same (not taking $\epsilon$ into account)}
+
+
+\subsubsection{Interactive Version of the Proof}
+\begin{enumerate}
+  \item In the first round of the protocol, the prover does the following:
+
+    \begin{itemize}
+      \item The prover samples the following values:
+
+        $\alpha, \beta \gets \pm \left(2^{\ell + \varepsilon} \sqrt{N_i}\right)$ \\
+        $\mu, \nu \gets \pm \left(2^{\ell} N_j\right)$ \\
+        $\sigma \gets \pm \left(2^{\ell} N_i N_j\right)$ \\
+        $r \gets \pm \left(2^{\ell + \varepsilon} N_i N_j\right)$ \\
+        $x, y \gets \pm \left(2^{\ell + \varepsilon} N_j\right)$.
+
+      \item The prover then computes:
+\begin{itemize}
+\item        $P = s_j^{p} t_j^\mu \bmod N_j$ 
+\item        $Q = s_j^{q} t_j^\nu \bmod N_j$ 
+\item        $A = s_j^\alpha t_j^x \bmod N_j$ 
+\item        $B = s_j^\beta t_j^y \bmod N_j$ 
+\item        $T = Q^\alpha t_j^r \bmod N_j$.
+ \end{itemize}
+ Note that $P,Q,A,B$ are computed using fixed-base multiexponentiations. %(It is also possible to express computation of $T$ as a fixed-base multiexponentiation $T=(s^qt^\nu)^\alpha \cdot t^r = s^{q\alpha}t^{\nu\alpha+r} \bmod N_j$ and then use multiexp preprocessing, but I'm not sure this will be a net win.)
+      \item The prover sends the first message  $(P, Q, A, B, T, \sigma)$ 
+        and also maintains local (secret) state $(\alpha, \beta, \mu, \nu, r, x, y)$.
+    \end{itemize}
+
+  \item The verifier chooses $e \leftarrow \pm Q$ and sends $e$ to the prover.
+
+  \item On input $N_i$, the challenge $e$, and local state that includes $(p, q)$, $\sigma$, and 
+  $(\alpha, \beta, \mu, \nu, r, x, y)$, the prover computes: \\
+    $z_1 = \alpha + ep$ \\
+    $z_2 = \beta + eq$ \\
+    $w_1 = x + e\mu$ \\
+    $w_2 = y + e\nu$ \\
+    $v = r + e \cdot (\sigma - \nu p)$,
+
+    and sends $(z_1, z_2, w_1, w_2, v)$ to the verifier.
+
+  \item Given $N_i$, initial message $(P, Q, A, B, T, \sigma)$, challenge $e$, and response $(z_1, z_2, w_1, w_2, v)$, the verifier accepts if and only if the following are true: \begin{itemize}
+\item    $s_j^{z_1} t_j^{w_1} = A \cdot P^e \bmod N_j$ 
+\item    $s_j^{z_2} t_j^{w_2} = B \cdot Q^e \bmod N_j$ 
+\item    $Q^{z_1} t_j^{v} = T \cdot (s_j^{N_i} t_j^\sigma)^e \bmod N_j$ 
+\item    $z_1 \in \pm \left(2^{\ell + \varepsilon} \sqrt{N_i}\right)$ 
+\item    $z_2 \in \pm \left(2^{\ell + \varepsilon} \sqrt{N_i}\right)$.
+\end{itemize}
+Note that the 1st and 2nd checks involve fixed-base multiexponentiations.
+
+\end{enumerate}
+
+\subsubsection{Non-Interactive Version of the Proof}
+
+\begin{itemize}
+  \item We deterministically derive a challenge by hashing inputs that include $\state$, the auxiliary data~$R_j$, the common input~$N_i$, and the initial protocol message~$(P, Q, A, B, T, \sigma)$.
+  We write the resulting function as
+  $e=\challengeni{fac}^{L} (\state, R_j, N_i, (P, Q, A, B, T, \sigma))$.
+
+ 
+
+  \item A proof is computed as follows:  compute initial message $(P, Q, A, B, T, \sigma)$ as described above; compute $e=\challengeni{fac}^{L} (\state, R_j, N_i, (P, Q, A, B, T, \sigma))$; next compute $(z_1, z_2, w_1, w_2, v)$ as described above, using challenge~$e$. Output the proof $((P, Q, A, B, T, \sigma), (z_1, z_2, w_1, w_2, v))$. We write the resulting function as $\proveni{fac}^{L}(\state, R_j, N_i, (p_i, q_i))$.
+
+  \item A party verifies a proof $\phi=((P, Q, A, B, T, \sigma), (z_1, z_2, w_1, w_2, v))$ by first computing \[e=\challengeni{fac}^{L} (\state, R_j, N_i, (P, Q, A, B, T, \sigma))\] and then verifying as described above, using the challenge~$e$. We write the resulting function as $\verifyni{fac}^{L}(\state, R_j, N_i, \phi)$.
+\end{itemize}
+
+
+\subsection{\proof{sch}: Schnorr Proof of Knowledge}
+We describe the standard Schnorr proof of knowledge, and also set up notation that we will use in what follows.
+\begin{itemize}
+    \item $\commit{sch}() \to (A; \alpha)$ \\
+    $\alpha \gets \Z_q \\
+    A = \alpha \cdot G$ \\
+    return $(\alpha, A)$
+
+    \item $\challenge{sch}() \to e$ \\
+    return $e \gets \Z_q$
+
+    \item $\prove{sch}(\alpha, e, x) \to z$ \\
+    return $z = \alpha + e x \bmod q$
+
+    \item $\verify{sch}(z, A, e, X)$ \\
+    accept iff $z \cdot G = A + e \cdot X$.
+\end{itemize}
+
+
+\section{Threshold Protocols}
+
+In this section we describe the various threshold protocols we have implemented. 
+Overall, we have the following protocols:
+\begin{enumerate}
+    \item When a ``signing cluster'' is initialized, the signers in that cluster run a provisioning protocol in which they each generate auxiliary information. That protocol is described in Section~\ref{section:aux_data_gen}. 
+
+    \item When key generation is requested in an initialized cluster, the signers in that cluster run a distributed key-generation protocol. 
+    We have implemented protocols for both $n$-out-of-$n$ key generation (cf.\ Section~\ref{sec:n-of-n-dkg}), as well as $t$-out-of-$n$ key  generation (cf.\ Section~\ref{sec:t-of-n-dkg}).
+
+    \item A threshold of signers who have already generated a key can compute \emph{presignatures} with respect to that key. Protocols for doing that, in both the ``non-threshold'' (i.e., $n$-out-of-$n$) and ``threshold'' (i.e., $t$-out-of-$n$) cases, are described in Section~\ref{sec:presigning}.
+
+    \item If a presignature has already been generated by some threshold of signers with respect to some key, those signers can non-interactively compute a signature on a given message~$m$ using the presignature they have computed. See Section~\ref{sec:signing}.
+\end{enumerate}
+
+\ignore{We have also implemented a protocol for $n$-out-of-$n$ key refresh that refreshes the shares associated with some key.
+Since we have not yet implemented a $t$-out-of-$n$ version of key refresh, and do not currently use key refresh in production, we have deferred a description of that protocol to
+ Appendix~\ref{sec:refresh}.
+(Note that when key refresh is used in some signing cluster, one should probably do a key refresh for \emph{all} the keys stored by that  cluster, and should also re-run the provisioning protocol for that cluster.)
+}
+
+\subsection{Provisioning Protocol}
+\label{section:aux_data_gen}
+
+This protocol is run to generate auxiliary information for each signer in a cluster.  
+
+\begin{description}
+  \item[\textbf{Input.}]
+    Party index $i$,
+    context separation string $\sid$,
+    security level $L$.
+
+  \item[\textbf{Round 1.}] \
+    \begin{itemize}
+    \item Generate $4\kappa$-bit safe primes $p_i, q_i$ using the algorithm from Section~\ref{sec:safe-prime}.
+      \item Compute $N_i = p_iq_i$ and $\phi = (p_i - 1)(q_i - 1)$, and create a Paillier decryption key $\sk_i$ using those values.
+     \item Sample  $r \gets \Z_{N_i}^{*}$ and $\lambda \gets \Z_\phi$,
+        and compute $t_i = r_i^2 \bmod N_i$ and $s_i = t_i^\lambda \bmod N_i$.
+      \item Compute $\hat{\psi}_i = \proveni{prm}^L(\sid||i, (N_i, s_i, t_i), (\phi, \lambda))$.
+      \item Sample $\rho_i, u_i \leftarrow \{0,1\}^\kappa$, 
+        and compute $V_i =
+        H(\sid\| n\| i\| N_i\|s_i\| t_i\| \hat{\psi}_i|\rho_i\| u_i)$.
+      \item Send $V_i$ to all parties.
+    \end{itemize}
+    
+
+  \item[\textbf{Round 2.}] \
+    \begin{itemize}
+      \item Receive $V_j$ from all parties.
+      \item ({\bf Reliability check.}) Optionally, if the reliability check is enabled:
+    \begin{itemize}
+        \item 
+        Compute $h_i = H(V_0 \| \dots \| V_{n-1})$ and 
+            send $h_i$ to all parties.
+        
+        
+        \item Upon receiving $h_j$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$.
+    \end{itemize}
+      \item Send $(N_i, s_i, t_i, \hat{\psi}_i, \rho_i, u_i)$ to all parties.
+    \end{itemize}
+
+  \item[\textbf{Round 3.}] \
+
+    \begin{itemize}
+      \item Receive $(N_j, s_j, t_j, \hat{\psi}_j, \rho_j, u_j)$
+        from all parties.
+      \item For all $j \in [n]$, set $R_j = (N_j, s_j, t_j)$; let
+       $\vec{R} = (R_j)_{j \in [n]}$.
+
+      \item For $j \neq i$:
+        \begin{itemize}
+          \item Assert $V_j =
+            H(\sid\| n\| j\| N_j\| s_j\| t_j\| \hat{\psi}_j\| \rho_j\|u_j)$.
+          \item Assert $N_j$ is at least $8 \cdot \kappa - 1$ bits in length
+          \item Assert $\verifyni{prm}^L(\sid||j, (N_j, s_j, t_j), \hat{\psi}_j)$.
+          \item Construct Paillier encryption key from~$N_j$.
+        \end{itemize}
+\item Compute $\rho=\bigoplus_j \rho_j$.
+      \item Compute $\psi_i = \proveni{mod}^L(\sid||i\|\rho, N_i, (p_i, q_i))$.
+      \item For $j\neq i$ do:
+        \begin{itemize}
+          \item Compute $\phi_i^j = \proveni{fac}^{L}(\sid||i\|\rho, R_j, N_i, (p_i, q_i))$.
+          \item Send $(\psi_i, \phi_i^j)$ to $P_j$.
+        \end{itemize}
+
+    \end{itemize}
+
+  \item[\textbf{Output.}] \
+
+    \begin{itemize}
+      \item Receive $(\psi_j, \phi_j^i)$ from all parties.
+      \item For $j \neq i$ do: 
+        \begin{itemize}
+          \item Assert $\verifyni{mod}^L(\sid||j\|\rho, N_j, \psi_j)$.
+          \item Assert $\verifyni{fac}^{L}(\sid||j\|\rho, R_i, N_j, \phi_j^i)$.
+        \end{itemize}
+
+      \item For $j \in [n]$ (including $j=i$), precompute a fixed-based multiexponentiation table $T_j$ as described in Section~\ref{sec:multiexp}. Let $\vec{T} = (T_j)_{j \in [n]}$.
+      \item Return $(p_i, q_i, \vec{R}, \vec{T})$.
+    \end{itemize}
+
+\end{description}
+
+
+\subsection{Distributed Key Generation}
+We implement two versions of distributed key generation. One generates a key along with an $n$-out-of-$n$ additive sharing of that key, and the other generates a key along with a $t$-out-of-$n$ Shamir secret sharing of that key. Note that only the former protocol is described in~\cite{cggmp21}.
+
+\subsubsection{Non-Threshold (i.e., $n$-out-of-$n$) Key Generation}
+\label{sec:n-of-n-dkg}
+
+This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option to replace the broadcast channel with a reliable broadcast subroutine.
+
+\begin{description}
+\item[\bf Input.]
+    Party index $i$,
+    number of signers $n$,
+    context separation string \sid,
+    security level~$L$,
+    curve $\E$ with generator $G$ of prime order $q$.
+
+\item[\bf Round 1.] \
+\begin{itemize}
+    \item Sample $x_i \gets \Z_q$, 
+          and set $X_i = x_i \cdot G$.
+    \item Sample $\rid_i \gets \{0,1\}^\kappa$.
+    \item Compute $(A_i; \tau_i) = \commit{sch}()$.
+    \item Sample $u_i \gets \{0,1\}^\kappa$
+          and set $V_i = H(\sid \| n \| i \| \rid_i \| X_i \| A_i \| u_i)$.
+    \item Send $V_i$ to all parties.
+\end{itemize}
+
+\item[\bf Round 2.] Upon receiving $V_j$ from all parties:
+\begin{itemize}
+    \item {\bf (Reliability check.)} Optionally, if the reliability check is enabled:
+\begin{itemize}
+    \item Compute $h_i = H(V_0 \| \dots \| V_{n-1})$ and
+        send $h_i$ to all parties.
+    
+    \item Upon receiving $h_j$ from all other parties: abort if $h_i \neq h_j$ for some $j\in [n]$.
+\end{itemize}
+    \item Send $(\rid_i, X_i, A_i, u_i)$ to all parties.
+    \end{itemize}
+
+\item[\bf Round 3.] 
+    Upon receiving $(\rid_j, X_j, A_j, u_j)$ from all other parties:
+    \begin{itemize}
+    \item Abort if $V_j \neq H(\sid \| n \| j \| \rid_j \| X_j \| A_j \| u_j)$
+          for some $j \in [n]$.
+    \item Set $\rid = \bigoplus_j \rid_j$.
+    \item Set $e_i = H(\sid \| i \| \rid \| X_i\|A_i)$
+          and compute $\psi_i = \prove{sch}(\tau_i, e_i, x_i)$.
+    \item Send $\psi_i$ to all parties.
+    \end{itemize}
+
+\item[\bf Output.] 
+    Upon receiving $\psi_j$ from all other parties:
+    \begin{itemize}
+    \item 
+        For all $j \ne i$:
+        \begin{itemize}
+            \item Set $e_j = H(\sid \| j \| \rid\|X_j\|A_j)$.
+            \item Assert $\verify{sch}(\psi_j, A_j, e_j, X_j)$.
+        \end{itemize}
+
+    \item Set $X = \sum_j X_j$,
+              $\vec X = (X_j)_{j\in[n]}$.
+
+    \item Output $(X, x_i, \vec X)$.
+    \end{itemize}
+
+\end{description}
+
+\subsubsection{Threshold (i.e., $t$-out-of-$n$) Key Generation}
+\label{sec:t-of-n-dkg}
+
+\begin{description}
+
+  \item[\textbf{Input.}]
+    Party index $i$,
+    threshold parameter $t$,
+    number of signers $n$,
+    context separation string $\sid$,
+    security level~$L$,
+    curve $E$ with generator $G$ of prime order $q$.
+
+  \item[\textbf{Round 1.}] \
+    \begin{itemize}
+      \item Sample $s_{i,0}, \ldots, s_{i,{t-1}} \gets \Z_q$. 
+            Set $\vec S_i = (s_{i,k} \cdot G)_{k \in [t]}$.
+            Let $f_i(x) = \sum_{k \in [t]} s_{i,k} \cdot x^k$ and $F_i(x) = f(x) \cdot G$.
+      \item Compute $\sigma_{i,j} = f_i(j + 1)$ for all $j \in [n]$.
+      \item Sample $\rid_i \gets \{0,1\}^\kappa$.
+      \item Compute $(A_i, \tau_i) \gets \commit{sch}()$. % $(r_i, h_i) \gets \commit{sch}()$
+
+      \item Sample $u_i \gets \{0,1\}^\kappa$
+        and compute $V_i = H(\sid\| n\| i\| t\|\rid_i\| \vec{S_i}\| A_i\| u_i)$.
+      \item Send $V_i$ to all parties.
+    \end{itemize}
+
+
+  \item[\textbf{Round 2.}] 
+ Upon receiving $V_j$ from all parties:
+    \begin{itemize}
+      \item {\bf (Reliability check.)} Optionally, if the reliability check is enabled:
+    \begin{itemize}
+        \item 
+        Compute $h_i = H(V_0 \| \cdots \| V_{n-1})$, and send $h_i$ to all parties.
+        
+        \item Upon receiving $h_j$ from all  parties: abort if 
+        $h_i \neq h_j$ for some $j \in [n]$.
+    \end{itemize}
+      \item Send $(\rid_i, \vec{S}_i, A_i, u_i)$ to all parties.
+      \item For all $j \neq i$, send $\sigma_{i,j}$ to $P_j$ via private channel.
+    \end{itemize}
+
+  \item[\textbf{Round 3.}] 
+Upon receiving $(\rid_j, \vec{S}_j, A_j, u_j)$ and $\sigma_{j,i}$ from all parties:
+    \begin{itemize}
+      \item For each party $j \neq i$:
+        \begin{itemize}
+        \item Check that $\vec{S}_j$ has length $t$.
+          \item Assert $V_j = H(\sid\| n\| j\| t\| \rid_j\| \vec{S}_j\| A_j\| u_j)$.
+        \item Define 
+        $F_j(x) = \sum_{k \in [t]} x^k \cdot S_{j,k}$.
+          \item Assert $\sigma_{j,i} \cdot G  = F_j(i + 1)$.
+        \end{itemize}
+      \item Compute $\rid = \oplus_{j \in [n]} \rid_j$.
+      \item Let $F(x) = \sum_{k \in [t]} x^k \cdot \left(\sum_{j\in [n]} S_{j,k}\right) = \sum_{j \in [n]} F_j(x)$. 
+         \item   For $j \in [n]$, compute
+            $X_j = F(j + 1)$. 
+            Let $\vec{X} = (X_j)_{j \in [n]}$.
+      \item Compute $x_i = \sum_{j \in [n]} \sigma_{j,i}$.
+      \item Compute challenge $e_i = H(\sid\| i\| \rid\| X_i\| A_i)$.
+      \item Compute Schnorr proof $\psi_i = \prove{sch}(\tau_i, e_i, \sigma_i)$.
+      \item Send $\psi_i$ to all parties.
+    \end{itemize}
+
+  \item[\textbf{Output.}] 
+  Upon receiving $\psi_j$ from all parties:
+    \begin{itemize}
+      \item For $j \neq i$:
+      set $e_j = H(\sid| j\| \rid\| X_j\| A_j)$ and 
+      assert $\verify{sch}(\psi_j, A_j, e_j, X_j)$.
+      \item Compute $Y = \sum_{j \in [n]} S_{j,0}$.
+      \item Create identity mapping $I : [n] \to \Z_q \setminus 0$,
+        $I(i) = i + 1$.
+      \item Return $(Y, x_i, \vec{X}, I)$.
+    \end{itemize}
+
+\end{description}
+
+
+
+\subsection{Presigning}
+\label{sec:presigning}
+
+We implemented both non-threshold and threshold versions of presigning. 
+The non-threshold version assumes the $n$ parties running the protocol have additive shares of the private key. 
+The threshold version of the protocol, which is not described in~\cite{cggmp21}, first maps the key shares (which are a $t$-out-of-$n$ Shamir sharing of the private key) to a $t$-out-of-$t$ sharing of the key using Lagrange interpolation and then runs the non-threshold protocol among the $t$ parties.
+
+
+
+\subsubsection{Non-Threshold ($n$-out-of-$n$) Presigning} \label{section:orig-presigning}
+
+The following protocol is based on \cite[Figure~7]{cggmp21}, although we have corrected some typos and eliminated some extraneous parts. (In particular, we do not have identifiable abort.)
+
+\begin{description}
+    \item[\textbf{Input.}] Number of parties $n$, party index $i\in [n]$, secret share $x_i$, list of signers' public-key shares $\vec X = \{X_j\}_{j \in [n]}$, 
+    %public key $\pk = \sum_{j\in[n]} X_j$, 
+    Paillier private key $\sk_i$, list of signers' auxiliary data $\vec R = ((s_j, t_j, N_j))_{j\in[n]}$, context separation string $\sid$, security level~$L$, elliptic curve $\E$ with generator~$G$.
+
+    \item[\textbf{Round 1.}] \
+    \begin{itemize}
+        \item Sample $k_i, \gamma_i \gets \Z_q$, $\rho_i, v_i \gets \Z^*_{N_i}$, and set $G_i = \enc^\crt_{\sk_i}(\gamma_i; v_i)$,
+            $K_i = \enc^\crt_{\sk_i}(k_i; \rho_i)$. 
+        \item For $j \ne i$ compute $\psi^0_{j,i} = \proveni{enc}^{L}(\sid \| i, R_j, (N_i, K_i), (k_i, \rho_i))$. 
+        \item Send $(K_i, G_i)$ to all parties, and for $j \neq i$ send $\psi^0_{j,i}$ to $P_j$.
+    \end{itemize}
+
+
+    \item[\textbf{Round 2.}] Upon receiving $(K_j, G_j, \psi^0_{i,j})$ from all parties, do:
+    \begin{itemize}
+     \item {\bf (Reliability check.)} Optionally, if the reliability check is enabled:
+    \begin{itemize}
+        \item Compute $h_i = H(K_0 \| G_0 \| \cdots \| K_{n-1} \| G_{n-1})$
+        and 
+        send $h_i$ to all parties.
+        
+        \item Upon receiving $h_j$ from all parties, abort if 
+        $h_i \neq h_j$ for some $j \in [n]$.
+    \end{itemize}
+        \item For $j \neq i$, assert $\verifyni{enc}^{L}(\sid \| j, R_i, (N_j, K_j), \psi^0_{i,j})$. 
+        
+        \item Compute $\Gamma_i = \gamma_i \cdot G$.
+        \item For $j \neq i$ do:
+        \begin{itemize}
+            \item Sample $r_{i,j}, \hat{r}_{i,j} \gets \Z_{N_i}$,
+                $s_{i,j}, \hat{s}_{i,j} \gets \Z_{N_j}$, and
+                $\beta_{i,j}, \hat{\beta}_{i,j} \gets \pm 2^{\ell'}$.
+            \item Compute $D_{j,i} = (\gamma_i \odot K_j) \oplus \enci{j}(-\beta_{i,j}; s_{i,j})$
+                and $F_{j,i} = \enc^\crt_{\sk_i}(-\beta_{i,j}; r_{i,j})$.
+            \item Compute $\hat{D}_{j,i} = (x_i \odot K_j) \oplus \enci{j}(-\hat{\beta}_{i,j}; \hat{s}_{i,j})$
+                and $\hat{F}_{j,i} = \enc^\crt_{\sk_i}(-\hat{\beta}_{i,j}; \hat{r}_{i,j})$.
+
+            \item Compute $\psi_{j,i} = \proveni{aff\mbox{-}g}^{\E,L}(\sid \| i, R_j, (N_j, N_i, K_j, D_{j,i}, F_{j,i}, \Gamma_i); (\gamma_i, -\beta_{i,j}, s_{i,j}, r_{i,j}))$ and
+            $\hat{\psi}_{j,i} = \proveni{aff\mbox{-}g}^{\E,L}(\sid \| i, R_j, (N_j, N_i, K_j, \hat{D}_{j,i}, \hat{F}_{j,i}, X_i); (x_i, -\hat{\beta}_{i,j}, \hat{s}_{i,j}, \hat{r}_{i,j}))$. 
+            
+            %\jnote{To consider later: this and the previous could possibly be combined for better efficiency}
+            \item Compute $\psi'_{j,i} = \proveni{log*}^{\E,L}(\sid \| i,R_j, (N_i, G_i, \Gamma_i, G); (\gamma_i, v_i))$.
+\item         Send $(\Gamma_i, D_{j,i}, F_{j,i}, \hat{D}_{j,i}, \hat{F}_{j,i}, \psi_{j,i}, \hat{\psi}_{j,i}, \psi'_{j,i})$
+        to $P_j$.
+        \end{itemize}
+        \end{itemize}
+
+    \item[\textbf{Round 3.}] \ 
+    \begin{enumerate}
+        \item Upon receiving $(\Gamma_j, D_{i,j}, F_{i,j}, \hat{D}_{i,j}, \hat{F}_{i,j}, \psi_{i,j}, \hat{\psi}_{i,j}, \psi'_{i,j})$ from $P_j$, do:
+
+        \begin{itemize}
+            \item Assert $\verifyni{aff\mbox{-}g}^{\E,L}(\sid \| j, R_i, (N_i, N_j, K_i, D_{i,j}, F_{i,j}, \Gamma_j), \psi_{i,j})$.
+            \item Assert $\verifyni{aff\mbox{-}g}^{\E,L}(\sid \| j, R_i, (N_i, N_j, K_i, \hat{D}_{i,j}, \hat{F}_{i,j}, X_j), \hat{\psi}_{i,j})$.
+            \item Assert $\verifyni{log*}^{\E,L}(\sid \| j, R_i, (N_j, G_j, \Gamma_j, G), \psi'_{i,j})$.
+        \end{itemize}
+
+        \item Compute $\Gamma = \sum_{j\in [n]} \Gamma_j$ and $\Delta_i = k_i \cdot \Gamma$.
+
+        \item For $j \ne i$, do:
+        \begin{itemize}
+            \item Compute $\alpha_{i,j} = \dec_{(p_i,q_i)}(D_{i,j})$ and $\hat{\alpha}_{i,j} = \dec_{(p_i,q_i)}(\hat{D}_{i,j})$.
+            \item Compute $\psi''_{j,i} = \proveni{log*}^{\E,L}(\sid \| i, R_j,(N_i, K_i, \Delta_i, \Gamma); (k_i, \rho_i))$.
+        \end{itemize}
+        \item  Compute $\delta_i = \gamma_i k_i + \sum_{j \ne i}(\alpha_{i,j} + \beta_{i,j}) \bmod q$ and
+            $\chi_i = x_i k_i + \sum_{j \ne i}(\hat{\alpha}_{i,j} + \hat{\beta}_{i,j}) \bmod q$. 
+
+        \item Send $(\delta_i, \Delta_i, \psi''_{j,i})$ to each $P_j$.
+    \end{enumerate}
+
+    \item[\textbf{Output}] \
+    \begin{enumerate}
+        \item Upon receiving $(\delta_j, \Delta_j, \psi''_{i,j})$ from $P_j$, assert $\verifyni{log*}^{\E,L}(\sid \| j, R_i,(N_j, K_j, \Delta_j, \Gamma), \psi''_{i,j})$.
+
+        \item Compute $\delta = \sum_j \delta_j$, and do:
+        \begin{itemize}
+            \item Assert $\delta \cdot G = \sum_j \Delta_j$. 
+            \item Set $R = \delta^{-1} \cdot \Gamma$ and output $(R, k_i, \chi_i)$.
+        \end{itemize}
+    \end{enumerate}
+\end{description}
+
+\subsubsection{Threshold ($t$-out-of-$n$) Presinging}
+
+\begin{description}
+
+\item[\bf Input.] Size of signing set $t$, identities of parties in signing set,
+ index $i\in [t]$, index map\footnote{$S(i)$ is the index that $P_i$ had at key-generation time.} $S : [t] \to [n]$, key share $K_{S(i)}$, context separation string $\sid$, security level $L$, curve $\E$ with generator $G$.
+
+    \item[\bf Setup.] The key share $K_{S(i)}$ contains $\threshold$, number of key holders~$n$, secret share $x'_{S(i)}$, parties' public shares $\vec X' = (X'_j)_{j \in [n]}$, a map $I : [n] \to \Fq \setminus \{0\}$, Paillier secret key $\sk_{S(i)}$, parties' Paillier keys $\vec N' = (N'_j)_{j \in [n]}$, and parties' auxiliary information $\vec R' = (s_j, t_j, \hat N)_{j \in [n]}$.
+
+    \item[\bf Step 1.] Set $\sk_i = \sk_{S(i)}$ and 
+            $\vec R = (R'_{S(j)})_{j \in [n]}$. Then:
+    \begin{itemize}
+           \item If shares are additive\footnote{In this case we have $t=n$.} shares of the private key, 
+            set $x_{i} = x'_{S(i)}$, $\vec X = (X'_{S(j)})_{j \in [n]}$.
+
+        
+        \item If shares are Shamir secret shares of the private key: 
+
+        \begin{itemize}
+        \item For $j \in [t]$, compute Lagrange coefficient $\lambda_j = \prod\limits_{m \in [t]\setminus\{j\}} \frac{I(S(m))}{I(S(m)) - I(S(j))} \bmod{q}$.
+            \item Compute $x_{i} = \lambda_i \cdot x'_{S(i)}$.
+            \item For $j \in [n]$, compute $X_j= \lambda_j \cdot X'_{S(j)}$; then set $\vec X = \{X_j\}_{j \in [t]}$.
+        \end{itemize}
+    \end{itemize}
+
+    \item[\bf Step 2.] Call the non-threshold presigning protocol from the previous section using inputs $t, i, x_i, \vec X$, $\sk_i$, $\vec R, \sid, L, \E$.
+\end{description}
+
+
+\subsection{Signing}
+\label{sec:signing}
+The
+signing protocol has two parts: one that takes the output from the presignature protocol and a hashed message and produces a partial signature, and another that takes partial signatures and combines them to produce a signature. 
+%This separation is introduced so final signature reconstruction can be done on coordinator. Functions are defined below.
+    
+\medskip\noindent{\bf Local signing.} The input is a presignature $S_i = (R, k_i, \chi_i)$ and a hashed message~$m$. Do:
+%
+%$\textsf{sign\_locally}(m, S_i) \to (r, \sigma_i)$
+        \begin{itemize}
+            \item Set $r = \affineX{R}$ and $\sigma_i = k m + r \chi$.
+            \item Output $(r, \sigma_i)$.
+        \end{itemize}
+        
+
+    \medskip\noindent{\bf Combining presignatures.} The input is the public key~$Y$, partial signatures $\{(r_i, \sigma_i)\}_{i=0}^{n-1}$, and hashed message~$m$.
+The function does:
+        \begin{itemize}
+            \item Assert $r_0 = r_1 = \dots = r_{n-1}$.
+            \item Let $\sigma = \sum_j \sigma_j$.
+            \item If $(r, \sigma)$ is not a valid signature on hashed message~$m$ with respect to public key~$Y$, then abort. Otherwise, 
+            output $(r, \sigma)$.
+        \end{itemize}
+
+
+\ignore{
+\section{Further Optimizations}
+
+\todo{decide whether we want to move it into jira tickets/github issues}
+
+\begin{enumerate}
+    \item Full use of CRT: the CRT optimization can be used (when applicable) for all computations involving exponentiation, not just Paillier encryption
+
+    \item Combine CRT and fixed-based multiexponentiation optimizations
+
+    \item In some cases, can do probabilistic bath checks. It may also be possible to combine several of the ZK proofs. (Note, however, that these optimizations involve deviations from~\cite{cggmp21}.)
+\end{enumerate}
+}
+
+\ignore{
+\appendix
+\section{Original presigning protocol}
+\label{appendix:presigning-orig}
+Original presigning protocol defined in CGGMP paper contains many typos and mistakes. We show original protocol below. Places that were changed in our implementation are \changedt{highlighted in red}.
+
+\begin{description}
+    \item[\textbf{Input.}] Key share $K_i$, context separation string $\sid$, security level $L$, curve $E$ with generator
+        $G$.
+    \item[\textbf{Setup.}] $P_i$ reads key share $K_i$ containing its index $i$, secret share $x_i$, list of public 
+    shares $X = (G \cdot x_j)_j$, shared public key $\pk = \sum_j X_j$, bytestring $\rid$ generated at keygen, 
+    prime numbers $p_i$ and $q_i$ (Paillier secret key), list of parties public Paillier keys $N = (N_j)_j$, 
+    lists of parties' Ring-Pedersen parameters $R = (N_j, s_j, t_j)_j$. 
+
+    \item[\textbf{Round 1.}] \
+    \begin{itemize}
+        \item Sample $\gamma_i, k_i \gets \Fq$, $v_i, \rho_i \gets \Z^*_{N_i}$ and set $G_i = \enci{i}(\gamma_i, v_i)$,
+            $K_i = \enci{i}(k_i, \rho_i)$
+        \item Compute $\psi^0_{j,i} = \proveni{enc}^{L,R_j}(\sid, (N_i, K_i); (k_i, \rho_i))$ for every $j \ne i$
+        \item Broadcast $(K_i, G_i)$ and send $\psi^0_{j,i}$ to each $P_j$
+    \end{itemize}
+
+    \item[\textbf{Round 2.}] \
+    \begin{enumerate}
+        \item Upon receiving $(K_j, G_j, \psi^0_{i,j})$ from $P_j$, do:
+            \begin{itemize}
+                \item Assert $\verifyni{enc}^{L,R_i}(\psi^0_{i,j}, \sid, (N_j, K_j))$ 
+            \end{itemize}
+        \item When passing above verification for all $P_j$, set $\Gamma_i = G \cdot \gamma_i$ and for every $j \ne i$ do:
+        \begin{itemize}
+            \item Sample $\changed{r_{i,j}}, s_{i,j}, \changed{\hat{r}_{i,j}}, \hat{s}_{i,j} \gets \Z_{N_j}$,
+                $\beta_{i,j}, \hat{\beta}_{i,j} \gets \Z_{2^{\ell' + 1}}$
+            \item $D_{j,i} = (\gamma_i \odot K_j) \oplus \enci{j}(-\beta_{i,j}, s_{i,j})$
+                and $F_{j,i} = \enci{i}(\changed{\beta_{i,j}}, \note{r_{i,j}})$
+            \item $\hat{D}_{j,i} = (x_i \odot K_j) \oplus \enci{j}(-\hat{\beta}_{i,j}, \hat{s}_{i,j})$
+                and $\hat{F}_{j,i} = \enci{i}(\changed{\hat{\beta}_{i,j}}, \note{\hat{r}_{i,j}})$
+            \item $\psi_{j,i} = \proveni{aff\mbox{-}g}^{L,R_j}(\sid, (N_j, N_i, \changed{D_{j,i}, K_j}, F_{j,i}, \Gamma_i); (\gamma_i, \beta_{i,j}, s_{i,j}, r_{i,j}))$
+            \item $\hat{\psi}_{j,i} = \proveni{aff\mbox{-}g}^{L,R_j}(\sid, (N_j, N_i, \changed{\hat{D}_{j,i}, K_j}, \hat{F}_{j,i}, X_i); (x_i, \hat{\beta}_{i,j}, \hat{s}_{i,j}, \hat{r}_{i,j}))$
+            \item $\psi'_{j,i} = \proveni{log*}^{L,R_j}(\sid, (N_i, G_i, \Gamma_i, G); (\gamma_i, v_i))$
+        \end{itemize}
+        Send $(\Gamma_i, D_{j,i}, F_{j,i}, \hat{D}_{j,i}, \hat{F}_{j,i}, \psi_{j,i}, \hat{\psi}_{j,i}, \psi'_{j,i})$
+        to each $P_j$
+    \end{enumerate}
+
+    \item[\textbf{Round 3.}] \ 
+    \begin{enumerate}
+        \item Upon receiving $(\Gamma_j, D_{i,j}, F_{i,j}, \hat{D}_{i,j}, \hat{F}_{i,j}, \psi_{i,j}, \hat{\psi}_{i,j}, \psi'_{i,j})$ from $P_j$, do:
+
+        \begin{itemize}
+            \item Assert $\verifyni{aff\mbox{-}g}^{L,R_i}(\psi_{i,j}, \sid, (N_i, N_j, \changed{D_{i,j}, K_i}, F_{j,i}, \Gamma_j))$
+            \item Assert $\verifyni{aff\mbox{-}g}^{L,R_i}(\hat{\psi}_{i,j}, \sid, (N_i, N_j, \changed{\hat{D}_{k,j}, K_i}, \hat{F}_{j,i}, X_j))$
+            \item Assert $\verifyni{log*}^{L,R_i}(\psi'_{i,j}, \sid, (N_j, G_j, \Gamma_j, G))$
+        \end{itemize}
+
+        \item When passing above verification for all $P_j$, set $\Gamma = \sum_j \Gamma_j$ and $\Delta_i = k_i \cdot \Gamma$,
+        and do:
+
+        For every $j \ne i$, set $\alpha_{i,j} = \dec(D_{i,j})$ and $\hat{\alpha}_{i,j} = \dec(\hat{D}_{i,j})$ and:
+        \begin{itemize}
+            \item $\delta_i = \gamma_i k_i + \sum_{j \ne i}(\alpha_{i,j} - \beta_{i,j}) \bmod q$
+            \item $\chi_i = x_i k_i + \sum_{j \ne i}(\hat{\alpha}_{i,j} - \hat{\beta}_{i,j}) \bmod q$
+            \item $\psi''_{j,i} = \proveni{log*}^{L,R_j}(sid, (N_i, K_i, \Delta_i, \Gamma); (k_i, \rho_i))$
+        \end{itemize}
+
+        Send $(\delta_i, \Delta_i, \psi''_{j,i})$ to each $P_j$
+    \end{enumerate}
+
+    \item[\textbf{Output}] \
+    \begin{enumerate}
+        \item Upon receiving $(\delta_j, \Delta_j, \psi''_{i,j})$ from $P_j$, do:
+        \begin{itemize}
+            \item Assert $\verifyni{log*}^{L,R_i}(\psi''_{i,j}, (N_j, K_j, \Delta_j, \Gamma))$
+        \end{itemize}
+
+        \item When passing above verification for all $P_j$, set $\delta = \sum_j \delta_j$, and do:
+        \begin{itemize}
+            \item Assert $\delta \cdot G = \sum_j \Delta_j$. In case of failure, return error that protocol was aborted by unknown party.
+            \item Set $R = \delta^{-1} \cdot \Gamma$ and output $(R, k_i, \chi_i)$
+        \end{itemize}
+    \end{enumerate}
+\end{description}
+}
+
+\bibliographystyle{plain}
+\bibliography{ref}
+\end{document}
+
+\begin{appendix}
+    \section{(Non-Threshold) Key Refresh}
+\label{sec:refresh}
+
+During a key refresh, shares of a private key are refreshed (while still maintaining a sharing of the same key). %Note that secure deletion of the old key shares is handled by the caller, and is out of scope of our library.
+When key refresh is used it is likely because of a concern that some signer has been compromised; thus, as noted earlier, 
+one should probably do a key refresh for \emph{all} the keys stored by that cluster, and should also re-run the provisioning protocol for that cluster.
+
+
+The following is based on \cite[Figure~6]{cggmp21}, with some unnecessary steps eliminated.
+
+%Compared to the version in the CGGMP21 paper, there are changes in round 3 related to proof recipients.
+%The original paper says that $\Pi_{sch}$ proof for $x_i^j$ should be calculated and sent to each recipient such that a recepient only receives one proof from each party. However, in the next round the original paper assumes that the recipient received a vector of proofs from each party. Here we take that assumption as the correct intent and make each party broadcast all proofs.
+
+\begin{description}
+  \item[\textbf{Input.}]
+    Key share $K_i$ (containing
+      a party index $i$,
+      secret share~$x_i$,
+      and list $\vec{X}=(X_k)_{k \in [n]}$ of public shares),
+    context separation string $\sid$,
+    security level~$L$,
+    curve $E$ with generator $G$ of prime order~$q$.
+
+
+  \item[\textbf{Round 1.}] \
+    \begin{itemize}
+%     \item Let $p_i, q_i$ be $4\kappa$-bit safe primes that were pre-generated. 
+  %    \item Compute $N_i = p_iq_i$ and $\phi = (p_i - 1)(q_i - 1)$, and create a Paillier decryption key using those values.
+      \item Sample $x_i^1, \ldots, x_i^{n-1} \leftarrow \Z_q$ and set $x_i^0=-\sum_{k=1}^{n-1} x_i^k$.
+        Then compute $X_i^k = x_i^k \cdot G$ for $k \in [n]$ and set $\vec{X}_i = (X_i^k)_{k \in [n]}$. 
+
+  %    \item Sample  $r \gets \Z_{N_i}^{*}$ and $\lambda \gets \Z_\phi$, and compute $t_i = r_i^2 \bmod N_i$ and $s_i = t_i^\lambda \bmod N_i$.
+   %   \item Compute $\hat{\psi}_i = \proveni{prm}^L(\sid||i, (N_i, s_i, t_i), (\phi, \lambda))$.
+      \item For $j \in [n]\setminus \{i\}$, 
+      compute $(A_i^j, \tau_i^j) \gets \commit{sch}()$. Set
+        $\vec{A_i} = (A_i^j)_{j \in [n]}, \vec{\tau} = (\tau_i^j)_{j \in [n]}$.
+        %\jnote{We could potentially optimize this so only one proof is needed}
+      \item Sample $\rho_i \gets \{0,1\}^\kappa$.
+      \item Sample nonce $u_i \gets \{0,1\}^\kappa$ % another value in code
+        and compute $V_i =
+        H(\sid\| n\| i\| \vec{X}_i\| \vec{A}_i\| N_i\| s_i\| t_i\| \hat{\psi}_i\| \rho_i\| u_i)$.
+      \item Broadcast $V_i$ to all parties.
+    \end{itemize}
+
+    \item[\bf Reliability check.] Optionally, if reliability check is enabled:
+    \begin{itemize}
+        \item Upon receiving $V_j$ from all parties:
+        set $h_i = H(V_0 \| \dots \| V_{n-1})$
+            and send $h_i$ to all parties.
+        
+        \item Upon receiving $h_j$ from all  parties:
+        abort if $h_i \neq h_j$ for some $j \in [n]$.
+    \end{itemize}
+
+  \item[\textbf{Round 2.}] \
+
+    \begin{itemize}
+      \item Receive $V_j$ from all parties.
+      \item Send $(\vec{X}_i, \vec{A}_i, N_i, s_i, t_i, \hat{\psi}_i, \rho_i, u_i)$ to all parties.
+    \end{itemize}
+
+  \item[\textbf{Round 3.}] \
+
+    \begin{itemize}
+      \item Receive $(\vec{X}_j, \vec{A}_j, N_j, s_j, t_j, \hat{\psi}_j, \rho_j, u_j)$
+        from all parties.
+      \item For all $j \in [n]$, set $R_j = (N_j, s_j, t_j)$; let $\vec{R} = (R_j)_{j \in [n]}$.
+
+      \item For each $j \in [n]$:
+        \begin{itemize}
+          \item Assert $V_j =
+            H(\sid\| n\| j\| \vec{X}_j\| \vec{A}_j\| N_j\| s_j\| t_j\| \hat{\psi}_j\| \rho_j\| u_j)$.
+          \item Assert that $\vec X_j$ and $\vec A_j$ each contain exactly $n$ elements.
+          \item Assert that $N_j$ is at least $8 \cdot \kappa - 1$ bits in length.
+          \item Assert $\verifyni{prm}^L(\sid||j, (N_j, s_j, t_j), \hat{\psi}_j)$.
+          \item Assert $\sum_k X_j^k = 0$ (the identity in~$\E$).
+          \item Construct Paillier encryption key from $N_j$.
+        \end{itemize}
+
+      
+      \item Compute $\rho = \oplus_j \rho_j$.
+      \item Compute $\psi_i = \proveni{mod}^L(\sid||i\|\rho, N_i, (p_i, q_i))$.
+      \item For $j \neq i$ do:
+        \begin{itemize}
+        \item Compute $\phi_i^j = \proveni{fac}^{L}(\sid||i\|\rho, R_j, N_i, (p_i, q_i))$. 
+        \item Compute $C_i^j = \enc_j(x_i^j)$ using a random nonce.
+        \item Compute $e^j_i = H(\sid || i || \rho\|X_i^j\|A_i^j)$ and $\psi_i^j = \prove{sch}(\tau_i^j, e_i^j, x_i^j)$.
+
+          \item Send $(\psi_i, \phi_i^j, C_i^j, \{\psi_i^k\}_{k \in [n]})$ to $P_j$.
+        \end{itemize}
+
+    \end{itemize}
+
+  \item[\textbf{Output.}] \
+
+    \begin{itemize}
+      \item Receive $(\psi_j, \phi_j^i, C_j^i, \{\psi^k_j\}_{k \in [n]})$ from all parties.
+    
+      \item For $j \in [n]$ do:
+        \begin{itemize}
+        \item  Decrypt $C_j^i$ to obtain $x_j^i$ and
+          assert
+            $X_j^i = x_j^i \cdot G$.
+                     \item Assert $\verifyni{mod}^L(\sid||j\|\rho, N_j, \psi_j)$.
+          \item Assert $\verifyni{fac}^{L}(\sid||j\|\rho, R_i, N_j, \phi_j^i)$.
+          \item For $k \in [n]$, set $e_j^k = H(\sid || j || \rho\|X_j^k\|A_j^k)$ and 
+          assert $\verify{sch}(\psi_j^k, A_j^k, e^k_j, X_j^k)$.
+        \end{itemize}
+
+      \item Compute $x_i^* = x_i + \sum_{j\in [n]} x_j^i$.
+      \item Compute $\vec{X}^* = (X_k^*)_{k \in [n]}$, where
+        $X_k^* = X_k + \sum_{j\in [n]} X_j^k$.
+      \item Return 
+        $((i, x_i^*, \vec{X}^*), p_i, q_i, \vec{R})$.
+    \end{itemize}
+
+\end{description}
+
+\end{appendix}
+
+\end{document}

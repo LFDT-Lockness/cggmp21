@@ -2,3 +2,11 @@
 
 .helix/
 .rstags
+
+spec/main.aux
+
+spec/main.log
+
+spec/main.out
+
+spec/main.pdf

@@ -1,0 +1,77 @@
+name: Build CGGMP21 Spec & Docs
+
+on:
+  pull_request:
+    branches: [ "*" ]
+  push:
+    branches: [ "m" ]
+
+jobs:
+  build_pdf:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v3
+    - name: Compile LaTeX document
+      uses: xu-cheng/latex-action@v3
+      with:
+        root_file: main.tex
+        working_directory: spec
+    - name: Rename PDF
+      run: mv spec/main.pdf spec/cggmp21-spec.pdf
+    - name: Upload artifacts
+      id: upload-pdf
+      uses: actions/upload-artifact@v4
+      with:
+        name: spec-pdf
+        path: spec/cggmp21-spec.pdf
+    - name: Leave PR comment
+      continue-on-error: true
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: spec_is_built
+        message: The spec was successfully compiled. PDF is available [here](${{ steps.upload-pdf.outputs.artifact-url }}).
+  build_docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Build docs
+      run: make docs && cp docs/redirect.html target/doc/index.html
+    - name: Upload docs
+      uses: actions/upload-artifact@v4
+      with:
+        name: docs
+        path: target/doc
+  deploy_pages:
+    runs-on: ubuntu-latest
+    needs: [build_pdf, build_docs]
+    if: github.ref == 'refs/heads/m'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: docs
+        path: website
+    - uses: actions/download-artifact@v4
+      with:
+        name: spec-pdf
+        path: spec
+    - name: Move the spec
+      run: mv spec/cggmp21-spec.pdf website
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: 'website'
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
