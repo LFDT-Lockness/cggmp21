@@ -32,7 +32,7 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_with = { version = "2" }
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
-slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true }
+slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true, features = ["std"] }
 
 [dev-dependencies]
 round-based = { version = "0.2", features = ["derive", "dev"] }

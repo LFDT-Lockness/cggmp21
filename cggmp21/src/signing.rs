@@ -292,6 +292,18 @@ where
     }
 
     /// Specifies HD derivation path
+    ///
+    /// ## Example
+    /// Set derivation path to m/1/999
+    ///
+    /// ```rust,no_run
+    /// # let eid = cggmp21::ExecutionId::new(b"protocol nonce");
+    /// # let (i, parties_indexes_at_keygen, key_share): (u16, Vec<u16>, cggmp21::KeyShare<cggmp21::supported_curves::Secp256k1>)
+    /// # = unimplemented!();
+    /// cggmp21::signing(eid, i, &parties_indexes_at_keygen, &key_share)
+    ///     .set_derivation_path([1, 999])?
+    /// # ; Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
     #[cfg(feature = "hd-wallets")]
     pub fn set_derivation_path<Index>(
         mut self,
