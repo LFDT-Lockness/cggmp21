@@ -899,7 +899,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
     \item {\bf (HD-wallets.)} 
     \begin{itemize}
       \item If HD-wallets support enabled, sample local chain code contribution $c_i \gets \{0,1\}^{256}$ (32-bytes string)
-      \item Otherwise, set $c_i = ``"$ (to empty string)
+      \item Otherwise, set $c_i = \bot$
     \end{itemize}
     \item Sample $u_i \gets \{0,1\}^\kappa$
           and set $V_i = H(\sid \| n \| i \| \rid_i \| X_i \| A_i \| u_i \| c_i)$.
@@ -975,7 +975,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
       \item {\bf (HD-wallets.)} 
       \begin{itemize}
         \item If HD-wallets support enabled, sample local chain code contribution $c_i \gets \{0,1\}^{128}$ (32-bytes string)
-        \item Otherwise, set $c_i = ``"$ (to empty string)
+        \item Otherwise, set $c_i = \bot$
       \end{itemize}
 
       \item Sample $u_i \gets \{0,1\}^\kappa$
@@ -1170,8 +1170,8 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
 
     \item[\bf Step 2.] {\bf (HD-wallets)} If HD-wallets support enabled:
     \begin{itemize}
-      \item Update $X_0 := X_0 + \text{shift} \cdot G$
-      \item If $i = 0$, update $x_0 := x_0 + \text{shift}$
+      \item Set $X_0 := X_0 + \text{shift} \cdot G$
+      \item If $i = 0$, set $x_0 := x_0 + \text{shift}$
       \item Note: output signature will be valid for public key $Y + \text{shift} \cdot G$
     \end{itemize}
 

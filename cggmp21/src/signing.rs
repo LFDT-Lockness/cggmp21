@@ -343,6 +343,8 @@ where
             self.enforce_reliable_broadcast,
             #[cfg(feature = "hd-wallets")]
             self.additive_shift,
+            #[cfg(not(feature = "hd-wallets"))]
+            None,
         )
         .await?
         {
@@ -374,6 +376,8 @@ where
             self.enforce_reliable_broadcast,
             #[cfg(feature = "hd-wallets")]
             self.additive_shift,
+            #[cfg(not(feature = "hd-wallets"))]
+            None,
         )
         .await?
         {
@@ -406,7 +410,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     S: &[PartyIndex],
     message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
-    #[cfg(feature = "hd-wallets")] additive_shift: Option<Scalar<E>>,
+    additive_shift: Option<Scalar<E>>,
 ) -> Result<ProtocolOutput<E>, SigningError>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -468,10 +472,7 @@ where
     debug_assert_eq!(key_share.core.shared_public_key, X.iter().sum::<Point<E>>());
 
     // Apply additive shift
-    #[cfg(feature = "hd-wallets")]
     let shift = additive_shift.unwrap_or(Scalar::zero());
-    #[cfg(not(feature = "hd-wallets"))]
-    let shift = Scalar::zero();
 
     let Shift = Point::generator() * shift;
 

@@ -220,7 +220,7 @@ impl<E: Curve> DirtyIncompleteKeyShare<E> {
 
     /// Checks whether HD wallet support was enabled for this key
     ///
-    /// In order to generate an HD wallet, [`.hw_wallet(true)`](crate::keygen::GenericKeygenBuilder::hd_wallet)
+    /// In order to generate an HD wallet, [`.hd_wallet(true)`](crate::keygen::GenericKeygenBuilder::hd_wallet)
     /// needs to be set at key generation.
     #[cfg(feature = "hd-wallets")]
     pub fn is_hd_wallet(&self) -> bool {
