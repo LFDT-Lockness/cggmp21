@@ -13,6 +13,7 @@ readme:
 	cargo readme -i src/lib.rs -r cggmp21/ -t ../docs/README.tpl --no-indent-headings \
 		| sed -E 's/(\/\*.+\*\/)/\1;/' \
 		| sed -E '/^\[`.+`\]:/d' \
+		| sed -E 's/\[`([^`]*)`\]\(.+?\)/`\1`/g' \
 		| sed -E 's/\[`([^`]*)`\]/`\1`/g' \
 		| perl -ne 's/(?<!!)\[([^\[]+?)\]\([^\(]+?\)/\1/g; print;' \
 		| sed -E '/^#$$/d' \
