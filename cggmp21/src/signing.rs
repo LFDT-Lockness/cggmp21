@@ -485,7 +485,6 @@ where
 
     // Apply additive shift
     let shift = additive_shift.unwrap_or(Scalar::zero());
-
     let Shift = Point::generator() * shift;
 
     X[0] += Shift;
