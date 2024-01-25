@@ -50,17 +50,11 @@ mod generic {
         let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
 
         #[cfg(feature = "hd-wallets")]
-        let (derivation_path, public_key) = if hd_wallet {
-            let (path, child_pub) = cggmp21_tests::random_derivation_path(
-                &mut rng,
-                &shares[0].extended_public_key().unwrap(),
-            );
-            (Some(path), child_pub)
+        let derivation_path = if hd_wallet {
+            Some(cggmp21_tests::random_derivation_path(&mut rng))
         } else {
-            (None, shares[0].shared_public_key)
+            None
         };
-        #[cfg(not(feature = "hd-wallets"))]
-        let public_key = shares[0].shared_public_key;
 
         // Choose `t` signers to perform signing
         let t = shares[0].min_signers();
@@ -96,6 +90,18 @@ mod generic {
         let signatures = futures::future::try_join_all(outputs)
             .await
             .expect("signing failed");
+
+        #[cfg(feature = "hd-wallets")]
+        let public_key = if let Some(path) = &derivation_path {
+            shares[0]
+                .derive_child_public_key(path.iter().cloned())
+                .unwrap()
+                .public_key
+        } else {
+            shares[0].shared_public_key
+        };
+        #[cfg(not(feature = "hd-wallets"))]
+        let public_key = shares[0].shared_public_key;
 
         signatures[0]
             .verify(&public_key, &message_to_sign)
