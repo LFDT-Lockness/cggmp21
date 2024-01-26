@@ -1,7 +1,7 @@
-#[generic_tests::define(attrs(tokio::test, test_case::case))]
+#[generic_tests::define(attrs(tokio::test, test_case::case, cfg_attr))]
 mod generic {
     use generic_ec::{Curve, Point};
-    use rand::{seq::SliceRandom, Rng};
+    use rand::{seq::SliceRandom, Rng, RngCore};
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
     use sha2::Sha256;
@@ -16,23 +16,27 @@ mod generic {
     type Share<E> = KeyShare<E>;
     type Incomplete<E> = IncompleteKeyShare<E>;
 
-    #[test_case::case(2, 3; "t2n3")]
-    #[test_case::case(4, 7; "t4n7")]
+    #[test_case::case(2, 3, false; "t2n3")]
+    #[test_case::case(3, 5, false; "t3n5")]
+    #[cfg_attr(feature = "hd-wallets", test_case::case(3, 5, true; "t3n5-hd"))]
     #[tokio::test]
-    async fn full_pipeline_works<E: Curve>(t: u16, n: u16)
+    async fn full_pipeline_works<E: Curve>(t: u16, n: u16, hd_enabled: bool)
     where
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
         let mut rng = DevRng::new();
-        let incomplete_shares = run_keygen(t, n, &mut rng).await;
-        let shares = run_refresh(incomplete_shares, &mut rng).await;
-        run_signing(&shares, &mut rng).await;
+        let incomplete_shares = run_keygen(t, n, hd_enabled, &mut rng).await;
+        let shares = run_aux_gen(incomplete_shares, &mut rng).await;
+        run_signing(&shares, hd_enabled, &mut rng).await;
     }
 
-    async fn run_keygen<E>(t: u16, n: u16, rng: &mut DevRng) -> Vec<Incomplete<E>>
+    async fn run_keygen<E>(t: u16, n: u16, hd_enabled: bool, rng: &mut DevRng) -> Vec<Incomplete<E>>
     where
         E: Curve,
     {
+        #[cfg(not(feature = "hd-wallets"))]
+        assert!(!hd_enabled);
+
         let mut simulation = Simulation::<ThresholdMsg<E, SecurityLevel128, Sha256>>::new();
 
         let eid: [u8; 32] = rng.gen();
@@ -44,10 +48,12 @@ mod generic {
             let mut party_rng = rng.fork();
 
             outputs.push(async move {
-                cggmp21::keygen(eid, i, n)
-                    .set_threshold(t)
-                    .start(&mut party_rng, party)
-                    .await
+                let keygen = cggmp21::keygen(eid, i, n).set_threshold(t);
+
+                #[cfg(feature = "hd-wallets")]
+                let keygen = keygen.hd_wallet(hd_enabled);
+
+                keygen.start(&mut party_rng, party).await
             })
         }
 
@@ -56,7 +62,7 @@ mod generic {
             .expect("keygen failed")
     }
 
-    async fn run_refresh<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
+    async fn run_aux_gen<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
     where
         E: Curve,
     {
@@ -91,15 +97,23 @@ mod generic {
             .collect()
     }
 
-    async fn run_signing<E>(shares: &[Share<E>], rng: &mut DevRng)
+    async fn run_signing<E>(shares: &[Share<E>], random_derivation_path: bool, rng: &mut DevRng)
     where
         E: Curve,
         Point<E>: generic_ec::coords::HasAffineX<E>,
     {
-        use rand::RngCore;
+        #[cfg(not(feature = "hd-wallets"))]
+        assert!(!random_derivation_path);
 
         let t = shares[0].min_signers();
         let n = shares.len().try_into().unwrap();
+
+        #[cfg(feature = "hd-wallets")]
+        let derivation_path = if random_derivation_path {
+            Some(cggmp21_tests::random_derivation_path(rng))
+        } else {
+            None
+        };
 
         let mut simulation = Simulation::<cggmp21::signing::msg::Msg<E, Sha256>>::new();
 
@@ -123,10 +137,20 @@ mod generic {
             let party = simulation.add_party();
             let mut party_rng = rng.fork();
 
+            #[cfg(feature = "hd-wallets")]
+            let derivation_path = derivation_path.clone();
+
             outputs.push(async move {
-                cggmp21::signing(eid, i, participants, share)
-                    .sign(&mut party_rng, party, message_to_sign)
-                    .await
+                let signing = cggmp21::signing(eid, i, participants, share);
+
+                #[cfg(feature = "hd-wallets")]
+                let signing = if let Some(derivation_path) = derivation_path {
+                    signing.set_derivation_path(derivation_path).unwrap()
+                } else {
+                    signing
+                };
+
+                signing.sign(&mut party_rng, party, message_to_sign).await
             });
         }
 
@@ -134,8 +158,20 @@ mod generic {
             .await
             .expect("signing failed");
 
+        #[cfg(feature = "hd-wallets")]
+        let public_key = if let Some(path) = &derivation_path {
+            shares[0]
+                .derive_child_public_key(path.iter().cloned())
+                .unwrap()
+                .public_key
+        } else {
+            shares[0].shared_public_key
+        };
+        #[cfg(not(feature = "hd-wallets"))]
+        let public_key = shares[0].shared_public_key;
+
         signatures[0]
-            .verify(&shares[0].core.shared_public_key, &message_to_sign)
+            .verify(&public_key, &message_to_sign)
             .expect("signature is not valid");
 
         assert!(signatures.iter().all(|s_i| signatures[0] == *s_i));

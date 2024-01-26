@@ -55,6 +55,13 @@ pub struct DirtyIncompleteKeyShare<E: Curve> {
     pub public_shares: Vec<Point<E>>,
     /// Verifiable secret sharing setup, present if key was generated using VSS scheme
     pub vss_setup: Option<VssSetup<E>>,
+    /// Chain code generated at keygen if HD wallets support was enabled
+    #[cfg(feature = "hd-wallets")]
+    #[serde(
+        default,
+        with = "serde_with::As::<Option<crate::utils::serde::HexOrBin>>"
+    )]
+    pub chain_code: Option<slip_10::ChainCode>,
     /// Secret share $x_i$
     #[serde_as(as = "Compact")]
     pub x: SecretScalar<E>,
@@ -209,6 +216,44 @@ impl<E: Curve> DirtyIncompleteKeyShare<E> {
             return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
         }
         Ok(())
+    }
+
+    /// Checks whether HD wallet support was enabled for this key
+    ///
+    /// In order to generate an HD wallet, [`.hd_wallet(true)`](crate::keygen::GenericKeygenBuilder::hd_wallet)
+    /// needs to be set at key generation.
+    #[cfg(feature = "hd-wallets")]
+    pub fn is_hd_wallet(&self) -> bool {
+        self.chain_code.is_some()
+    }
+
+    /// Returns extended public key, if HD support was enabled
+    #[cfg(feature = "hd-wallets")]
+    pub fn extended_public_key(&self) -> Option<slip_10::ExtendedPublicKey<E>> {
+        Some(slip_10::ExtendedPublicKey {
+            public_key: self.shared_public_key,
+            chain_code: self.chain_code?,
+        })
+    }
+
+    /// Derives child public key, if it's HD key
+    #[cfg(feature = "hd-wallets")]
+    pub fn derive_child_public_key<ChildIndex>(
+        &self,
+        derivation_path: impl IntoIterator<Item = ChildIndex>,
+    ) -> Result<
+        slip_10::ExtendedPublicKey<E>,
+        HdError<<ChildIndex as TryInto<slip_10::NonHardenedIndex>>::Error>,
+    >
+    where
+        slip_10::NonHardenedIndex: TryFrom<ChildIndex>,
+    {
+        let epub = self.extended_public_key().ok_or(HdError::DisabledHd)?;
+        slip_10::try_derive_child_public_key_with_path(
+            &epub,
+            derivation_path.into_iter().map(|index| index.try_into()),
+        )
+        .map_err(HdError::InvalidPath)
     }
 }
 
@@ -787,4 +832,15 @@ enum ReconstructErrorReason {
     Subset,
     #[error("interpolation failed (seems like a bug)")]
     Interpolation,
+}
+
+/// Error related to HD key derivation
+#[derive(Debug, Error)]
+pub enum HdError<E> {
+    /// HD derivation is disabled for the key
+    #[error("HD derivation is disabled for the key")]
+    DisabledHd,
+    /// Derivation path is not valid
+    #[error("derivation path is not valid")]
+    InvalidPath(#[source] E),
 }

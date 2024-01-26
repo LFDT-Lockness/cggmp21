@@ -880,7 +880,7 @@ We implement two versions of distributed key generation. One generates a key alo
 \subsubsection{Non-Threshold (i.e., $n$-out-of-$n$) Key Generation}
 \label{sec:n-of-n-dkg}
 
-This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option to replace the broadcast channel with a reliable broadcast subroutine.
+This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option to replace the broadcast channel with a reliable broadcast subroutine, and we added optional support of HD-wallets.
 
 \begin{description}
 \item[\bf Input.]
@@ -896,8 +896,13 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
           and set $X_i = x_i \cdot G$.
     \item Sample $\rid_i \gets \{0,1\}^\kappa$.
     \item Compute $(A_i; \tau_i) = \commit{sch}()$.
+    \item {\bf (HD-wallets.)} 
+    \begin{itemize}
+      \item If HD-wallets support enabled, sample local chain code contribution $c_i \gets \{0,1\}^{256}$ (32-bytes string)
+      \item Otherwise, set $c_i = \bot$
+    \end{itemize}
     \item Sample $u_i \gets \{0,1\}^\kappa$
-          and set $V_i = H(\sid \| n \| i \| \rid_i \| X_i \| A_i \| u_i)$.
+          and set $V_i = H(\sid \| n \| i \| \rid_i \| X_i \| A_i \| u_i \| c_i)$.
     \item Send $V_i$ to all parties.
 \end{itemize}
 
@@ -910,15 +915,19 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
     
     \item Upon receiving $h_j$ from all other parties: abort if $h_i \neq h_j$ for some $j\in [n]$.
 \end{itemize}
-    \item Send $(\rid_i, X_i, A_i, u_i)$ to all parties.
+    \item Send $(\rid_i, X_i, A_i, u_i, c_i)$ to all parties.
     \end{itemize}
 
 \item[\bf Round 3.] 
-    Upon receiving $(\rid_j, X_j, A_j, u_j)$ from all other parties:
+    Upon receiving $(\rid_j, X_j, A_j, u_j, c_j)$ from all other parties:
     \begin{itemize}
-    \item Abort if $V_j \neq H(\sid \| n \| j \| \rid_j \| X_j \| A_j \| u_j)$
+    \item Abort if $V_j \neq H(\sid \| n \| j \| \rid_j \| X_j \| A_j \| u_j \| c_j)$
           for some $j \in [n]$.
     \item Set $\rid = \bigoplus_j \rid_j$.
+    \item {\bf (HD-wallets.)} If HD-wallets support enabled:
+    \begin{itemize}
+      \item Set chain code $c = \bigoplus_j c_j$
+    \end{itemize}
     \item Set $e_i = H(\sid \| i \| \rid \| X_i\|A_i)$
           and compute $\psi_i = \prove{sch}(\tau_i, e_i, x_i)$.
     \item Send $\psi_i$ to all parties.
@@ -937,7 +946,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
     \item Set $X = \sum_j X_j$,
               $\vec X = (X_j)_{j\in[n]}$.
 
-    \item Output $(X, x_i, \vec X)$.
+    \item Output $(X, x_i, \vec X, c)$.
     \end{itemize}
 
 \end{description}
@@ -963,9 +972,14 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
       \item Compute $\sigma_{i,j} = f_i(j + 1)$ for all $j \in [n]$.
       \item Sample $\rid_i \gets \{0,1\}^\kappa$.
       \item Compute $(A_i, \tau_i) \gets \commit{sch}()$. % $(r_i, h_i) \gets \commit{sch}()$
+      \item {\bf (HD-wallets.)} 
+      \begin{itemize}
+        \item If HD-wallets support enabled, sample local chain code contribution $c_i \gets \{0,1\}^{128}$ (32-bytes string)
+        \item Otherwise, set $c_i = \bot$
+      \end{itemize}
 
       \item Sample $u_i \gets \{0,1\}^\kappa$
-        and compute $V_i = H(\sid\| n\| i\| t\|\rid_i\| \vec{S_i}\| A_i\| u_i)$.
+        and compute $V_i = H(\sid\| n\| i\| t\|\rid_i\| \vec{S_i}\| A_i\| u_i \| c_i)$.
       \item Send $V_i$ to all parties.
     \end{itemize}
 
@@ -981,24 +995,28 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
         \item Upon receiving $h_j$ from all  parties: abort if 
         $h_i \neq h_j$ for some $j \in [n]$.
     \end{itemize}
-      \item Send $(\rid_i, \vec{S}_i, A_i, u_i)$ to all parties.
+      \item Send $(\rid_i, \vec{S}_i, A_i, u_i, c_i)$ to all parties.
       \item For all $j \neq i$, send $\sigma_{i,j}$ to $P_j$ via private channel.
     \end{itemize}
 
   \item[\textbf{Round 3.}] 
-Upon receiving $(\rid_j, \vec{S}_j, A_j, u_j)$ and $\sigma_{j,i}$ from all parties:
+    Upon receiving $(\rid_j, \vec{S}_j, A_j, u_j, c_j)$ and $\sigma_{j,i}$ from all parties:
     \begin{itemize}
       \item For each party $j \neq i$:
         \begin{itemize}
         \item Check that $\vec{S}_j$ has length $t$.
-          \item Assert $V_j = H(\sid\| n\| j\| t\| \rid_j\| \vec{S}_j\| A_j\| u_j)$.
+        \item Assert $V_j = H(\sid\| n\| j\| t\| \rid_j\| \vec{S}_j\| A_j\| u_j \| c_j)$.
         \item Define 
-        $F_j(x) = \sum_{k \in [t]} x^k \cdot S_{j,k}$.
-          \item Assert $\sigma_{j,i} \cdot G  = F_j(i + 1)$.
+          $F_j(x) = \sum_{k \in [t]} x^k \cdot S_{j,k}$.
+        \item Assert $\sigma_{j,i} \cdot G  = F_j(i + 1)$.
         \end{itemize}
-      \item Compute $\rid = \oplus_{j \in [n]} \rid_j$.
-      \item Let $F(x) = \sum_{k \in [t]} x^k \cdot \left(\sum_{j\in [n]} S_{j,k}\right) = \sum_{j \in [n]} F_j(x)$. 
-         \item   For $j \in [n]$, compute
+        \item Compute $\rid = \bigoplus_{j \in [n]} \rid_j$.
+        \item {\bf (HD-wallets.)} If HD-wallets support enabled:
+        \begin{itemize}
+          \item Set chain code $c = \bigoplus_{j \in [n]} c_j$
+        \end{itemize}
+        \item Let $F(x) = \sum_{k \in [t]} x^k \cdot \left(\sum_{j\in [n]} S_{j,k}\right) = \sum_{j \in [n]} F_j(x)$. 
+        \item   For $j \in [n]$, compute
             $X_j = F(j + 1)$. 
             Let $\vec{X} = (X_j)_{j \in [n]}$.
       \item Compute $x_i = \sum_{j \in [n]} \sigma_{j,i}$.
@@ -1016,7 +1034,7 @@ Upon receiving $(\rid_j, \vec{S}_j, A_j, u_j)$ and $\sigma_{j,i}$ from all parti
       \item Compute $Y = \sum_{j \in [n]} S_{j,0}$.
       \item Create identity mapping $I : [n] \to \Z_q \setminus 0$,
         $I(i) = i + 1$.
-      \item Return $(Y, x_i, \vec{X}, I)$.
+      \item Return $(Y, x_i, \vec{X}, I, c)$.
     \end{itemize}
 
 \end{description}
@@ -1123,28 +1141,41 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
 
 \begin{description}
 
-\item[\bf Input.] Size of signing set $t$, identities of parties in signing set,
- index $i\in [t]$, index map\footnote{$S(i)$ is the index that $P_i$ had at key-generation time.} $S : [t] \to [n]$, key share $K_{S(i)}$, context separation string $\sid$, security level $L$, curve $\E$ with generator $G$.
+\item[\bf Input.] 
+  Size of signing set $t$,
+  identities of parties in signing set,
+  index $i\in [t]$,
+  index map\footnote{$S(i)$ is the index that $P_i$ had at key-generation time.} $S : [t] \to [n]$,
+  key share $K_{S(i)}$,
+  context separation string $\sid$,
+  security level $L$, curve $\E$ with generator $G$.
+
+  {\bf HD-wallets inputs:} additive $\text{shift} \in \Fq$ \footnote{Deriving additive shift is up to specific standard of HD-wallets, e.g. see \cite{bip32} or \cite{slip10}} ($\text{shift} = 0$ disables HD derivation)
 
     \item[\bf Setup.] The key share $K_{S(i)}$ contains $\threshold$, number of key holders~$n$, secret share $x'_{S(i)}$, parties' public shares $\vec X' = (X'_j)_{j \in [n]}$, a map $I : [n] \to \Fq \setminus \{0\}$, Paillier secret key $\sk_{S(i)}$, parties' Paillier keys $\vec N' = (N'_j)_{j \in [n]}$, and parties' auxiliary information $\vec R' = (s_j, t_j, \hat N)_{j \in [n]}$.
 
     \item[\bf Step 1.] Set $\sk_i = \sk_{S(i)}$ and 
-            $\vec R = (R'_{S(j)})_{j \in [n]}$. Then:
+                       $\vec R = (R'_{S(j)})_{j \in [n]}$. Then:
     \begin{itemize}
-           \item If shares are additive\footnote{In this case we have $t=n$.} shares of the private key, 
+        \item If shares are additive\footnote{In this case we have $t=n$.} shares of the private key, 
             set $x_{i} = x'_{S(i)}$, $\vec X = (X'_{S(j)})_{j \in [n]}$.
-
         
         \item If shares are Shamir secret shares of the private key: 
-
         \begin{itemize}
-        \item For $j \in [t]$, compute Lagrange coefficient $\lambda_j = \prod\limits_{m \in [t]\setminus\{j\}} \frac{I(S(m))}{I(S(m)) - I(S(j))} \bmod{q}$.
+            \item For $j \in [t]$, compute Lagrange coefficient $\lambda_j = \prod\limits_{m \in [t]\setminus\{j\}} \frac{I(S(m))}{I(S(m)) - I(S(j))} \bmod{q}$.
             \item Compute $x_{i} = \lambda_i \cdot x'_{S(i)}$.
             \item For $j \in [n]$, compute $X_j= \lambda_j \cdot X'_{S(j)}$; then set $\vec X = \{X_j\}_{j \in [t]}$.
         \end{itemize}
     \end{itemize}
 
-    \item[\bf Step 2.] Call the non-threshold presigning protocol from the previous section using inputs $t, i, x_i, \vec X$, $\sk_i$, $\vec R, \sid, L, \E$.
+    \item[\bf Step 2.] {\bf (HD-wallets)} If HD-wallets support enabled:
+    \begin{itemize}
+      \item Set $X_0 := X_0 + \text{shift} \cdot G$
+      \item If $i = 0$, set $x_0 := x_0 + \text{shift}$
+      \item Note: output signature will be valid for public key $Y + \text{shift} \cdot G$
+    \end{itemize}
+
+    \item[\bf Step 3.] Call the non-threshold presigning protocol from the previous section using inputs $t, i, x_i, \vec X$, $\sk_i$, $\vec R, \sid, L, \E$.
 \end{description}
 
 

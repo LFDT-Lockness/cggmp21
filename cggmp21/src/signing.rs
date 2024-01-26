@@ -227,6 +227,9 @@ pub struct SigningBuilder<
     tracer: Option<&'r mut dyn Tracer>,
     enforce_reliable_broadcast: bool,
     _digest: std::marker::PhantomData<D>,
+
+    #[cfg(feature = "hd-wallets")]
+    additive_shift: Option<Scalar<E>>,
 }
 
 impl<'r, E, L, D> SigningBuilder<'r, E, L, D>
@@ -251,6 +254,8 @@ where
             tracer: None,
             enforce_reliable_broadcast: true,
             _digest: std::marker::PhantomData,
+            #[cfg(feature = "hd-wallets")]
+            additive_shift: None,
         }
     }
 
@@ -267,6 +272,8 @@ where
             enforce_reliable_broadcast: self.enforce_reliable_broadcast,
             execution_id: self.execution_id,
             _digest: std::marker::PhantomData,
+            #[cfg(feature = "hd-wallets")]
+            additive_shift: self.additive_shift,
         }
     }
 
@@ -282,6 +289,48 @@ where
             enforce_reliable_broadcast: v,
             ..self
         }
+    }
+
+    /// Specifies HD derivation path
+    ///
+    /// ## Example
+    /// Set derivation path to m/1/999
+    ///
+    /// ```rust,no_run
+    /// # let eid = cggmp21::ExecutionId::new(b"protocol nonce");
+    /// # let (i, parties_indexes_at_keygen, key_share): (u16, Vec<u16>, cggmp21::KeyShare<cggmp21::supported_curves::Secp256k1>)
+    /// # = unimplemented!();
+    /// cggmp21::signing(eid, i, &parties_indexes_at_keygen, &key_share)
+    ///     .set_derivation_path([1, 999])?
+    /// # ; Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    #[cfg(feature = "hd-wallets")]
+    pub fn set_derivation_path<Index>(
+        mut self,
+        path: impl IntoIterator<Item = Index>,
+    ) -> Result<Self, crate::key_share::HdError<<Index as TryInto<slip_10::NonHardenedIndex>>::Error>>
+    where
+        slip_10::NonHardenedIndex: TryFrom<Index>,
+    {
+        use crate::key_share::HdError;
+
+        let mut public_key = self
+            .key_share
+            .extended_public_key()
+            .ok_or(HdError::DisabledHd)?;
+        let mut additive_shift = Scalar::<E>::zero();
+
+        for child_index in path {
+            let child_index: slip_10::NonHardenedIndex =
+                child_index.try_into().map_err(HdError::InvalidPath)?;
+            let shift = slip_10::derive_public_shift(&public_key, child_index);
+
+            additive_shift += shift.shift;
+            public_key = shift.child_public_key;
+        }
+
+        self.additive_shift = Some(additive_shift);
+        Ok(self)
     }
 
     /// Starts presignature generation protocol
@@ -304,6 +353,10 @@ where
             self.parties_indexes_at_keygen,
             None,
             self.enforce_reliable_broadcast,
+            #[cfg(feature = "hd-wallets")]
+            self.additive_shift,
+            #[cfg(not(feature = "hd-wallets"))]
+            None,
         )
         .await?
         {
@@ -333,6 +386,10 @@ where
             self.parties_indexes_at_keygen,
             Some(message_to_sign),
             self.enforce_reliable_broadcast,
+            #[cfg(feature = "hd-wallets")]
+            self.additive_shift,
+            #[cfg(not(feature = "hd-wallets"))]
+            None,
         )
         .await?
         {
@@ -365,6 +422,7 @@ async fn signing_t_out_of_n<M, E, L, D, R>(
     S: &[PartyIndex],
     message_to_sign: Option<DataToSign<E>>,
     enforce_reliable_broadcast: bool,
+    additive_shift: Option<Scalar<E>>,
 ) -> Result<ProtocolOutput<E>, SigningError>
 where
     M: Mpc<ProtocolMessage = Msg<E, D>>,
@@ -401,7 +459,7 @@ where
     }
 
     // Assemble x_i and \vec X
-    let (x_i, X) = if let Some(VssSetup { I, .. }) = &key_share.core.vss_setup {
+    let (mut x_i, mut X) = if let Some(VssSetup { I, .. }) = &key_share.core.vss_setup {
         // For t-out-of-n keys generated via VSS DKG scheme
         let I = utils::subset(S, I).ok_or(Bug::Subset)?;
         let X = utils::subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
@@ -425,6 +483,19 @@ where
     };
     debug_assert_eq!(key_share.core.shared_public_key, X.iter().sum::<Point<E>>());
 
+    // Apply additive shift
+    let shift = additive_shift.unwrap_or(Scalar::zero());
+    let Shift = Point::generator() * shift;
+
+    X[0] += Shift;
+    if i == 0 {
+        x_i = SecretScalar::new(&mut (x_i + shift));
+    }
+    debug_assert_eq!(
+        key_share.core.shared_public_key + Shift,
+        X.iter().sum::<Point<E>>()
+    );
+
     // Assemble rest of the data
     let (p_i, q_i) = (&key_share.aux.p, &key_share.aux.q);
     let R = utils::subset(S, &key_share.aux.parties).ok_or(Bug::Subset)?;
@@ -439,7 +510,7 @@ where
         t,
         &x_i,
         &X,
-        key_share.core.shared_public_key,
+        key_share.core.shared_public_key + Shift,
         p_i,
         q_i,
         &R,

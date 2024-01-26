@@ -44,19 +44,25 @@ pub struct MsgRound1<D: Digest> {
     pub commitment: digest::Output<D>,
 }
 /// Message from round 2
+#[serde_with::serde_as]
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
 #[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round2")]
 pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     /// `rid_i`
-    #[serde(with = "hex::serde")]
+    #[serde_as(as = "utils::serde::HexOrBin")]
     #[udigest(as_bytes)]
     pub rid: L::Rid,
     /// $X_i$
     pub X: Point<E>,
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
+    /// Party contribution to chain code
+    #[cfg(feature = "hd-wallets")]
+    #[serde_as(as = "Option<utils::serde::HexOrBin>")]
+    #[udigest(with = utils::encoding::maybe_bytes)]
+    pub chain_code: Option<slip_10::ChainCode>,
     /// $u_i$
     #[serde(with = "hex::serde")]
     #[udigest(as_bytes)]
@@ -98,6 +104,7 @@ pub async fn run_keygen<E, R, M, L, D>(
     execution_id: ExecutionId<'_>,
     rng: &mut R,
     party: M,
+    #[cfg(feature = "hd-wallets")] hd_enabled: bool,
 ) -> Result<IncompleteKeyShare<E>, KeygenError>
 where
     E: Curve,
@@ -132,12 +139,21 @@ where
     };
     let tag_i = tag(i);
 
-    tracer.stage("Sample x_i, rid_i");
+    tracer.stage("Sample x_i, rid_i, chain_code");
     let x_i = SecretScalar::<E>::random(rng);
     let X_i = Point::generator() * &x_i;
 
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
+
+    #[cfg(feature = "hd-wallets")]
+    let chain_code_local = if hd_enabled {
+        let mut chain_code = slip_10::ChainCode::default();
+        rng.fill_bytes(&mut chain_code);
+        Some(chain_code)
+    } else {
+        None
+    };
 
     tracer.stage("Sample schnorr commitment");
     let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
@@ -147,6 +163,8 @@ where
         rid,
         X: X_i,
         sch_commit,
+        #[cfg(feature = "hd-wallets")]
+        chain_code: chain_code_local,
         decommit: {
             let mut nonce = L::Rid::default();
             rng.fill_bytes(nonce.as_mut());
@@ -172,15 +190,14 @@ where
     let commitments = rounds
         .complete(round1)
         .await
-        .map_err(IoError::receive_message)?
-        .into_vec_including_me(my_commitment);
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
         let h_i = udigest::Tag::<D>::new_structured(Tag::Unindexed { sid })
-            .digest_iter(commitments.iter());
+            .digest_iter(commitments.iter_including_me(&my_commitment));
 
         tracer.send_msg();
         outgoings
@@ -225,27 +242,41 @@ where
     let decommitments = rounds
         .complete(round2)
         .await
-        .map_err(IoError::receive_message)?
-        .into_vec_including_me(my_decommitment);
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     tracer.stage("Validate decommitments");
-    let blame = (0u16..)
-        .zip(&commitments)
-        .zip(&decommitments)
-        .filter(|((j, commitment), decommitment)| {
-            let com_expected = tag(*j).digest(decommitment);
-            commitment.commitment != com_expected
-        })
-        .map(|((j, _), _)| j)
-        .collect::<Vec<_>>();
+    let blame = utils::collect_blame(&commitments, &decommitments, |j, com, decom| {
+        let com_expected = tag(j).digest(decom);
+        com.commitment != com_expected
+    });
     if !blame.is_empty() {
-        return Err(KeygenAborted::InvalidDecommitment { parties: blame }.into());
+        return Err(KeygenAborted::InvalidDecommitment(blame).into());
     }
+
+    #[cfg(feature = "hd-wallets")]
+    let chain_code = if hd_enabled {
+        tracer.stage("Calculate chain_code");
+        let blame = utils::collect_simple_blame(&decommitments, |decom| decom.chain_code.is_none());
+        if !blame.is_empty() {
+            return Err(KeygenAborted::MissingChainCode(blame).into());
+        }
+        Some(decommitments.iter_including_me(&my_decommitment).try_fold(
+            slip_10::ChainCode::default(),
+            |acc, decom| {
+                Ok::<_, Bug>(utils::xor_array(
+                    acc,
+                    decom.chain_code.ok_or(Bug::NoChainCode)?,
+                ))
+            },
+        )?)
+    } else {
+        None
+    };
 
     tracer.stage("Calculate challege rid");
     let rid = decommitments
-        .iter()
+        .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), utils::xor_array);
     let challenge = {
@@ -278,13 +309,11 @@ where
     let sch_proofs = rounds
         .complete(round3)
         .await
-        .map_err(IoError::receive_message)?
-        .into_vec_including_me(my_sch_proof);
+        .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
     tracer.stage("Validate schnorr proofs");
-    let mut blame = vec![];
-    for ((j, decommitment), sch_proof) in (0u16..).zip(&decommitments).zip(&sch_proofs) {
+    let blame = utils::collect_blame(&decommitments, &sch_proofs, |j, decom, sch_proof| {
         let challenge = {
             let hash = |d: D| {
                 d.chain_update(sid)
@@ -296,16 +325,13 @@ where
             Scalar::random(&mut rng)
         };
         let challenge = schnorr_pok::Challenge { nonce: challenge };
-        if sch_proof
+        sch_proof
             .sch_proof
-            .verify(&decommitment.sch_commit, &challenge, &decommitment.X)
+            .verify(&decom.sch_commit, &challenge, &decom.X)
             .is_err()
-        {
-            blame.push(j);
-        }
-    }
+    });
     if !blame.is_empty() {
-        return Err(KeygenAborted::InvalidSchnorrProof { parties: blame }.into());
+        return Err(KeygenAborted::InvalidSchnorrProof(blame).into());
     }
 
     tracer.protocol_ends();
@@ -313,10 +339,18 @@ where
     Ok(DirtyIncompleteKeyShare {
         curve: Default::default(),
         i,
-        shared_public_key: decommitments.iter().map(|d| d.X).sum(),
-        public_shares: decommitments.iter().map(|d| d.X).collect(),
+        shared_public_key: decommitments
+            .iter_including_me(&my_decommitment)
+            .map(|d| d.X)
+            .sum(),
+        public_shares: decommitments
+            .iter_including_me(&my_decommitment)
+            .map(|d| d.X)
+            .collect(),
         x: x_i,
         vss_setup: None,
+        #[cfg(feature = "hd-wallets")]
+        chain_code,
     }
     .try_into()
     .map_err(Bug::InvalidKeyShare)?)

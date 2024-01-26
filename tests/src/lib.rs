@@ -41,10 +41,11 @@ impl PrecomputedKeyShares {
         &self,
         t: Option<u16>,
         n: u16,
+        hd_enabled: bool,
     ) -> Result<Vec<KeyShare<E, L>>> {
         let key_shares = self
             .shares
-            .get(&format!("t={t:?},n={n},curve={}", E::CURVE_NAME))
+            .get(&Self::key::<E>(t, n, hd_enabled))
             .context("shares not found")?;
         serde_json::from_value(key_shares.clone()).context("parse key shares")
     }
@@ -53,6 +54,7 @@ impl PrecomputedKeyShares {
         &mut self,
         t: Option<u16>,
         n: u16,
+        hd_enabled: bool,
         shares: &[KeyShare<E, L>],
     ) -> Result<()> {
         if usize::from(n) != shares.len() {
@@ -60,8 +62,15 @@ impl PrecomputedKeyShares {
         }
         let key_shares = serde_json::to_value(shares).context("serialize shares")?;
         self.shares
-            .insert(format!("t={t:?},n={n},curve={}", E::CURVE_NAME), key_shares);
+            .insert(Self::key::<E>(t, n, hd_enabled), key_shares);
         Ok(())
+    }
+
+    fn key<E: Curve>(t: Option<u16>, n: u16, hd_enabled: bool) -> String {
+        format!(
+            "t={t:?},n={n},curve={},hd_wallet={hd_enabled}",
+            E::CURVE_NAME
+        )
     }
 }
 
@@ -154,4 +163,14 @@ pub fn convert_from_stark_scalar(
 ) -> anyhow::Result<generic_ec::Scalar<generic_ec::curves::Stark>> {
     let bytes = x.to_bytes_be();
     generic_ec::Scalar::from_be_bytes(bytes).context("Can't read bytes")
+}
+
+#[cfg(feature = "hd-wallets")]
+pub fn random_derivation_path(rng: &mut impl rand::RngCore) -> Vec<u32> {
+    use rand::Rng;
+    let len = rng.gen_range(1..=3);
+    let path = std::iter::repeat_with(|| rng.gen_range(0..cggmp21::slip_10::H))
+        .take(len)
+        .collect::<Vec<_>>();
+    path
 }
