@@ -110,7 +110,7 @@ let aux_info = cggmp21::aux_info_gen(eid, i, n, pregenerated_primes)
 
 After keygen and aux info gen are done, you can make a “complete” key share that can be used for signing:
 ```rust
-let key_share = cggmp21::KeyShare::make(incomplete_key_share, aux_info)?;
+let key_share = cggmp21::KeyShare::from_parts((incomplete_key_share, aux_info))?;
 ```
 
 ### Signing

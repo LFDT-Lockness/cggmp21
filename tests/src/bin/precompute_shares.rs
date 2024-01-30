@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use cggmp21::supported_curves::{Secp256k1, Secp256r1, Stark};
 use cggmp21::{
-    security_level::{SecurityLevel, SecurityLevel128},
+    security_level::{KeygenSecurityLevel, SecurityLevel128},
     trusted_dealer,
 };
 use cggmp21_tests::{generate_blum_prime, PrecomputedKeyShares, PregeneratedPrimes};

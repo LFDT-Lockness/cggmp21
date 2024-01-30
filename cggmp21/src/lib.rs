@@ -138,7 +138,7 @@
 //! ```rust,no_run
 //! # fn main() -> Result<(), cggmp21::key_share::InvalidKeyShare> {
 //! # let (incomplete_key_share, aux_info): (cggmp21::IncompleteKeyShare<cggmp21::supported_curves::Secp256k1>, cggmp21::key_share::AuxInfo) = unimplemented!();
-//! let key_share = cggmp21::KeyShare::make(incomplete_key_share, aux_info)?;
+//! let key_share = cggmp21::KeyShare::from_parts((incomplete_key_share, aux_info))?;
 //! # Ok(()) }
 //! ```
 //!
@@ -251,6 +251,9 @@ pub use {
     round_based,
 };
 
+#[doc(inline)]
+pub use cggmp21_keygen::{keygen, progress, ExecutionId};
+
 use generic_ec::{coords::HasAffineX, Curve, Point};
 use key_share::AnyKeyShare;
 use round_based::PartyIndex;
@@ -258,11 +261,8 @@ use security_level::SecurityLevel;
 use signing::SigningBuilder;
 
 mod errors;
-mod execution_id;
 pub mod key_refresh;
 pub mod key_share;
-pub mod keygen;
-pub mod progress;
 pub mod security_level;
 pub mod signing;
 pub mod supported_curves;
@@ -278,27 +278,24 @@ mod default_choice {
     pub type SecurityLevel = crate::security_level::SecurityLevel128;
 }
 
-pub use self::execution_id::ExecutionId;
+/// Threshold and non-threshold CGGMP21 DKG
+pub mod keygen {
+    #[doc(inline)]
+    pub use cggmp21_keygen::{
+        msg, GenericKeygenBuilder, KeygenBuilder, KeygenError, NonThreshold,
+        ThresholdKeygenBuilder, WithThreshold,
+    };
+
+    pub use msg::non_threshold::Msg as NonThresholdMsg;
+    pub use msg::threshold::Msg as ThresholdMsg;
+}
+
 pub use self::{
     key_refresh::{KeyRefreshError, PregeneratedPrimes},
     key_share::{IncompleteKeyShare, KeyShare},
     keygen::KeygenError,
     signing::{DataToSign, PartialSignature, Presignature, Signature, SigningError},
 };
-
-/// Distributed key generation protocol
-///
-/// Each party of the protocol should have uniquely assigned index $i$ such that $0 \le i < n$
-/// (where $n$ is amount of parties in the protocol).
-///
-/// [KeygenBuilder]: keygen::KeygenBuilder
-/// [`set_threshold`]: keygen::GenericKeygenBuilder::set_threshold
-pub fn keygen<E>(eid: ExecutionId, i: u16, n: u16) -> keygen::KeygenBuilder<E>
-where
-    E: Curve,
-{
-    keygen::KeygenBuilder::new(eid, i, n)
-}
 
 /// Protocol for finalizing the keygen by generating aux info.
 ///
@@ -309,7 +306,7 @@ where
 /// of signers] co-sharing the key.
 ///
 /// Outputs [`AuxInfo`](key_share::AuxInfo) that can be used to "complete" [`IncompleteKeyShare`]
-/// using [`KeyShare::make`].
+/// using [`KeyShare::from_parts`].
 ///
 /// [inside the key share]: key_share::DirtyIncompleteKeyShare::i
 /// [as number of signers]: IncompleteKeyShare::n

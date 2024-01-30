@@ -11,7 +11,7 @@ keywords = ["mpc", "dkg", "threshold-signatures", "tss", "ecdsa", "t-ecdsa"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-key-share = { path = "../key-share" }
+key-share = { path = "../key-share", features = ["serde"] }
 slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true }
 
 generic-ec = { version = "0.1", features = ["serde", "udigest"] }

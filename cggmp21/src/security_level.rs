@@ -11,21 +11,19 @@
 
 use crate::rug::Integer;
 
+/// Security level of CGGMP21 DKG protocol
+pub use cggmp21_keygen::security_level::SecurityLevel as KeygenSecurityLevel;
+
 /// Hardcoded value for parameter $m$ of security level
 ///
 /// Currently, [security parameter $m$](SecurityLevel::M) is hardcoded to this constant. We're going to fix that
 /// once `feature(generic_const_exprs)` is stable.
 pub const M: usize = 128;
 
-/// Security level of the protocol
+/// Security level of the CGGMP21 protocol
 ///
 /// You should not implement this trait manually. Use [define_security_level] macro instead.
-pub trait SecurityLevel: Clone + Sync + Send + 'static {
-    /// $\kappa$ bits of security
-    const SECURITY_BITS: u32;
-    /// $\kappa/8$ bytes of security
-    const SECURITY_BYTES: usize;
-
+pub trait SecurityLevel: KeygenSecurityLevel {
     /// $\varepsilon$ bits
     const EPSILON: usize;
 
@@ -41,17 +39,6 @@ pub trait SecurityLevel: Clone + Sync + Send + 'static {
     /// it will produce a compilation error if different value of $m$ is set. We're going to fix that once `generic_const_exprs`
     /// feature is stable.
     const M: usize;
-
-    /// Static array of $\kappa/8$ bytes
-    type Rid: AsRef<[u8]>
-        + AsMut<[u8]>
-        + Default
-        + Clone
-        + hex::FromHex<Error = hex::FromHexError>
-        + Send
-        + Sync
-        + Unpin
-        + 'static;
 
     /// $q$ parameter
     ///
@@ -86,6 +73,9 @@ pub mod _internal {
     use hex::FromHex;
 
     pub use crate::rug::Integer;
+    pub use cggmp21_keygen::security_level::{
+        define_security_level as define_keygen_security_level, SecurityLevel as KeygenSecurityLevel,
+    };
 
     #[derive(Clone)]
     pub struct Rid<const N: usize>([u8; N]);
@@ -152,17 +142,36 @@ macro_rules! define_security_level {
         epsilon = $e:expr,
         ell = $ell:expr,
         ell_prime = $ell_prime:expr,
+        m = $m:tt,
+        q = $q:expr,
+    }) => {
+        $crate::define_security_level! {
+            $struct_name {
+                epsilon = $e,
+                ell = $ell,
+                ell_prime = $ell_prime,
+                m = $m,
+                q = $q,
+            }
+        }
+        $crate::security_level::_internal::define_keygen_security_level! {
+            $struct_name {
+                security_bits = $k,
+            }
+        }
+    };
+    ($struct_name:ident {
+        epsilon = $e:expr,
+        ell = $ell:expr,
+        ell_prime = $ell_prime:expr,
         m = 128,
         q = $q:expr,
     }) => {
         impl $crate::security_level::SecurityLevel for $struct_name {
-            const SECURITY_BITS: u32 = $k;
-            const SECURITY_BYTES: usize = $k / 8;
             const EPSILON: usize = $e;
             const ELL: usize = $ell;
             const ELL_PRIME: usize = $ell_prime;
             const M: usize = 128;
-            type Rid = $crate::security_level::_internal::Rid<{$k / 8}>;
 
             fn q() -> $crate::security_level::_internal::Integer {
                 $q
@@ -170,11 +179,10 @@ macro_rules! define_security_level {
         }
     };
     ($struct_name:ident {
-        security_bits = $k:expr,
         epsilon = $e:expr,
         ell = $ell:expr,
         ell_prime = $ell_prime:expr,
-        m = $m:expr,
+        m = $m:tt,
         q = $q:expr,
     }) => {
         compile_error!(concat!("Currently, we can not set security parameter M to anything but 128 (you set m=", stringify!($m), ")"));
@@ -184,13 +192,9 @@ macro_rules! define_security_level {
 #[doc(inline)]
 pub use define_security_level;
 
-/// 128-bits security level
-///
-/// This security level is intended to provide 128 bits of security for the protocol when run with up to 128 participants.
-#[derive(Clone)]
-pub struct SecurityLevel128;
+#[doc(inline)]
+pub use cggmp21_keygen::security_level::SecurityLevel128;
 define_security_level!(SecurityLevel128{
-    security_bits = 384,
     epsilon = 230,
     ell = 256,
     ell_prime = 848,

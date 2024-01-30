@@ -52,7 +52,7 @@ pub struct PregeneratedPrimes<L = crate::default_choice::SecurityLevel> {
 impl<L: SecurityLevel> PregeneratedPrimes<L> {
     /// Constructs pregenerated primes from two big numbers
     ///
-    /// Returns `None` if big numbers are smaller than 4 * [L::SECURITY_BITS](SecurityLevel::SECURITY_BITS)
+    /// Returns `None` if big numbers are smaller than 4 * [L::SECURITY_BITS](crate::security_level::KeygenSecurityLevel::SECURITY_BITS)
     ///
     /// Function doesn't validate that provided numbers are primes. If they're not,
     /// key refresh protocol should fail with some ZK proof error.

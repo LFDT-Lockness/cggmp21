@@ -1,5 +1,6 @@
 use anyhow::Context;
 use cggmp21::{
+    key_share::Validate,
     progress::PerfProfiler,
     security_level::{SecurityLevel, SecurityLevel128},
     signing::DataToSign,
@@ -211,17 +212,26 @@ async fn do_becnhmarks<L: SecurityLevel>(args: Args) {
             };
 
         if aux_data.is_some() && args.optimize_multiexp {
-            let aux_data = aux_data.as_mut().unwrap();
             let start = std::time::Instant::now();
-            aux_data
-                .iter_mut()
-                .for_each(|aux_i| aux_i.precompute_multiexp_tables().unwrap());
+
+            aux_data = Some(
+                aux_data
+                    .clone()
+                    .unwrap()
+                    .into_iter()
+                    .map(|aux_i| {
+                        let mut aux_i = aux_i.into_inner();
+                        aux_i.precompute_multiexp_tables().unwrap();
+                        aux_i.validate().unwrap()
+                    })
+                    .collect(),
+            );
             let took = std::time::Instant::now().duration_since(start);
 
             println!("Precompute multiexp tables (avg): {:?}", took / n.into());
             println!(
                 "Size of multiexp tables per key share: {} bytes",
-                aux_data[0].multiexp_tables_size()
+                aux_data.as_ref().unwrap()[0].multiexp_tables_size()
             );
             println!(
                 "Size of exponents: {:?}",
@@ -237,7 +247,9 @@ async fn do_becnhmarks<L: SecurityLevel>(args: Args) {
                 .expect("non threshold key shares are not generated")
                 .into_iter()
                 .zip(aux_data.expect("aux data is not generated"))
-                .map(|(key_share, aux_data)| cggmp21::KeyShare::make(key_share, aux_data))
+                .map(|(key_share, aux_data)| {
+                    cggmp21::key_share::KeyShare::from_parts((key_share, aux_data))
+                })
                 .collect::<Result<Vec<_>, _>>()
                 .expect("couldn't complete a share");
 

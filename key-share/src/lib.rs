@@ -22,7 +22,7 @@ use generic_ec_zkp::polynomial::lagrange_coefficient;
 mod utils;
 mod valid;
 
-pub use self::valid::{Valid, Validate, ValidateError};
+pub use self::valid::{Valid, Validate, ValidateError, ValidateFromParts};
 
 /// Core key share
 ///
@@ -121,25 +121,25 @@ pub struct VssSetup<E: Curve> {
 }
 
 impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
-    type Error = InvalidKeyShare;
+    type Error = InvalidCoreShare;
 
     fn is_valid(&self) -> Result<(), Self::Error> {
         let n: u16 = self
             .public_shares
             .len()
             .try_into()
-            .map_err(|_| InvalidKeyShareReason::NOverflowsU16)?;
+            .map_err(|_| InvalidShareReason::NOverflowsU16)?;
 
         if n < 2 {
-            return Err(InvalidKeyShareReason::TooFewParties.into());
+            return Err(InvalidShareReason::TooFewParties.into());
         }
         if self.i >= n {
-            return Err(InvalidKeyShareReason::PartyIndexOutOfBounds.into());
+            return Err(InvalidShareReason::PartyIndexOutOfBounds.into());
         }
 
         let party_public_share = self.public_shares[usize::from(self.i)];
         if party_public_share != Point::generator() * &self.x {
-            return Err(InvalidKeyShareReason::PartySecretShareDoesntMatchPublicShare.into());
+            return Err(InvalidShareReason::PartySecretShareDoesntMatchPublicShare.into());
         }
 
         match &self.vss_setup {
@@ -151,21 +151,22 @@ impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
     }
 }
 
+#[allow(clippy::nonminimal_bool)]
 fn validate_vss_key_share<E: Curve>(
     key_share: &DirtyCoreKeyShare<E>,
     n: u16,
     vss_setup: &VssSetup<E>,
-) -> Result<(), InvalidKeyShare> {
+) -> Result<(), InvalidCoreShare> {
     let t = vss_setup.min_signers;
 
     if !(2 <= t) {
-        return Err(InvalidKeyShareReason::ThresholdTooSmall.into());
+        return Err(InvalidShareReason::ThresholdTooSmall.into());
     }
     if !(t <= n) {
-        return Err(InvalidKeyShareReason::ThresholdTooLarge.into());
+        return Err(InvalidShareReason::ThresholdTooLarge.into());
     }
     if vss_setup.I.len() != usize::from(n) {
-        return Err(InvalidKeyShareReason::ILen.into());
+        return Err(InvalidShareReason::ILen.into());
     }
 
     // Now we need to check that public key shares indeed form a public key.
@@ -185,11 +186,11 @@ fn validate_vss_key_share<E: Curve>(
             .try_fold(Point::zero(), |acc, (lambda_j, X_j)| {
                 Some(acc + lambda_j? * X_j)
             })
-            .ok_or(InvalidKeyShareReason::INotPairwiseDistinct)
+            .ok_or(InvalidShareReason::INotPairwiseDistinct)
     };
     let reconstructed_pk = interpolation(Scalar::zero())?;
     if reconstructed_pk != key_share.shared_public_key {
-        return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
+        return Err(InvalidShareReason::SharesDontMatchPublicKey.into());
     }
 
     for (&j, public_share_j) in vss_setup
@@ -199,7 +200,7 @@ fn validate_vss_key_share<E: Curve>(
         .skip(t.into())
     {
         if interpolation(j.into())? != *public_share_j {
-            return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
+            return Err(InvalidShareReason::SharesDontMatchPublicKey.into());
         }
     }
 
@@ -208,9 +209,9 @@ fn validate_vss_key_share<E: Curve>(
 
 fn validate_non_vss_key_share<E: Curve>(
     key_share: &DirtyCoreKeyShare<E>,
-) -> Result<(), InvalidKeyShare> {
+) -> Result<(), InvalidCoreShare> {
     if key_share.shared_public_key != key_share.public_shares.iter().sum::<Point<E>>() {
-        return Err(InvalidKeyShareReason::SharesDontMatchPublicKey.into());
+        return Err(InvalidShareReason::SharesDontMatchPublicKey.into());
     }
     Ok(())
 }
@@ -280,10 +281,10 @@ impl<E: Curve> CoreKeyShare<E> {
 /// Error indicating that key share is not valid
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
-pub struct InvalidKeyShare(#[from] InvalidKeyShareReason);
+pub struct InvalidCoreShare(#[from] InvalidShareReason);
 
 #[derive(Debug, thiserror::Error)]
-enum InvalidKeyShareReason {
+enum InvalidShareReason {
     #[error("`n` overflows u16")]
     NOverflowsU16,
     #[error("amount of parties `n` is less than 2: n < 2")]
@@ -313,4 +314,10 @@ pub enum HdError<E> {
     /// Derivation path is not valid
     #[error("derivation path is not valid")]
     InvalidPath(#[source] E),
+}
+
+impl<T> From<ValidateError<T, InvalidCoreShare>> for InvalidCoreShare {
+    fn from(err: ValidateError<T, InvalidCoreShare>) -> Self {
+        err.into_error()
+    }
 }

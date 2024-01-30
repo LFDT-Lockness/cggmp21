@@ -11,9 +11,6 @@ use crate::security_level::SecurityLevel;
 
 pub use paillier_zk::fast_paillier::utils::external_rand;
 
-mod hex_or_bin;
-pub use hex_or_bin::HexOrBin;
-
 /// Converts `&Scalar<E>` into Integer
 pub fn scalar_to_bignumber<E: Curve>(scalar: impl AsRef<Scalar<E>>) -> Integer {
     Integer::from_digits(&scalar.as_ref().to_be_bytes(), rug::integer::Order::Msf)
@@ -238,15 +235,6 @@ pub mod encoding {
         for x in list {
             integer(x, encoder.add_item())
         }
-    }
-
-    #[cfg(feature = "hd-wallets")]
-    pub fn maybe_bytes<B: udigest::Buffer>(
-        m: &Option<impl AsRef<[u8]>>,
-        encoder: udigest::encoding::EncodeValue<B>,
-    ) {
-        use udigest::Digestable;
-        m.as_ref().map(udigest::Bytes).unambiguously_encode(encoder)
     }
 }
 

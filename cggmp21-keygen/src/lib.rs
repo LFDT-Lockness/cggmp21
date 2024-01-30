@@ -1,5 +1,5 @@
 //! Threshold and non-threshold CGGMP21 DKG
-#![allow(non_snake_case)]
+#![allow(non_snake_case, clippy::too_many_arguments)]
 
 pub mod progress;
 pub mod security_level;
@@ -26,7 +26,7 @@ pub use key_share;
 use crate::progress::Tracer;
 use crate::{
     errors::IoError,
-    key_share::{CoreKeyShare, InvalidKeyShare},
+    key_share::{CoreKeyShare, InvalidCoreShare},
     security_level::SecurityLevel,
 };
 
@@ -301,7 +301,7 @@ enum KeygenAborted {
 #[derive(Debug, Error)]
 enum Bug {
     #[error("resulting key share is not valid")]
-    InvalidKeyShare(#[source] InvalidKeyShare),
+    InvalidKeyShare(#[source] InvalidCoreShare),
     #[error("unexpected zero value")]
     NonZeroScalar,
     #[cfg(feature = "hd-wallets")]
