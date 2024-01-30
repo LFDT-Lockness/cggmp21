@@ -1,0 +1,35 @@
+[package]
+name = "cggmp21-keygen"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "UC-secure DKG implementation based on CGGMP21 paper"
+repository = "https://github.com/dfns/cggmp21"
+categories = ["algorithms", "cryptography"]
+keywords = ["mpc", "dkg", "threshold-signatures", "tss", "ecdsa", "t-ecdsa"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+key-share = { path = "../key-share" }
+slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true }
+
+generic-ec = { version = "0.1", features = ["serde", "udigest"] }
+generic-ec-zkp = { version = "0.1", features = ["serde", "udigest"] }
+udigest = { version = "0.1", features = ["std", "derive"]}
+
+round-based = { version = "0.2", features = ["derive"] }
+futures = "0.3"
+
+sha2 = "0.10"
+digest = "0.10"
+rand_core = "0.6"
+
+serde = { version = "1", features = ["derive"] }
+serde_with = { version = "2" }
+hex = { version = "0.4", default-features = false, features = ["serde"] }
+
+thiserror = "1"
+
+[features]
+hd-wallets = ["slip-10", "key-share/hd-wallets"]

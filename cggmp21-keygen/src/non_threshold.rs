@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::progress::Tracer;
 use crate::{
     errors::IoError,
-    key_share::{DirtyIncompleteKeyShare, IncompleteKeyShare},
+    key_share::{CoreKeyShare, DirtyCoreKeyShare, Validate},
     security_level::SecurityLevel,
     utils, ExecutionId,
 };
@@ -105,7 +105,7 @@ pub async fn run_keygen<E, R, M, L, D>(
     rng: &mut R,
     party: M,
     #[cfg(feature = "hd-wallets")] hd_enabled: bool,
-) -> Result<IncompleteKeyShare<E>, KeygenError>
+) -> Result<CoreKeyShare<E>, KeygenError>
 where
     E: Curve,
     L: SecurityLevel,
@@ -286,7 +286,7 @@ where
                 .chain_update(rid.as_ref())
                 .finalize()
         };
-        let mut rng = paillier_zk::rng::HashRng::new(hash);
+        let mut rng = crate::rng::HashRng::new(hash);
         Scalar::random(&mut rng)
     };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
@@ -321,7 +321,7 @@ where
                     .chain_update(rid.as_ref())
                     .finalize()
             };
-            let mut rng = paillier_zk::rng::HashRng::new(hash);
+            let mut rng = crate::rng::HashRng::new(hash);
             Scalar::random(&mut rng)
         };
         let challenge = schnorr_pok::Challenge { nonce: challenge };
@@ -336,7 +336,7 @@ where
 
     tracer.protocol_ends();
 
-    Ok(DirtyIncompleteKeyShare {
+    Ok(DirtyCoreKeyShare {
         curve: Default::default(),
         i,
         shared_public_key: decommitments
@@ -352,6 +352,6 @@ where
         #[cfg(feature = "hd-wallets")]
         chain_code,
     }
-    .try_into()
-    .map_err(Bug::InvalidKeyShare)?)
+    .validate()
+    .map_err(|e| Bug::InvalidKeyShare(e.into_error()))?)
 }

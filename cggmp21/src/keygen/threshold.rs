@@ -55,7 +55,7 @@ pub struct MsgRound1<D: Digest> {
 #[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
 pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// `rid_i`
-    #[serde_as(as = "utils::serde::HexOrBin")]
+    #[serde_as(as = "utils::HexOrBin")]
     #[udigest(as_bytes)]
     pub rid: L::Rid,
     /// $\vec S_i$
@@ -64,7 +64,7 @@ pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     pub sch_commit: schnorr_pok::Commit<E>,
     /// Party contribution to chain code
     #[cfg(feature = "hd-wallets")]
-    #[serde_as(as = "Option<utils::serde::HexOrBin>")]
+    #[serde_as(as = "Option<utils::HexOrBin>")]
     #[udigest(with = utils::encoding::maybe_bytes)]
     pub chain_code: Option<slip_10::ChainCode>,
     /// $u_i$

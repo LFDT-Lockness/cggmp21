@@ -57,10 +57,7 @@ pub struct DirtyIncompleteKeyShare<E: Curve> {
     pub vss_setup: Option<VssSetup<E>>,
     /// Chain code generated at keygen if HD wallets support was enabled
     #[cfg(feature = "hd-wallets")]
-    #[serde(
-        default,
-        with = "serde_with::As::<Option<crate::utils::serde::HexOrBin>>"
-    )]
+    #[serde(default, with = "serde_with::As::<Option<crate::utils::HexOrBin>>")]
     pub chain_code: Option<slip_10::ChainCode>,
     /// Secret share $x_i$
     #[serde_as(as = "Compact")]
