@@ -15,7 +15,8 @@ use crate::security_level::SecurityLevel;
 #[doc(inline)]
 pub use cggmp21_keygen::key_share::{
     CoreKeyShare as IncompleteKeyShare, DirtyCoreKeyShare as DirtyIncompleteKeyShare, HdError,
-    Valid, Validate, ValidateError, ValidateFromParts, VssSetup,
+    InvalidCoreShare as InvalidIncompleteKeyShare, Valid, Validate, ValidateError,
+    ValidateFromParts, VssSetup,
 };
 
 /// Key share
@@ -437,7 +438,7 @@ pub struct InvalidKeyShare(#[from] InvalidKeyShareReason);
 #[derive(Debug, Error)]
 enum InvalidKeyShareReason {
     #[error(transparent)]
-    InvalidCoreShare(cggmp21_keygen::key_share::InvalidCoreShare),
+    InvalidCoreShare(InvalidIncompleteKeyShare),
     #[error("size of parties auxiliary data list doesn't match `n`: n != parties.len()")]
     AuxLen,
     #[error("N_i != p q")]
@@ -485,27 +486,19 @@ enum ReconstructErrorReason {
     Interpolation,
 }
 
-impl From<cggmp21_keygen::key_share::InvalidCoreShare> for InvalidKeyShare {
-    fn from(err: cggmp21_keygen::key_share::InvalidCoreShare) -> Self {
+impl From<InvalidIncompleteKeyShare> for InvalidKeyShare {
+    fn from(err: InvalidIncompleteKeyShare) -> Self {
         Self(InvalidKeyShareReason::InvalidCoreShare(err))
     }
 }
 
-impl<T>
-    From<cggmp21_keygen::key_share::ValidateError<T, cggmp21_keygen::key_share::InvalidCoreShare>>
-    for InvalidKeyShare
-{
-    fn from(
-        err: cggmp21_keygen::key_share::ValidateError<
-            T,
-            cggmp21_keygen::key_share::InvalidCoreShare,
-        >,
-    ) -> Self {
+impl<T> From<ValidateError<T, InvalidIncompleteKeyShare>> for InvalidKeyShare {
+    fn from(err: ValidateError<T, InvalidIncompleteKeyShare>) -> Self {
         err.into_error().into()
     }
 }
 
-impl<T> From<cggmp21_keygen::key_share::ValidateError<T, InvalidKeyShare>> for InvalidKeyShare {
+impl<T> From<ValidateError<T, InvalidKeyShare>> for InvalidKeyShare {
     fn from(err: cggmp21_keygen::key_share::ValidateError<T, InvalidKeyShare>) -> Self {
         err.into_error()
     }
