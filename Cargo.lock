@@ -881,7 +881,7 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.1.2"
-source = "git+https://github.com/dfns/generic-ec?branch=small-impos#b3b192ba6925b7c52d6bee78b193020b0bfd378b"
+source = "git+https://github.com/dfns/generic-ec?branch=m#aea13ae9bd6b98e909124bd830ce85d945c18e51"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -912,7 +912,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.1"
-source = "git+https://github.com/dfns/generic-ec?branch=small-impos#b3b192ba6925b7c52d6bee78b193020b0bfd378b"
+source = "git+https://github.com/dfns/generic-ec?branch=m#aea13ae9bd6b98e909124bd830ce85d945c18e51"
 dependencies = [
  "crypto-bigint",
  "elliptic-curve",

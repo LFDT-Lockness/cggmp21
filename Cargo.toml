@@ -9,4 +9,4 @@ members = [
 
 [patch.crates-io.generic-ec]
 git = "https://github.com/dfns/generic-ec"
-branch = "small-impos"
+branch = "m"
