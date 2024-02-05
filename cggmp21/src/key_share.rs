@@ -21,10 +21,10 @@ pub use cggmp21_keygen::key_share::{
 
 /// Key share
 ///
-#[doc = include_str!("../docs/key_share.md")]
+#[doc = include_str!("../../docs/key_share.md")]
 ///
-#[doc = include_str!("../docs/validated_key_share_note.md")]
-#[doc = include_str!("../docs/validated_key_share_disclaimer.md")]
+#[doc = include_str!("../../docs/validated_key_share_note.md")]
+#[doc = include_str!("../../docs/validated_key_share_disclaimer.md")]
 pub type KeyShare<E, L = crate::default_choice::SecurityLevel> = Valid<DirtyKeyShare<E, L>>;
 
 /// Auxiliary information
@@ -49,7 +49,7 @@ pub struct DirtyAuxInfo<L: SecurityLevel = crate::default_choice::SecurityLevel>
 
 /// Dirty (unvalidated) key share
 ///
-#[doc = include_str!("../docs/key_share.md")]
+#[doc = include_str!("../../docs/key_share.md")]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct DirtyKeyShare<E: Curve, L: SecurityLevel = crate::default_choice::SecurityLevel> {

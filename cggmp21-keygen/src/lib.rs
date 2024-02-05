@@ -40,7 +40,7 @@ mod default_choice {
     pub type SecurityLevel = crate::security_level::SecurityLevel128;
 }
 
-#[doc = include_str!("../../cggmp21/docs/mpc_message.md")]
+#[doc = include_str!("../../docs/mpc_message.md")]
 pub mod msg {
     /// Messages types related to non threshold DKG protocol
     pub mod non_threshold {
@@ -178,7 +178,7 @@ where
         self
     }
 
-    #[doc = include_str!("../../cggmp21/docs/enforce_reliable_broadcast.md")]
+    #[doc = include_str!("../../docs/enforce_reliable_broadcast.md")]
     pub fn enforce_reliable_broadcast(self, enforce: bool) -> Self {
         Self {
             reliable_broadcast_enforced: enforce,
