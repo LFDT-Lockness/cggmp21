@@ -80,7 +80,6 @@ pub struct DirtyCoreKeyShare<E: Curve> {
     pub i: u16,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
-    // #[cfg_attr(feature = "serde", serde_as(as = "generic_ec::serde::Compact"))]
     pub shared_public_key: Point<E>,
     /// Public shares of all signers sharing the key
     ///
