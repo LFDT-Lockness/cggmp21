@@ -1,18 +1,19 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
-use generic_ec_zkp::schnorr_pok;
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
+use generic_ec_zkp::{polynomial::Polynomial, schnorr_pok};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
     Outgoing, ProtocolMessage,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 use crate::progress::Tracer;
 use crate::{
     errors::IoError,
-    key_share::{DirtyIncompleteKeyShare, IncompleteKeyShare},
+    key_share::{CoreKeyShare, DirtyCoreKeyShare, Validate, VssSetup},
     security_level::SecurityLevel,
     utils, ExecutionId,
 };
@@ -25,48 +26,57 @@ use super::{Bug, KeygenAborted, KeygenError};
 pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     /// Round 1 message
     Round1(MsgRound1<D>),
-    /// Reliability check message (optional additional round)
-    ReliabilityCheck(MsgReliabilityCheck<D>),
-    /// Round 2 message
-    Round2(MsgRound2<E, L>),
+    /// Round 2a message
+    Round2Broad(MsgRound2Broad<E, L>),
+    /// Round 2b message
+    Round2Uni(MsgRound2Uni<E>),
     /// Round 3 message
     Round3(MsgRound3<E>),
+    /// Reliability check message (optional additional round)
+    ReliabilityCheck(MsgReliabilityCheck<D>),
 }
 
 /// Message from round 1
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
-#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round1")]
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
 pub struct MsgRound1<D: Digest> {
     /// $V_i$
     #[udigest(as_bytes)]
     pub commitment: digest::Output<D>,
 }
-/// Message from round 2
-#[serde_with::serde_as]
+/// Message from round 2 broadcasted to everyone
+#[serde_as]
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
-#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round2")]
-pub struct MsgRound2<E: Curve, L: SecurityLevel> {
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
+pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// `rid_i`
-    #[serde_as(as = "utils::serde::HexOrBin")]
+    #[serde_as(as = "utils::HexOrBin")]
     #[udigest(as_bytes)]
     pub rid: L::Rid,
-    /// $X_i$
-    pub X: Point<E>,
+    /// $\vec S_i$
+    pub F: Polynomial<Point<E>>,
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
     /// Party contribution to chain code
     #[cfg(feature = "hd-wallets")]
-    #[serde_as(as = "Option<utils::serde::HexOrBin>")]
+    #[serde_as(as = "Option<utils::HexOrBin>")]
     #[udigest(with = utils::encoding::maybe_bytes)]
     pub chain_code: Option<slip_10::ChainCode>,
     /// $u_i$
     #[serde(with = "hex::serde")]
     #[udigest(as_bytes)]
     pub decommit: L::Rid,
+}
+/// Message from round 2 unicasted to each party
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct MsgRound2Uni<E: Curve> {
+    /// $\sigma_{i,j}$
+    pub sigma: Scalar<E>,
 }
 /// Message from round 3
 #[derive(Clone, Serialize, Deserialize)]
@@ -81,7 +91,7 @@ pub struct MsgRound3<E: Curve> {
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 #[derive(udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.tag")]
+#[udigest(tag = "dfns.cggmp21.keygen.threshold.tag")]
 enum Tag<'a> {
     /// Tag that includes the prover index
     Indexed {
@@ -96,16 +106,17 @@ enum Tag<'a> {
     },
 }
 
-pub async fn run_keygen<E, R, M, L, D>(
+pub async fn run_threshold_keygen<E, R, M, L, D>(
     mut tracer: Option<&mut dyn Tracer>,
     i: u16,
+    t: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
     execution_id: ExecutionId<'_>,
     rng: &mut R,
     party: M,
     #[cfg(feature = "hd-wallets")] hd_enabled: bool,
-) -> Result<IncompleteKeyShare<E>, KeygenError>
+) -> Result<CoreKeyShare<E>, KeygenError>
 where
     E: Curve,
     L: SecurityLevel,
@@ -122,7 +133,8 @@ where
     let mut rounds = RoundsRouter::<Msg<E, L, D>>::builder();
     let round1 = rounds.add_round(RoundInput::<MsgRound1<D>>::broadcast(i, n));
     let round1_sync = rounds.add_round(RoundInput::<MsgReliabilityCheck<D>>::broadcast(i, n));
-    let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L>>::broadcast(i, n));
+    let round2_broad = rounds.add_round(RoundInput::<MsgRound2Broad<E, L>>::broadcast(i, n));
+    let round2_uni = rounds.add_round(RoundInput::<MsgRound2Uni<E>>::p2p(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::broadcast(i, n));
     let mut rounds = rounds.listen(incomings);
 
@@ -139,12 +151,21 @@ where
     };
     let tag_i = tag(i);
 
-    tracer.stage("Sample x_i, rid_i, chain_code");
-    let x_i = SecretScalar::<E>::random(rng);
-    let X_i = Point::generator() * &x_i;
-
+    tracer.stage("Sample rid_i, schnorr commitment, polynomial, chain_code");
     let mut rid = L::Rid::default();
     rng.fill_bytes(rid.as_mut());
+
+    let (r, h) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
+
+    let f = Polynomial::<SecretScalar<E>>::sample(rng, usize::from(t) - 1);
+    let F = &f * &Point::generator();
+    let sigmas = (0..n)
+        .map(|j| {
+            let x = Scalar::from(j + 1);
+            f.value(&x)
+        })
+        .collect::<Vec<_>>();
+    debug_assert_eq!(sigmas.len(), usize::from(n));
 
     #[cfg(feature = "hd-wallets")]
     let chain_code_local = if hd_enabled {
@@ -155,14 +176,11 @@ where
         None
     };
 
-    tracer.stage("Sample schnorr commitment");
-    let (sch_secret, sch_commit) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
-
     tracer.stage("Commit to public data");
-    let my_decommitment = MsgRound2 {
+    let my_decommitment = MsgRound2Broad {
         rid,
-        X: X_i,
-        sch_commit,
+        F: F.clone(),
+        sch_commit: h,
         #[cfg(feature = "hd-wallets")]
         chain_code: chain_code_local,
         decommit: {
@@ -172,11 +190,11 @@ where
         },
     };
     let hash_commit = tag_i.clone().digest(&my_decommitment);
+
+    tracer.send_msg();
     let my_commitment = MsgRound1 {
         commitment: hash_commit,
     };
-
-    tracer.send_msg();
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
         .await
@@ -211,16 +229,16 @@ where
         tracer.round_begins();
 
         tracer.receive_msgs();
-        let round1_hashes = rounds
+        let hashes = rounds
             .complete(round1_sync)
             .await
             .map_err(IoError::receive_message)?;
         tracer.msgs_received();
 
         tracer.stage("Assert other parties hashed messages (reliability check)");
-        let parties_have_different_hashes = round1_hashes
+        let parties_have_different_hashes = hashes
             .into_iter_indexed()
-            .filter(|(_j, _msg_id, hash_j)| hash_j.0 != h_i)
+            .filter(|(_j, _msg_id, h_j)| h_i != h_j.0)
             .map(|(j, msg_id, _)| (j, msg_id))
             .collect::<Vec<_>>();
         if !parties_have_different_hashes.is_empty() {
@@ -230,9 +248,21 @@ where
 
     tracer.send_msg();
     outgoings
-        .send(Outgoing::broadcast(Msg::Round2(my_decommitment.clone())))
+        .send(Outgoing::broadcast(Msg::Round2Broad(
+            my_decommitment.clone(),
+        )))
         .await
         .map_err(IoError::send_message)?;
+
+    for j in utils::iter_peers(i, n) {
+        let message = MsgRound2Uni {
+            sigma: sigmas[usize::from(j)],
+        };
+        outgoings
+            .send(Outgoing::p2p(j, Msg::Round2Uni(message)))
+            .await
+            .map_err(IoError::send_message)?;
+    }
     tracer.msg_sent();
 
     // Round 3
@@ -240,7 +270,11 @@ where
 
     tracer.receive_msgs();
     let decommitments = rounds
-        .complete(round2)
+        .complete(round2_broad)
+        .await
+        .map_err(IoError::receive_message)?;
+    let sigmas_msg = rounds
+        .complete(round2_uni)
         .await
         .map_err(IoError::receive_message)?;
     tracer.msgs_received();
@@ -254,9 +288,37 @@ where
         return Err(KeygenAborted::InvalidDecommitment(blame).into());
     }
 
+    tracer.stage("Validate data size");
+    let blame = decommitments
+        .iter_indexed()
+        .filter(|(_, _, d)| d.F.degree() + 1 != usize::from(t))
+        .map(|t| t.0)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeygenAborted::InvalidDataSize { parties: blame }.into());
+    }
+
+    tracer.stage("Validate Feldmann VSS");
+    let blame = decommitments
+        .iter_indexed()
+        .zip(sigmas_msg.iter())
+        .filter(|((_, _, d), s)| {
+            d.F.value::<_, Point<_>>(&Scalar::from(i + 1)) != Point::generator() * s.sigma
+        })
+        .map(|t| t.0 .0)
+        .collect::<Vec<_>>();
+    if !blame.is_empty() {
+        return Err(KeygenAborted::FeldmanVerificationFailed { parties: blame }.into());
+    }
+
+    tracer.stage("Compute rid");
+    let rid = decommitments
+        .iter_including_me(&my_decommitment)
+        .map(|d| &d.rid)
+        .fold(L::Rid::default(), utils::xor_array);
     #[cfg(feature = "hd-wallets")]
     let chain_code = if hd_enabled {
-        tracer.stage("Calculate chain_code");
+        tracer.stage("Compute chain_code");
         let blame = utils::collect_simple_blame(&decommitments, |decom| decom.chain_code.is_none());
         if !blame.is_empty() {
             return Err(KeygenAborted::MissingChainCode(blame).into());
@@ -273,36 +335,47 @@ where
     } else {
         None
     };
-
-    tracer.stage("Calculate challege rid");
-    let rid = decommitments
+    tracer.stage("Compute Ys");
+    let polynomial_sum = decommitments
         .iter_including_me(&my_decommitment)
-        .map(|d| &d.rid)
-        .fold(L::Rid::default(), utils::xor_array);
+        .map(|d| &d.F)
+        .sum::<Polynomial<_>>();
+    let ys = (0..n)
+        .map(|l| polynomial_sum.value(&Scalar::from(l + 1)))
+        .collect::<Vec<_>>();
+    tracer.stage("Compute sigma");
+    let sigma: Scalar<E> = sigmas_msg.iter().map(|msg| msg.sigma).sum();
+    let mut sigma = sigma + sigmas[usize::from(i)];
+    let sigma = SecretScalar::new(&mut sigma);
+    debug_assert_eq!(Point::generator() * &sigma, ys[usize::from(i)]);
+
+    tracer.stage("Calculate challenge");
     let challenge = {
         let hash = |d: D| {
             d.chain_update(sid)
                 .chain_update(i.to_be_bytes())
                 .chain_update(rid.as_ref())
+                .chain_update(&ys[usize::from(i)].to_bytes(true)) // y_i
+                .chain_update(&my_decommitment.sch_commit.0.to_bytes(false)) // h
                 .finalize()
         };
-        let mut rng = paillier_zk::rng::HashRng::new(hash);
+        let mut rng = crate::rng::HashRng::new(hash);
         Scalar::random(&mut rng)
     };
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
-    tracer.stage("Prove knowledge of `x_i`");
-    let sch_proof = schnorr_pok::prove(&sch_secret, &challenge, &x_i);
+    tracer.stage("Prove knowledge of `sigma_i`");
+    let z = schnorr_pok::prove(&r, &challenge, &sigma);
 
     tracer.send_msg();
-    let my_sch_proof = MsgRound3 { sch_proof };
+    let my_sch_proof = MsgRound3 { sch_proof: z };
     outgoings
         .send(Outgoing::broadcast(Msg::Round3(my_sch_proof.clone())))
         .await
         .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
-    // Round 4
+    // Output round
     tracer.round_begins();
 
     tracer.receive_msgs();
@@ -319,39 +392,48 @@ where
                 d.chain_update(sid)
                     .chain_update(j.to_be_bytes())
                     .chain_update(rid.as_ref())
+                    .chain_update(&ys[usize::from(j)].to_bytes(true)) // y_i
+                    .chain_update(&decom.sch_commit.0.to_bytes(false)) // h
                     .finalize()
             };
-            let mut rng = paillier_zk::rng::HashRng::new(hash);
+            let mut rng = crate::rng::HashRng::new(hash);
             Scalar::random(&mut rng)
         };
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         sch_proof
             .sch_proof
-            .verify(&decom.sch_commit, &challenge, &decom.X)
+            .verify(&decom.sch_commit, &challenge, &ys[usize::from(j)])
             .is_err()
     });
     if !blame.is_empty() {
         return Err(KeygenAborted::InvalidSchnorrProof(blame).into());
     }
 
+    tracer.stage("Derive resulting public key and other data");
+    let y: Point<E> = decommitments
+        .iter_including_me(&my_decommitment)
+        .map(|d| d.F.coefs()[0])
+        .sum();
+    let key_shares_indexes = (1..=n)
+        .map(|i| NonZero::from_scalar(Scalar::from(i)))
+        .collect::<Option<Vec<_>>>()
+        .ok_or(Bug::NonZeroScalar)?;
+
     tracer.protocol_ends();
 
-    Ok(DirtyIncompleteKeyShare {
+    Ok(DirtyCoreKeyShare {
         curve: Default::default(),
         i,
-        shared_public_key: decommitments
-            .iter_including_me(&my_decommitment)
-            .map(|d| d.X)
-            .sum(),
-        public_shares: decommitments
-            .iter_including_me(&my_decommitment)
-            .map(|d| d.X)
-            .collect(),
-        x: x_i,
-        vss_setup: None,
+        shared_public_key: y,
+        public_shares: ys,
+        vss_setup: Some(VssSetup {
+            min_signers: t,
+            I: key_shares_indexes,
+        }),
         #[cfg(feature = "hd-wallets")]
         chain_code,
+        x: sigma,
     }
-    .try_into()
-    .map_err(Bug::InvalidKeyShare)?)
+    .validate()
+    .map_err(|err| Bug::InvalidKeyShare(err.into_error()))?)
 }

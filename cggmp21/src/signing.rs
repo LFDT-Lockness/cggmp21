@@ -105,7 +105,7 @@ pub struct Signature<E: Curve> {
     pub s: NonZero<Scalar<E>>,
 }
 
-#[doc = include_str!("../docs/mpc_message.md")]
+#[doc = include_str!("../../docs/mpc_message.md")]
 pub mod msg {
     use digest::Digest;
     use generic_ec::Curve;
@@ -283,7 +283,7 @@ where
         self
     }
 
-    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    #[doc = include_str!("../../docs/enforce_reliable_broadcast.md")]
     pub fn enforce_reliable_broadcast(self, v: bool) -> Self {
         Self {
             enforce_reliable_broadcast: v,

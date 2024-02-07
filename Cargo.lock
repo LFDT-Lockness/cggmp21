@@ -277,8 +277,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
+ "cggmp21-keygen",
  "digest",
  "futures",
  "generic-ec",
@@ -290,6 +291,26 @@ dependencies = [
  "rand_chacha",
  "rand_core",
  "rand_dev",
+ "round-based",
+ "serde",
+ "serde_with 2.3.3",
+ "sha2",
+ "slip-10",
+ "thiserror",
+ "udigest",
+]
+
+[[package]]
+name = "cggmp21-keygen"
+version = "0.1.0"
+dependencies = [
+ "digest",
+ "futures",
+ "generic-ec",
+ "generic-ec-zkp",
+ "hex",
+ "key-share",
+ "rand_core",
  "round-based",
  "serde",
  "serde_with 2.3.3",
@@ -859,9 +880,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81960ce6c780f5a63f6ab4e94b3b34212f839ce7e7768b953413e4ee3c4d1438"
+checksum = "e61335b136fd9559af4284e642c081c2845e1f92650909eeec1fb47a8945a3f7"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -891,9 +912,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-curves"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15d2e666dc9d9ac12f101e119490ff6f6577a25c3a3e43ba901e51b18203d128"
+checksum = "a01b7dc4d4f06522f1c2bd8170c978f555a317c0e6c6f141b8b4f3db63c8c302"
 dependencies = [
  "crypto-bigint",
  "elliptic-curve",
@@ -1252,6 +1273,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f6d5ed8676d904364de097082f4e7d240b571b67989ced0240f08b7f966f940"
 dependencies = [
  "cpufeatures",
+]
+
+[[package]]
+name = "key-share"
+version = "0.1.0"
+dependencies = [
+ "generic-ec",
+ "generic-ec-zkp",
+ "hex",
+ "serde",
+ "serde_with 2.3.3",
+ "slip-10",
+ "thiserror",
 ]
 
 [[package]]

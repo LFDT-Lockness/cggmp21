@@ -36,7 +36,7 @@ use thiserror::Error;
 use crate::{
     key_share::{
         AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, IncompleteKeyShare, InvalidKeyShare,
-        KeyShare, PartyAux, VssSetup,
+        KeyShare, PartyAux, Validate, VssSetup,
     },
     security_level::SecurityLevel,
     utils,
@@ -218,8 +218,8 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
                     #[cfg(feature = "hd-wallets")]
                     chain_code,
                 }
-                .try_into()
-                .map_err(Reason::InvalidKeyShare)
+                .validate()
+                .map_err(|err| Reason::InvalidKeyShare(err.into_error().into()))
             })
             .collect::<Result<Vec<_>, _>>()?)
     }
@@ -247,9 +247,9 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         let key_shares = core_key_shares
             .into_iter()
             .zip(aux_data)
-            .map(|(core_key_share, aux_data)| KeyShare::make(core_key_share, aux_data))
+            .map(|(core, aux)| KeyShare::from_parts((core, aux)))
             .collect::<Result<Vec<_>, _>>()
-            .map_err(Reason::InvalidKeyShare)?;
+            .map_err(|err| Reason::InvalidKeyShare(err.into_error()))?;
 
         Ok(key_shares)
     }
@@ -257,7 +257,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
 
 /// Generates auxiliary data for `n` signers
 ///
-/// Auxiliary data can be used to "complete" core key share using [`KeyShare::make`] constructor.
+/// Auxiliary data can be used to "complete" core key share using [`KeyShare::from_parts`] constructor.
 ///
 /// `enable_multiexp` and `enable_crt` flags configure whether to enable [multiexp](TrustedDealerBuilder::enable_multiexp)
 /// and [CRT](TrustedDealerBuilder::enable_crt) optimizations.
@@ -332,8 +332,8 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
                 parties: public_aux_data,
                 security_level: PhantomData,
             }
-            .try_into()
-            .map_err(Reason::InvalidKeyShare)
+            .validate()
+            .map_err(|err| Reason::InvalidKeyShare(err.into_error()))
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(TrustedDealerError)

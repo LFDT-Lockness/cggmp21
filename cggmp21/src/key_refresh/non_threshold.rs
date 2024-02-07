@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 use crate::{
     errors::IoError,
-    key_share::{AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, KeyShare, PartyAux},
+    key_share::{DirtyAuxInfo, DirtyIncompleteKeyShare, KeyShare, PartyAux, Validate},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -661,8 +661,8 @@ where
         x: SecretScalar::new(&mut x_star),
         ..old_core_share
     }
-    .try_into()
-    .map_err(Bug::InvalidShareGenerated)?;
+    .validate()
+    .map_err(|err| Bug::InvalidShareGenerated(err.into_error().into()))?;
     tracer.stage("Assemble auxiliary info");
     let mut party_auxes = decommitments
         .iter_including_me(&decommitment)
@@ -675,14 +675,12 @@ where
         })
         .collect::<Vec<_>>();
     party_auxes[usize::from(i)].crt = crt;
-    let mut aux: AuxInfo<L> = DirtyAuxInfo {
+    let mut aux = DirtyAuxInfo {
         p,
         q,
         parties: party_auxes,
         security_level: std::marker::PhantomData,
-    }
-    .try_into()
-    .map_err(Bug::InvalidShareGenerated)?;
+    };
 
     if build_multiexp_tables {
         tracer.stage("Build multiexp tables");
@@ -691,8 +689,13 @@ where
             .map_err(Bug::BuildMultiexpTables)?;
     }
 
+    let aux = aux
+        .validate()
+        .map_err(|err| Bug::InvalidShareGenerated(err.into_error()))?;
+
     tracer.stage("Assemble key share");
-    let key_share = KeyShare::make(new_core_share, aux).map_err(Bug::InvalidShareGenerated)?;
+    let key_share = KeyShare::from_parts((new_core_share, aux))
+        .map_err(|err| Bug::InvalidShareGenerated(err.into_error()))?;
 
     tracer.protocol_ends();
     Ok(key_share)

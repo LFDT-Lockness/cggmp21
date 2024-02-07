@@ -1,4 +1,4 @@
-use cggmp21::{security_level::SecurityLevel128, signing::msg::Msg};
+use cggmp21::{key_share::AnyKeyShare, security_level::SecurityLevel128, signing::msg::Msg};
 use cggmp21_tests::{convert_from_stark_scalar, convert_stark_scalar};
 use generic_ec::{coords::HasAffineX, curves::Stark};
 use rand::{seq::SliceRandom, Rng, SeedableRng};

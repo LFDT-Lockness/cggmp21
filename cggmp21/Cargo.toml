@@ -1,6 +1,6 @@
 [package]
 name = "cggmp21"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "TSS ECDSA implementation based on CGGMP21 paper"
@@ -12,6 +12,8 @@ readme = "../README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cggmp21-keygen = { path = "../cggmp21-keygen" }
+
 generic-ec = { version = "0.1", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.1", features = ["serde", "udigest"] }
 round-based = { version = "0.2", features = ["derive"] }
@@ -48,7 +50,7 @@ all-curves = ["curve-secp256k1", "curve-secp256r1", "curve-stark"]
 curve-secp256k1 = ["generic-ec/curve-secp256k1"]
 curve-secp256r1 = ["generic-ec/curve-secp256r1"]
 curve-stark = ["generic-ec/curve-stark"]
-hd-wallets = ["dep:slip-10"]
+hd-wallets = ["dep:slip-10", "cggmp21-keygen/hd-wallets"]
 spof = []
 
 [package.metadata.docs.rs]

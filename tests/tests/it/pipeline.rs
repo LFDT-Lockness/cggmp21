@@ -6,15 +6,12 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::keygen::ThresholdMsg;
     use cggmp21::{
-        key_share::{IncompleteKeyShare, KeyShare},
+        key_share::{AnyKeyShare, IncompleteKeyShare, KeyShare},
+        keygen::ThresholdMsg,
         security_level::SecurityLevel128,
         ExecutionId,
     };
-
-    type Share<E> = KeyShare<E>;
-    type Incomplete<E> = IncompleteKeyShare<E>;
 
     #[test_case::case(2, 3, false; "t2n3")]
     #[test_case::case(3, 5, false; "t3n5")]
@@ -30,7 +27,12 @@ mod generic {
         run_signing(&shares, hd_enabled, &mut rng).await;
     }
 
-    async fn run_keygen<E>(t: u16, n: u16, hd_enabled: bool, rng: &mut DevRng) -> Vec<Incomplete<E>>
+    async fn run_keygen<E>(
+        t: u16,
+        n: u16,
+        hd_enabled: bool,
+        rng: &mut DevRng,
+    ) -> Vec<IncompleteKeyShare<E>>
     where
         E: Curve,
     {
@@ -62,7 +64,10 @@ mod generic {
             .expect("keygen failed")
     }
 
-    async fn run_aux_gen<E>(shares: Vec<Incomplete<E>>, rng: &mut DevRng) -> Vec<Share<E>>
+    async fn run_aux_gen<E>(
+        shares: Vec<IncompleteKeyShare<E>>,
+        rng: &mut DevRng,
+    ) -> Vec<KeyShare<E>>
     where
         E: Curve,
     {
@@ -93,11 +98,13 @@ mod generic {
         shares
             .into_iter()
             .zip(aux_infos.into_iter())
-            .map(|(core, aux)| Share::make(core, aux).expect("Couldn't make share from parts"))
+            .map(|(core, aux)| {
+                KeyShare::from_parts((core, aux)).expect("Couldn't make share from parts")
+            })
             .collect()
     }
 
-    async fn run_signing<E>(shares: &[Share<E>], random_derivation_path: bool, rng: &mut DevRng)
+    async fn run_signing<E>(shares: &[KeyShare<E>], random_derivation_path: bool, rng: &mut DevRng)
     where
         E: Curve,
         Point<E>: generic_ec::coords::HasAffineX<E>,

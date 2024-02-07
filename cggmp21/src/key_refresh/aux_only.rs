@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::IoError,
-    key_share::{AuxInfo, DirtyAuxInfo, PartyAux},
+    key_share::{AuxInfo, DirtyAuxInfo, PartyAux, Validate},
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -470,14 +470,12 @@ where
         })
         .collect::<Vec<_>>();
     party_auxes[usize::from(i)].crt = crt;
-    let mut aux: AuxInfo<L> = DirtyAuxInfo {
+    let mut aux = DirtyAuxInfo {
         p,
         q,
         parties: party_auxes,
         security_level: std::marker::PhantomData,
-    }
-    .try_into()
-    .map_err(Bug::InvalidShareGenerated)?;
+    };
 
     if compute_multiexp_table {
         tracer.stage("Precompute multiexp tables");
@@ -485,6 +483,10 @@ where
         aux.precompute_multiexp_tables()
             .map_err(Bug::BuildMultiexpTables)?;
     }
+
+    let aux = aux
+        .validate()
+        .map_err(|err| Bug::InvalidShareGenerated(err.into_error()))?;
 
     tracer.protocol_ends();
     Ok(aux)

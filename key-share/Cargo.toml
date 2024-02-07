@@ -1,0 +1,22 @@
+[package]
+name = "key-share"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+generic-ec = "0.1.3"
+generic-ec-zkp = "0.1"
+
+slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true, features = ["std"] }
+
+serde = { version = "1", features = ["derive"], optional = true }
+hex = { version = "0.4", default-features = false, features = ["serde"], optional = true }
+serde_with = { version = "2", optional = true}
+
+thiserror = "1"
+
+[features]
+serde = ["dep:serde", "serde_with", "hex"]
+hd-wallets = ["slip-10"]

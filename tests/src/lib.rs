@@ -169,8 +169,7 @@ pub fn convert_from_stark_scalar(
 pub fn random_derivation_path(rng: &mut impl rand::RngCore) -> Vec<u32> {
     use rand::Rng;
     let len = rng.gen_range(1..=3);
-    let path = std::iter::repeat_with(|| rng.gen_range(0..cggmp21::slip_10::H))
+    std::iter::repeat_with(|| rng.gen_range(0..cggmp21::slip_10::H))
         .take(len)
-        .collect::<Vec<_>>();
-    path
+        .collect::<Vec<_>>()
 }

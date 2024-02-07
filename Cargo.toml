@@ -2,5 +2,8 @@
 resolver = "2"
 members = [
     "cggmp21",
+    "cggmp21-keygen",
+    "key-share",
     "tests",
 ]
+

@@ -6,7 +6,11 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
-    use cggmp21::{security_level::SecurityLevel128, ExecutionId};
+    use cggmp21::{
+        key_share::{DirtyKeyShare, Validate},
+        security_level::SecurityLevel128,
+        ExecutionId,
+    };
 
     #[test_case::case(3, false; "n3")]
     #[test_case::case(5, false; "n5")]
@@ -157,7 +161,14 @@ mod generic {
         let key_shares = shares
             .into_iter()
             .zip(aux_infos.into_iter())
-            .map(|(share, aux)| share.update_aux(aux).unwrap())
+            .map(|(share, aux)| {
+                DirtyKeyShare {
+                    core: share.into_inner().core,
+                    aux: aux.into_inner(),
+                }
+                .validate()
+                .unwrap()
+            })
             .collect::<Vec<_>>();
 
         // attempt to sign with new shares and verify the signature

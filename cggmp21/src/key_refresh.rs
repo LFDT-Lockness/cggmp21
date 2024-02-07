@@ -24,7 +24,7 @@ use crate::{fast_paillier, rug::Integer};
 #[doc(no_inline)]
 pub use self::msg::{aux_only::Msg as AuxOnlyMsg, non_threshold::Msg as NonThresholdMsg};
 
-#[doc = include_str!("../docs/mpc_message.md")]
+#[doc = include_str!("../../docs/mpc_message.md")]
 pub mod msg {
     /// Messages types related to aux information generation protocol
     pub mod aux_only {
@@ -52,7 +52,7 @@ pub struct PregeneratedPrimes<L = crate::default_choice::SecurityLevel> {
 impl<L: SecurityLevel> PregeneratedPrimes<L> {
     /// Constructs pregenerated primes from two big numbers
     ///
-    /// Returns `None` if big numbers are smaller than 4 * [L::SECURITY_BITS](SecurityLevel::SECURITY_BITS)
+    /// Returns `None` if big numbers are smaller than 4 * [L::SECURITY_BITS](crate::security_level::KeygenSecurityLevel::SECURITY_BITS)
     ///
     /// Function doesn't validate that provided numbers are primes. If they're not,
     /// key refresh protocol should fail with some ZK proof error.
@@ -248,7 +248,7 @@ where
         self
     }
 
-    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    #[doc = include_str!("../../docs/enforce_reliable_broadcast.md")]
     pub fn enforce_reliable_broadcast(self, v: bool) -> Self {
         Self {
             enforce_reliable_broadcast: v,

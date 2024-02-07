@@ -1,9 +1,18 @@
-//! Threshold and non-threshold DKG
+//! Threshold and non-threshold CGGMP21 DKG
+#![allow(non_snake_case, clippy::too_many_arguments)]
+
+pub mod progress;
+pub mod security_level;
 
 /// Non-threshold DKG specific types
 mod non_threshold;
 /// Threshold DKG specific types
 mod threshold;
+
+mod errors;
+mod execution_id;
+mod rng;
+mod utils;
 
 use digest::Digest;
 use generic_ec::Curve;
@@ -11,29 +20,35 @@ use rand_core::{CryptoRng, RngCore};
 use round_based::{Mpc, MsgId, PartyIndex};
 use thiserror::Error;
 
+#[doc(inline)]
+pub use key_share;
+
 use crate::progress::Tracer;
-use crate::utils;
 use crate::{
     errors::IoError,
-    key_share::{IncompleteKeyShare, InvalidKeyShare},
+    key_share::{CoreKeyShare, InvalidCoreShare},
     security_level::SecurityLevel,
-    ExecutionId,
 };
 
+pub use self::execution_id::ExecutionId;
 #[doc(no_inline)]
 pub use self::msg::{non_threshold::Msg as NonThresholdMsg, threshold::Msg as ThresholdMsg};
 
-#[doc = include_str!("../docs/mpc_message.md")]
+/// Defines default choice for digest and security level used across the crate
+mod default_choice {
+    pub type Digest = sha2::Sha256;
+    pub type SecurityLevel = crate::security_level::SecurityLevel128;
+}
+
+#[doc = include_str!("../../docs/mpc_message.md")]
 pub mod msg {
     /// Messages types related to non threshold DKG protocol
     pub mod non_threshold {
-        pub use crate::keygen::non_threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3,
-        };
+        pub use crate::non_threshold::{Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3};
     }
     /// Messages types related to threshold DKG protocol
     pub mod threshold {
-        pub use crate::keygen::threshold::{
+        pub use crate::threshold::{
             Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
         };
     }
@@ -163,7 +178,7 @@ where
         self
     }
 
-    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    #[doc = include_str!("../../docs/enforce_reliable_broadcast.md")]
     pub fn enforce_reliable_broadcast(self, enforce: bool) -> Self {
         Self {
             reliable_broadcast_enforced: enforce,
@@ -186,11 +201,7 @@ where
     D: Digest + Clone + 'static,
 {
     /// Starts key generation
-    pub async fn start<R, M>(
-        self,
-        rng: &mut R,
-        party: M,
-    ) -> Result<IncompleteKeyShare<E>, KeygenError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<CoreKeyShare<E>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
@@ -217,11 +228,7 @@ where
     D: Digest + Clone + 'static,
 {
     /// Starts threshold key generation
-    pub async fn start<R, M>(
-        self,
-        rng: &mut R,
-        party: M,
-    ) -> Result<IncompleteKeyShare<E>, KeygenError>
+    pub async fn start<R, M>(self, rng: &mut R, party: M) -> Result<CoreKeyShare<E>, KeygenError>
     where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
@@ -294,10 +301,18 @@ enum KeygenAborted {
 #[derive(Debug, Error)]
 enum Bug {
     #[error("resulting key share is not valid")]
-    InvalidKeyShare(#[source] InvalidKeyShare),
+    InvalidKeyShare(#[source] InvalidCoreShare),
     #[error("unexpected zero value")]
     NonZeroScalar,
     #[cfg(feature = "hd-wallets")]
     #[error("chain code is missing although we checked that it should be present")]
     NoChainCode,
+}
+
+/// Distributed key generation protocol
+///
+/// Each party of the protocol should have uniquely assigned index $i$ such that $0 \le i < n$
+/// (where $n$ is amount of parties in the protocol).
+pub fn keygen<E: Curve>(eid: ExecutionId, i: u16, n: u16) -> KeygenBuilder<E> {
+    KeygenBuilder::new(eid, i, n)
 }

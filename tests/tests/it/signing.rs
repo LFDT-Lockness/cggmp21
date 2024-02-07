@@ -9,6 +9,7 @@ mod generic {
     use round_based::simulation::Simulation;
     use sha2::Sha256;
 
+    use cggmp21::key_share::AnyKeyShare;
     use cggmp21::signing::{msg::Msg, DataToSign};
     use cggmp21::{security_level::SecurityLevel128, ExecutionId};
 
