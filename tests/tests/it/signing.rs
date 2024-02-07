@@ -3,8 +3,7 @@ mod generic {
     use cggmp21_tests::external_verifier::ExternalVerifier;
     use generic_ec::{coords::HasAffineX, Curve, Point};
     use rand::seq::SliceRandom;
-    use rand::{Rng, RngCore, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
+    use rand::{Rng, RngCore};
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
     use sha2::Sha256;
@@ -68,7 +67,7 @@ mod generic {
         let mut outputs = vec![];
         for (i, share) in (0..).zip(participants_shares) {
             let party = simulation.add_party();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
 
             #[cfg(feature = "hd-wallets")]
             let derivation_path = derivation_path.clone();
@@ -111,6 +110,105 @@ mod generic {
         assert!(signatures.iter().all(|s_i| signatures[0] == *s_i));
 
         V::verify(&public_key, &signatures[0], &original_message_to_sign)
+            .expect("external verification failed")
+    }
+
+    #[test_case::case(Some(3), 5, false; "t3n5")]
+    #[cfg_attr(feature = "hd-wallets", test_case::case(Some(3), 5, true; "t3n5-hd"))]
+    #[tokio::test]
+    async fn signing_with_presigs<E: Curve, V>(t: Option<u16>, n: u16, hd_wallet: bool)
+    where
+        Point<E>: HasAffineX<E>,
+        V: ExternalVerifier<E>,
+    {
+        #[cfg(not(feature = "hd-wallets"))]
+        assert!(!hd_wallet);
+
+        let mut rng = DevRng::new();
+
+        let shares = cggmp21_tests::CACHED_SHARES
+            .get_shares::<E, SecurityLevel128>(t, n, hd_wallet)
+            .expect("retrieve cached shares");
+
+        let mut simulation = Simulation::<Msg<E, Sha256>>::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
+
+        // Choose `t` signers to generate presignature
+        let t = shares[0].min_signers();
+        let mut participants = (0..n).collect::<Vec<_>>();
+        participants.shuffle(&mut rng);
+        let participants = &participants[..usize::from(t)];
+        println!("Signers: {participants:?}");
+
+        let participants_shares = participants.iter().map(|i| &shares[usize::from(*i)]);
+
+        let mut outputs = vec![];
+        for (i, share) in (0..).zip(participants_shares) {
+            let party = simulation.add_party();
+            let mut party_rng = rng.fork();
+
+            outputs.push(async move {
+                cggmp21::signing(eid, i, participants, share)
+                    .generate_presignature(&mut party_rng, party)
+                    .await
+            });
+        }
+
+        let presignatures = futures::future::try_join_all(outputs)
+            .await
+            .expect("signing failed");
+
+        // Now, that we have presignatures generated, we learn (generate) a messages to sign
+        // and the derivation path (if hd is enabled)
+        let mut original_message_to_sign = [0u8; 100];
+        rng.fill_bytes(&mut original_message_to_sign);
+        let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
+
+        #[cfg(feature = "hd-wallets")]
+        let derivation_path = if hd_wallet {
+            Some(cggmp21_tests::random_derivation_path(&mut rng))
+        } else {
+            None
+        };
+
+        let partial_signatures = presignatures
+            .into_iter()
+            .map(|presig| {
+                #[cfg(feature = "hd-wallets")]
+                let presig = if let Some(derivation_path) = &derivation_path {
+                    let epub = shares[0].extended_public_key().expect("not hd wallet");
+                    presig
+                        .set_derivation_path(epub, derivation_path.iter().copied())
+                        .unwrap()
+                } else {
+                    presig
+                };
+                presig.issue_partial_signature(message_to_sign)
+            })
+            .collect::<Vec<_>>();
+
+        let signature = cggmp21::PartialSignature::combine(&partial_signatures)
+            .expect("invalid partial sigantures");
+
+        #[cfg(feature = "hd-wallets")]
+        let public_key = if let Some(path) = &derivation_path {
+            shares[0]
+                .derive_child_public_key(path.iter().cloned())
+                .unwrap()
+                .public_key
+        } else {
+            shares[0].shared_public_key
+        };
+        #[cfg(not(feature = "hd-wallets"))]
+        let public_key = shares[0].shared_public_key;
+
+        signature
+            .verify(&public_key, &message_to_sign)
+            .expect("signature is not valid");
+
+        V::verify(&public_key, &signature, &original_message_to_sign)
             .expect("external verification failed")
     }
 

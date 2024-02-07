@@ -293,6 +293,10 @@ where
 
     /// Specifies HD derivation path
     ///
+    /// Note: when generating a presignature, derivation path doesn't need to be known in advance. Instead
+    /// of using this method, [`Presingature::set_derivation_path`] could be used to set derivation path
+    /// after presignature was generated.
+    ///
     /// ## Example
     /// Set derivation path to m/1/999
     ///
@@ -313,23 +317,12 @@ where
         slip_10::NonHardenedIndex: TryFrom<Index>,
     {
         use crate::key_share::HdError;
-
-        let mut public_key = self
+        let public_key = self
             .key_share
             .extended_public_key()
             .ok_or(HdError::DisabledHd)?;
-        let mut additive_shift = Scalar::<E>::zero();
-
-        for child_index in path {
-            let child_index: slip_10::NonHardenedIndex =
-                child_index.try_into().map_err(HdError::InvalidPath)?;
-            let shift = slip_10::derive_public_shift(&public_key, child_index);
-
-            additive_shift += shift.shift;
-            public_key = shift.child_public_key;
-        }
-
-        self.additive_shift = Some(additive_shift);
+        self.additive_shift =
+            Some(derive_additive_shift(public_key, path).map_err(HdError::InvalidPath)?);
         Ok(self)
     }
 
@@ -1154,6 +1147,53 @@ where
         let sigma_i = self.k.as_ref() * m + r * self.chi.as_ref();
         PartialSignature { r, sigma: sigma_i }
     }
+
+    /// Specifies HD derivation path
+    ///
+    /// Outputs a presignature that can be used to sign a message with a child key derived from master
+    /// `epub` using `derivation_path`. Note that all signers need to set the same derivation path,
+    /// otherwise output signature will be invalid.
+    ///
+    /// `epub` must be an [extended public key](DirtyIncompleteKeyShare::extended_public_key) assoicated
+    /// with the key share that was used to generate presignature. Using wrong `epub` will simply
+    /// lead to invalid signature.
+    #[cfg(feature = "hd-wallets")]
+    pub fn set_derivation_path<Index>(
+        mut self,
+        epub: slip_10::ExtendedPublicKey<E>,
+        derivation_path: impl IntoIterator<Item = Index>,
+    ) -> Result<Self, <Index as TryInto<slip_10::NonHardenedIndex>>::Error>
+    where
+        slip_10::NonHardenedIndex: TryFrom<Index>,
+    {
+        let additive_shift = derive_additive_shift(epub, derivation_path)?;
+
+        let mut chi = self.chi + additive_shift * &self.k;
+        self.chi = SecretScalar::new(&mut chi);
+
+        Ok(self)
+    }
+}
+
+#[cfg(feature = "hd-wallets")]
+fn derive_additive_shift<E: Curve, Index>(
+    mut epub: slip_10::ExtendedPublicKey<E>,
+    path: impl IntoIterator<Item = Index>,
+) -> Result<Scalar<E>, <Index as TryInto<slip_10::NonHardenedIndex>>::Error>
+where
+    slip_10::NonHardenedIndex: TryFrom<Index>,
+{
+    let mut additive_shift = Scalar::<E>::zero();
+
+    for child_index in path {
+        let child_index: slip_10::NonHardenedIndex = child_index.try_into()?;
+        let shift = slip_10::derive_public_shift(&epub, child_index);
+
+        additive_shift += shift.shift;
+        epub = shift.child_public_key;
+    }
+
+    Ok(additive_shift)
 }
 
 impl<E: Curve> PartialSignature<E> {
