@@ -4,8 +4,6 @@
 \usepackage{algorithm}
 \usepackage{fullpage}
 \usepackage{amsmath,amsfonts,amssymb}
-%\usepackage{geometry}
-%\usepackage{appendix,url}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{graphicx,etoolbox}
 \usepackage{hyperref,url}
@@ -1150,7 +1148,7 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
   context separation string $\sid$,
   security level $L$, curve $\E$ with generator $G$.
 
-  {\bf HD-wallets inputs:} additive $\text{shift} \in \Fq$ \footnote{Deriving additive shift is up to specific standard of HD-wallets, e.g. see \cite{bip32} or \cite{slip10}} ($\text{shift} = 0$ disables HD derivation)
+  {\bf HD-wallets inputs:} additive $\text{shift} \in \Fq$ \footnote{Deriving additive shift is up to specific standard of HD-wallets, e.g. see \cite{bip32} or \cite{slip10} \label{deriving-shift-note}} ($\text{shift} = 0$ disables HD derivation)
 
     \item[\bf Setup.] The key share $K_{S(i)}$ contains $\threshold$, number of key holders~$n$, secret share $x'_{S(i)}$, parties' public shares $\vec X' = (X'_j)_{j \in [n]}$, a map $I : [n] \to \Fq \setminus \{0\}$, Paillier secret key $\sk_{S(i)}$, parties' Paillier keys $\vec N' = (N'_j)_{j \in [n]}$, and parties' auxiliary information $\vec R' = (s_j, t_j, \hat N)_{j \in [n]}$.
 
@@ -1181,14 +1179,17 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
 
 \subsection{Signing}
 \label{sec:signing}
-The
-signing protocol has two parts: one that takes the output from the presignature protocol and a hashed message and produces a partial signature, and another that takes partial signatures and combines them to produce a signature. 
+The signing protocol has two parts: one that takes the output from the presignature protocol and a hashed message and produces a partial signature, and another that takes partial signatures and combines them to produce a signature. 
 %This separation is introduced so final signature reconstruction can be done on coordinator. Functions are defined below.
     
-\medskip\noindent{\bf Local signing.} The input is a presignature $S_i = (R, k_i, \chi_i)$ and a hashed message~$m$. Do:
-%
-%$\textsf{sign\_locally}(m, S_i) \to (r, \sigma_i)$
+\medskip\noindent{\bf Local signing.} The input is a presignature 
+  $S_i = (R, k_i, \chi_i)$,
+  a hashed message~$m$,
+  and, if HD wallets support is enabled, additive $\text{shift} \in \Fq$ \footref{deriving-shift-note} ($\text{shift} = 0$ disables HD derivation).
+  Do:
         \begin{itemize}
+            \item If {\bf HD-wallets} support enabled: \\
+              Set $\chi := \chi + k \cdot \text{shift}$
             \item Set $r = \affineX{R}$ and $\sigma_i = k m + r \chi$.
             \item Output $(r, \sigma_i)$.
         \end{itemize}

@@ -1147,7 +1147,9 @@ where
         let sigma_i = self.k.as_ref() * m + r * self.chi.as_ref();
         PartialSignature { r, sigma: sigma_i }
     }
+}
 
+impl<E: Curve> Presignature<E> {
     /// Specifies HD derivation path
     ///
     /// Outputs a presignature that can be used to sign a message with a child key derived from master
