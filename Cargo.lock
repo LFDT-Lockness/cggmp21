@@ -2033,7 +2033,8 @@ dependencies = [
 [[package]]
 name = "slip-10"
 version = "0.1.0"
-source = "git+https://github.com/dfns/slip-10?branch=m#6c6e5bf0a2a8eed063b3a7ebb4eff3a62092fe1c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4670651d286d5714497971c12d36b83d75679c39da5d5ed757ff5e1e1d45855c"
 dependencies = [
  "generic-array",
  "generic-ec",

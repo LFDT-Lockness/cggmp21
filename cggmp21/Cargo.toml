@@ -12,7 +12,7 @@ readme = "../README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cggmp21-keygen = { path = "../cggmp21-keygen" }
+cggmp21-keygen = { path = "../cggmp21-keygen", version = "0.1" }
 
 generic-ec = { version = "0.1", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.1", features = ["serde", "udigest"] }
@@ -34,7 +34,7 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_with = { version = "2" }
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
-slip-10 = { git = "https://github.com/dfns/slip-10", branch = "m", optional = true, features = ["std"] }
+slip-10 = { version = "0.1", optional = true, features = ["std"] }
 
 [dev-dependencies]
 round-based = { version = "0.2", features = ["derive", "dev"] }
