@@ -24,8 +24,7 @@
 
 use std::{iter, marker::PhantomData};
 
-use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
-use generic_ec_zkp::polynomial::Polynomial;
+use generic_ec::{Curve, SecretScalar};
 use paillier_zk::{
     rug::{Complete, Integer},
     IntegerExt,
@@ -35,8 +34,7 @@ use thiserror::Error;
 
 use crate::{
     key_share::{
-        AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, IncompleteKeyShare, InvalidKeyShare,
-        KeyShare, PartyAux, Validate, VssSetup,
+        AuxInfo, DirtyAuxInfo, IncompleteKeyShare, InvalidKeyShare, KeyShare, PartyAux, Validate,
     },
     security_level::SecurityLevel,
     utils,
@@ -51,16 +49,15 @@ pub fn builder<E: Curve, L: SecurityLevel>(n: u16) -> TrustedDealerBuilder<E, L>
     TrustedDealerBuilder::new(n)
 }
 
+type Inner<E> = key_share::trusted_dealer::TrustedDealerBuilder<E>;
+
 /// Trusted dealer builder
 pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
-    t: Option<u16>,
+    inner: Inner<E>,
     n: u16,
-    shared_secret_key: Option<SecretScalar<E>>,
     pregenerated_primes: Option<Vec<(Integer, Integer)>>,
     enable_mulitexp: bool,
     enable_crt: bool,
-    #[cfg(feature = "hd-wallets")]
-    enable_hd: bool,
     _ph: PhantomData<L>,
 }
 
@@ -70,14 +67,11 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Takes amount of key shares `n` to be generated
     pub fn new(n: u16) -> Self {
         TrustedDealerBuilder {
-            t: None,
+            inner: Inner::new(n),
             n,
-            shared_secret_key: None,
             pregenerated_primes: None,
             enable_mulitexp: false,
             enable_crt: false,
-            #[cfg(feature = "hd-wallets")]
-            enable_hd: false,
             _ph: PhantomData,
         }
     }
@@ -95,7 +89,10 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     ///
     /// Default: `None`
     pub fn set_threshold(self, t: Option<u16>) -> Self {
-        Self { t, ..self }
+        Self {
+            inner: self.inner.set_threshold(t),
+            ..self
+        }
     }
 
     /// Sets shared secret key to be generated
@@ -103,7 +100,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Resulting key shares will share specified secret key.
     pub fn set_shared_secret_key(self, sk: SecretScalar<E>) -> Self {
         Self {
-            shared_secret_key: Some(sk),
+            inner: self.inner.set_shared_secret_key(sk),
             ..self
         }
     }
@@ -143,7 +140,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     #[cfg(feature = "hd-wallets")]
     pub fn hd_wallet(self, v: bool) -> Self {
         Self {
-            enable_hd: v,
+            inner: self.inner.hd_wallet(v),
             ..self
         }
     }
@@ -156,72 +153,10 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         self,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<Vec<IncompleteKeyShare<E>>, TrustedDealerError> {
-        let shared_secret_key = self
-            .shared_secret_key
-            .unwrap_or_else(|| SecretScalar::random(rng));
-        let key_shares_indexes = (1..=self.n)
-            .map(|i| NonZero::from_scalar(Scalar::from(i)))
-            .collect::<Option<Vec<_>>>()
-            .ok_or(Reason::DeriveKeyShareIndex)?;
-        let (shared_public_key, secret_shares) = if let Some(t) = self.t {
-            let f = Polynomial::sample_with_const_term(rng, usize::from(t) - 1, shared_secret_key);
-            let pk = Point::generator() * f.value::<_, Scalar<_>>(&Scalar::zero());
-            let shares = key_shares_indexes
-                .iter()
-                .map(|I_i| f.value(I_i))
-                .map(|mut x_i| SecretScalar::new(&mut x_i))
-                .collect::<Vec<_>>();
-            (pk, shares)
-        } else {
-            let mut shares = iter::repeat_with(|| SecretScalar::<E>::random(rng))
-                .take((self.n - 1).into())
-                .collect::<Vec<_>>();
-            shares.push(SecretScalar::new(
-                &mut (shared_secret_key - shares.iter().sum::<Scalar<E>>()),
-            ));
-            let pk = shares.iter().map(|x_j| Point::generator() * x_j).sum();
-            (pk, shares)
-        };
-
-        let public_shares = secret_shares
-            .iter()
-            .map(|s_i| Point::generator() * s_i)
-            .collect::<Vec<_>>();
-
-        let vss_setup = self.t.map(|t| VssSetup {
-            min_signers: t,
-            I: key_shares_indexes,
-        });
-
-        let mut rid = L::Rid::default();
-        rng.fill_bytes(rid.as_mut());
-
-        #[cfg(feature = "hd-wallets")]
-        let chain_code = if self.enable_hd {
-            let mut code = slip_10::ChainCode::default();
-            rng.fill_bytes(&mut code);
-            Some(code)
-        } else {
-            None
-        };
-
-        Ok((0u16..)
-            .zip(secret_shares)
-            .map(|(i, x_i)| {
-                DirtyIncompleteKeyShare::<E> {
-                    curve: Default::default(),
-                    i,
-                    shared_public_key,
-                    public_shares: public_shares.clone(),
-                    x: x_i,
-                    vss_setup: vss_setup.clone(),
-                    #[cfg(feature = "hd-wallets")]
-                    chain_code,
-                }
-                .validate()
-                .map_err(|err| Reason::InvalidKeyShare(err.into_error().into()))
-            })
-            .collect::<Result<Vec<_>, _>>()?)
+        self.inner
+            .generate_shares(rng)
+            .map_err(Reason::Inner)
+            .map_err(TrustedDealerError)
     }
 
     /// Generates [`KeyShare`]s
@@ -237,7 +172,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         let enable_crt = self.enable_crt;
 
         let primes = self.pregenerated_primes.take();
-        let core_key_shares = self.generate_core_shares(rng)?;
+        let core_key_shares = self.inner.generate_shares(rng).map_err(Reason::Inner)?;
         let aux_data = if let Some(primes) = primes {
             generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)?
         } else {
@@ -350,10 +285,10 @@ enum Reason {
     InvalidKeyShare(#[source] InvalidKeyShare),
     #[error("pow mod undefined")]
     PowMod,
-    #[error("deriving key share index failed")]
-    DeriveKeyShareIndex,
     #[error("couldn't build a CRT")]
     BuildCrt(#[source] InvalidKeyShare),
     #[error("couldn't build multiexp tables")]
     BuildMultiexp(#[source] InvalidKeyShare),
+    #[error(transparent)]
+    Inner(#[from] key_share::trusted_dealer::TrustedDealerError),
 }
