@@ -21,6 +21,8 @@ use core::ops;
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient;
 
+#[cfg(feature = "spof")]
+pub mod trusted_dealer;
 mod utils;
 mod valid;
 
