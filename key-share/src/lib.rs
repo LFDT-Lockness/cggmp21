@@ -40,6 +40,20 @@ pub use self::valid::{Valid, Validate, ValidateError, ValidateFromParts};
 /// you need to obtain dirty key share via [`Valid::into_inner`], modify the key share, and validate it
 /// again to obtain `CoreKeyShare`.
 pub type CoreKeyShare<E> = Valid<DirtyCoreKeyShare<E>>;
+/// Public Key Info
+///
+/// Type alias to [`DirtyKeyInfo`] wrapped into [`Valid<T>`](Valid), meaning that the key info
+/// has been validated that:
+/// * Number of signers `n` doesn't overflow [`u16::MAX`], and that n >= 2
+/// * Threshold value is within range `2 <= t <= n`
+/// * All signers commitments sum up to public key
+///
+/// It's impossible to obtain [`KeyInfo`] that doesn't meet above requirements.
+///
+/// Only immutable access to the key info is provided. If you need to change content of the key info,
+/// you need to obtain dirty key info via [`Valid::into_inner`], modify the key info, and validate it
+/// again to obtain [`KeyInfo`].
+pub type KeyInfo<E> = Valid<DirtyKeyInfo<E>>;
 
 #[cfg(feature = "serde")]
 use serde_with::As;
@@ -119,45 +133,90 @@ pub struct VssSetup<E: Curve> {
     pub I: Vec<NonZero<Scalar<E>>>,
 }
 
+/// Public Key Info
+///
+/// Contains public information about the TSS key, including shared public key, commitments to
+/// secret shares and etc.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound = ""))]
+pub struct DirtyKeyInfo<E: Curve> {
+    /// Guard that ensures curve consistency for deseraization
+    pub curve: CurveName<E>,
+    /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
+    #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
+    pub shared_public_key: Point<E>,
+    /// Public shares of all signers sharing the key
+    ///
+    /// `public_shares[i]` corresponds to public share (or public commitment) of $\ith$ party.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "As::<Vec<generic_ec::serde::Compact>>")
+    )]
+    pub public_shares: Vec<Point<E>>,
+    /// Verifiable secret sharing setup, present if key was generated using VSS scheme
+    pub vss_setup: Option<VssSetup<E>>,
+    /// Chain code associated with the key, if HD wallets support was enabled
+    #[cfg(feature = "hd-wallets")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default),
+        serde(with = "As::<Option<utils::HexOrBin>>")
+    )]
+    pub chain_code: Option<slip_10::ChainCode>,
+}
+
 impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
     type Error = InvalidCoreShare;
 
     fn is_valid(&self) -> Result<(), Self::Error> {
-        let n: u16 = self
+        let party_public_share = self
             .public_shares
-            .len()
-            .try_into()
-            .map_err(|_| InvalidShareReason::NOverflowsU16)?;
-
-        if n < 2 {
-            return Err(InvalidShareReason::TooFewParties.into());
-        }
-        if self.i >= n {
-            return Err(InvalidShareReason::PartyIndexOutOfBounds.into());
-        }
-
-        let party_public_share = self.public_shares[usize::from(self.i)];
-        if party_public_share != Point::generator() * &self.x {
+            .get(usize::from(self.i))
+            .ok_or(InvalidShareReason::PartyIndexOutOfBounds)?;
+        if *party_public_share != Point::generator() * &self.x {
             return Err(InvalidShareReason::PartySecretShareDoesntMatchPublicShare.into());
         }
 
         match &self.vss_setup {
-            Some(vss_setup) => validate_vss_key_share(self, n, vss_setup)?,
-            None => validate_non_vss_key_share(self)?,
+            Some(vss_setup) => {
+                validate_vss_key_info(self.shared_public_key, &self.public_shares, vss_setup)?
+            }
+            None => validate_non_vss_key_info(self.shared_public_key, &self.public_shares)?,
         }
 
         Ok(())
     }
 }
 
+impl<E: Curve> Validate for DirtyKeyInfo<E> {
+    type Error = InvalidCoreShare;
+
+    fn is_valid(&self) -> Result<(), Self::Error> {
+        match &self.vss_setup {
+            Some(vss_setup) => {
+                validate_vss_key_info(self.shared_public_key, &self.public_shares, vss_setup)
+            }
+            None => validate_non_vss_key_info(self.shared_public_key, &self.public_shares),
+        }
+    }
+}
+
 #[allow(clippy::nonminimal_bool)]
-fn validate_vss_key_share<E: Curve>(
-    key_share: &DirtyCoreKeyShare<E>,
-    n: u16,
+fn validate_vss_key_info<E: Curve>(
+    shared_public_key: Point<E>,
+    public_shares: &[Point<E>],
     vss_setup: &VssSetup<E>,
 ) -> Result<(), InvalidCoreShare> {
-    let t = vss_setup.min_signers;
+    let n: u16 = public_shares
+        .len()
+        .try_into()
+        .map_err(|_| InvalidShareReason::NOverflowsU16)?;
+    if n < 2 {
+        return Err(InvalidShareReason::TooFewParties.into());
+    }
 
+    let t = vss_setup.min_signers;
     if !(2 <= t) {
         return Err(InvalidShareReason::ThresholdTooSmall.into());
     }
@@ -175,7 +234,7 @@ fn validate_vss_key_share<E: Curve>(
     // 2. Using first `t` public key shares, derive other `n-t` public shares
     //    and compare with the ones specified in the key share
 
-    let first_t_shares = &key_share.public_shares[0..usize::from(t)];
+    let first_t_shares = &public_shares[0..usize::from(t)];
     let indexes = &vss_setup.I[0..usize::from(t)];
     let interpolation = |x: Scalar<E>| {
         let lagrange_coefficients =
@@ -188,16 +247,11 @@ fn validate_vss_key_share<E: Curve>(
             .ok_or(InvalidShareReason::INotPairwiseDistinct)
     };
     let reconstructed_pk = interpolation(Scalar::zero())?;
-    if reconstructed_pk != key_share.shared_public_key {
+    if reconstructed_pk != shared_public_key {
         return Err(InvalidShareReason::SharesDontMatchPublicKey.into());
     }
 
-    for (&j, public_share_j) in vss_setup
-        .I
-        .iter()
-        .zip(&key_share.public_shares)
-        .skip(t.into())
-    {
+    for (&j, public_share_j) in vss_setup.I.iter().zip(public_shares).skip(t.into()) {
         if interpolation(j.into())? != *public_share_j {
             return Err(InvalidShareReason::SharesDontMatchPublicKey.into());
         }
@@ -206,10 +260,18 @@ fn validate_vss_key_share<E: Curve>(
     Ok(())
 }
 
-fn validate_non_vss_key_share<E: Curve>(
-    key_share: &DirtyCoreKeyShare<E>,
+fn validate_non_vss_key_info<E: Curve>(
+    shared_public_key: Point<E>,
+    public_shares: &[Point<E>],
 ) -> Result<(), InvalidCoreShare> {
-    if key_share.shared_public_key != key_share.public_shares.iter().sum::<Point<E>>() {
+    let n: u16 = public_shares
+        .len()
+        .try_into()
+        .map_err(|_| InvalidShareReason::NOverflowsU16)?;
+    if n < 2 {
+        return Err(InvalidShareReason::TooFewParties.into());
+    }
+    if shared_public_key != public_shares.iter().sum::<Point<E>>() {
         return Err(InvalidShareReason::SharesDontMatchPublicKey.into());
     }
     Ok(())
