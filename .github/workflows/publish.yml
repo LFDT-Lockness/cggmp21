@@ -1,7 +1,9 @@
 on:
   push:
-    tags:        
+    tags:
       - 'v*'
+      - 'key-share-v*'
+      - 'cggmp21-keygen-v*'
   workflow_dispatch:
 
 name: Publish
@@ -11,12 +13,41 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
-  publish-round-based:
-    name: Publish crate
+  publish-cggmp21:
+    name: Publish cggmp21
     environment: crates.io
     runs-on: ubuntu-latest
+    if: >-
+      github.ref_type == 'tag'
+      && startsWith(github.ref_name, 'v')
     steps:
     - uses: actions/checkout@v3
     - run: cargo publish -p cggmp21
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
+
+  publish-key-share:
+    name: Publish key-share
+    environment: crates.io
+    runs-on: ubuntu-latest
+    if: >-
+      github.ref_type == 'tag'
+      && startsWith(github.ref_name, 'key-share-v')
+    steps:
+    - uses: actions/checkout@v3
+    - run: cargo publish -p key-share --token ${CRATES_TOKEN}
+      env:
+        CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+
+  publish-cggmp21-keygen:
+    name: Publish cggmp21-keygen
+    environment: crates.io
+    runs-on: ubuntu-latest
+    if: >-
+      github.ref_type == 'tag'
+      && startsWith(github.ref_name, 'cggmp21-keygen-v')
+    steps:
+    - uses: actions/checkout@v3
+    - run: cargo publish -p cggmp21-keygen --token ${CRATES_TOKEN}
+      env:
+        CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
