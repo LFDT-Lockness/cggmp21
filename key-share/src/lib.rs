@@ -121,6 +121,7 @@ pub struct DirtyCoreKeyShare<E: Curve> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound = ""))]
+#[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
 /// Secret sharing setup of a key
 pub struct VssSetup<E: Curve> {
     /// Threshold parameter
@@ -140,8 +141,10 @@ pub struct VssSetup<E: Curve> {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound = ""))]
+#[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
 pub struct DirtyKeyInfo<E: Curve> {
     /// Guard that ensures curve consistency for deseraization
+    #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::curve_name))]
     pub curve: CurveName<E>,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
@@ -163,6 +166,7 @@ pub struct DirtyKeyInfo<E: Curve> {
         serde(default),
         serde(with = "As::<Option<utils::HexOrBin>>")
     )]
+    #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::maybe_bytes))]
     pub chain_code: Option<slip_10::ChainCode>,
 }
 

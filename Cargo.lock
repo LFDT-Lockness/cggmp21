@@ -1286,6 +1286,7 @@ dependencies = [
  "serde_with 2.3.3",
  "slip-10",
  "thiserror",
+ "udigest",
 ]
 
 [[package]]
