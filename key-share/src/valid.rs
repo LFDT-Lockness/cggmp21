@@ -46,12 +46,26 @@ where
             Ok(Self(T::from_parts(parts)))
         }
     }
+
+    /// Constructs `Self` from its [`ValidProjection`]
+    pub fn from<K>(value: Valid<K>) -> Self
+    where
+        T: ValidProjection<K>,
+        K: Validate,
+    {
+        Self(value.0.into())
+    }
 }
 
 impl<T> Valid<T> {
     /// Returns wraped validated value
     pub fn into_inner(self) -> T {
         self.0
+    }
+
+    /// Returns a wrapped reference to validated data
+    pub fn as_ref(&self) -> Valid<&T> {
+        Valid(&self.0)
     }
 }
 
@@ -87,6 +101,13 @@ pub trait Validate {
         Self: Sized,
     {
         Valid::validate(self)
+    }
+}
+
+impl<T: Validate> Validate for &T {
+    type Error = <T as Validate>::Error;
+    fn is_valid(&self) -> Result<(), Self::Error> {
+        (*self).is_valid()
     }
 }
 
@@ -152,6 +173,9 @@ pub trait ValidateFromParts<Parts>: Validate {
     /// Constructs `Self` from parts
     fn from_parts(parts: Parts) -> Self;
 }
+
+/// Marker trait stating that `Self` is projection of `T`: if `T` is valid, then `Self::from(T)` is valid as well
+pub trait ValidProjection<T: Validate>: Validate + From<T> {}
 
 /// Validation error
 ///

@@ -22,7 +22,7 @@ use generic_ec_zkp::polynomial::lagrange_coefficient;
 mod utils;
 mod valid;
 
-pub use self::valid::{Valid, Validate, ValidateError, ValidateFromParts};
+pub use self::valid::{Valid, ValidProjection, Validate, ValidateError, ValidateFromParts};
 
 /// Core key share
 ///
@@ -338,6 +338,34 @@ impl<E: Curve> CoreKeyShare<E> {
         self.shared_public_key
     }
 }
+
+impl<E: Curve> From<&DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {
+    fn from(key_share: &DirtyCoreKeyShare<E>) -> Self {
+        DirtyKeyInfo {
+            curve: key_share.curve,
+            shared_public_key: key_share.shared_public_key,
+            public_shares: key_share.public_shares.clone(),
+            vss_setup: key_share.vss_setup.clone(),
+            #[cfg(feature = "hd-wallets")]
+            chain_code: key_share.chain_code,
+        }
+    }
+}
+impl<E: Curve> From<DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {
+    fn from(key_share: DirtyCoreKeyShare<E>) -> Self {
+        DirtyKeyInfo {
+            curve: key_share.curve,
+            shared_public_key: key_share.shared_public_key,
+            public_shares: key_share.public_shares,
+            vss_setup: key_share.vss_setup,
+            #[cfg(feature = "hd-wallets")]
+            chain_code: key_share.chain_code,
+        }
+    }
+}
+
+impl<E: Curve> ValidProjection<DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {}
+impl<E: Curve> ValidProjection<&DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {}
 
 /// Error indicating that key share is not valid
 #[derive(Debug, thiserror::Error)]
