@@ -127,6 +127,7 @@ where
     /// Performs a debug assertion that `T` is validated
     fn from_ref_unchecked(value: &T) -> &Self {
         #[cfg(debug_assertions)]
+        #[allow(clippy::expect_used)]
         value
             .is_valid()
             .expect("debug assertions: value is invalid, but was assumed to be valid");
