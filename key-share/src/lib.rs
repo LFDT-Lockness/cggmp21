@@ -169,6 +169,31 @@ impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
     }
 }
 
+impl<E: Curve> ValidateFromParts<(u16, DirtyKeyInfo<E>, SecretScalar<E>)> for DirtyCoreKeyShare<E> {
+    fn validate_parts(
+        (i, key_info, x): &(u16, DirtyKeyInfo<E>, SecretScalar<E>),
+    ) -> Result<(), Self::Error> {
+        let party_public_share = key_info
+            .public_shares
+            .get(usize::from(*i))
+            .ok_or(InvalidShareReason::PartyIndexOutOfBounds)?;
+        if *party_public_share != Point::generator() * x {
+            return Err(InvalidShareReason::PartySecretShareDoesntMatchPublicShare.into());
+        }
+
+        Ok(())
+    }
+
+    fn from_parts((i, key_info, x): (u16, DirtyKeyInfo<E>, SecretScalar<E>)) -> Self {
+        Self {
+            curve: Default::default(),
+            i,
+            key_info,
+            x,
+        }
+    }
+}
+
 impl<E: Curve> Validate for DirtyKeyInfo<E> {
     type Error = InvalidCoreShare;
 
