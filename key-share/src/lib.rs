@@ -16,13 +16,15 @@
 #![forbid(unused_crate_dependencies)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+use core::ops;
+
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient;
 
 mod utils;
 mod valid;
 
-pub use self::valid::{Valid, ValidProjection, Validate, ValidateError, ValidateFromParts};
+pub use self::valid::{Valid, Validate, ValidateError, ValidateFromParts};
 
 /// Core key share
 ///
@@ -92,46 +94,12 @@ pub struct DirtyCoreKeyShare<E: Curve> {
     pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
-    /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
-    #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
-    pub shared_public_key: Point<E>,
-    /// Public shares of all signers sharing the key
-    ///
-    /// `public_shares[i]` corresponds to public share (or public commitment) of $\ith$ party.
-    #[cfg_attr(
-        feature = "serde",
-        serde(with = "As::<Vec<generic_ec::serde::Compact>>")
-    )]
-    pub public_shares: Vec<Point<E>>,
-    /// Verifiable secret sharing setup, present if key was generated using VSS scheme
-    pub vss_setup: Option<VssSetup<E>>,
-    /// Chain code associated with the key, if HD wallets support was enabled
-    #[cfg(feature = "hd-wallets")]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default),
-        serde(with = "As::<Option<utils::HexOrBin>>")
-    )]
-    pub chain_code: Option<slip_10::ChainCode>,
+    /// Public key info
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub key_info: DirtyKeyInfo<E>,
     /// Secret share $x_i$
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
     pub x: SecretScalar<E>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound = ""))]
-#[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
-/// Secret sharing setup of a key
-pub struct VssSetup<E: Curve> {
-    /// Threshold parameter
-    ///
-    /// Specifies how many signers are required to perform signing
-    pub min_signers: u16,
-    /// Key shares indexes
-    ///
-    /// `I[i]` corresponds to key share index of a $\ith$ signer
-    pub I: Vec<NonZero<Scalar<E>>>,
 }
 
 /// Public Key Info
@@ -143,9 +111,6 @@ pub struct VssSetup<E: Curve> {
 #[cfg_attr(feature = "serde", serde(bound = ""))]
 #[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
 pub struct DirtyKeyInfo<E: Curve> {
-    /// Guard that ensures curve consistency for deseraization
-    #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::curve_name))]
-    pub curve: CurveName<E>,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
     pub shared_public_key: Point<E>,
@@ -170,6 +135,22 @@ pub struct DirtyKeyInfo<E: Curve> {
     pub chain_code: Option<slip_10::ChainCode>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound = ""))]
+#[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
+/// Secret sharing setup of a key
+pub struct VssSetup<E: Curve> {
+    /// Threshold parameter
+    ///
+    /// Specifies how many signers are required to perform signing
+    pub min_signers: u16,
+    /// Key shares indexes
+    ///
+    /// `I[i]` corresponds to key share index of a $\ith$ signer
+    pub I: Vec<NonZero<Scalar<E>>>,
+}
+
 impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
     type Error = InvalidCoreShare;
 
@@ -182,12 +163,7 @@ impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
             return Err(InvalidShareReason::PartySecretShareDoesntMatchPublicShare.into());
         }
 
-        match &self.vss_setup {
-            Some(vss_setup) => {
-                validate_vss_key_info(self.shared_public_key, &self.public_shares, vss_setup)?
-            }
-            None => validate_non_vss_key_info(self.shared_public_key, &self.public_shares)?,
-        }
+        self.key_info.is_valid()?;
 
         Ok(())
     }
@@ -391,33 +367,17 @@ impl<E: Curve> CoreKeyShare<E> {
     }
 }
 
-impl<E: Curve> From<&DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {
-    fn from(key_share: &DirtyCoreKeyShare<E>) -> Self {
-        DirtyKeyInfo {
-            curve: key_share.curve,
-            shared_public_key: key_share.shared_public_key,
-            public_shares: key_share.public_shares.clone(),
-            vss_setup: key_share.vss_setup.clone(),
-            #[cfg(feature = "hd-wallets")]
-            chain_code: key_share.chain_code,
-        }
+impl<E: Curve> ops::Deref for DirtyCoreKeyShare<E> {
+    type Target = DirtyKeyInfo<E>;
+    fn deref(&self) -> &Self::Target {
+        &self.key_info
     }
 }
-impl<E: Curve> From<DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {
-    fn from(key_share: DirtyCoreKeyShare<E>) -> Self {
-        DirtyKeyInfo {
-            curve: key_share.curve,
-            shared_public_key: key_share.shared_public_key,
-            public_shares: key_share.public_shares,
-            vss_setup: key_share.vss_setup,
-            #[cfg(feature = "hd-wallets")]
-            chain_code: key_share.chain_code,
-        }
+impl<E: Curve> AsRef<DirtyKeyInfo<E>> for DirtyCoreKeyShare<E> {
+    fn as_ref(&self) -> &DirtyKeyInfo<E> {
+        &self.key_info
     }
 }
-
-impl<E: Curve> ValidProjection<DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {}
-impl<E: Curve> ValidProjection<&DirtyCoreKeyShare<E>> for DirtyKeyInfo<E> {}
 
 /// Error indicating that key share is not valid
 #[derive(Debug, thiserror::Error)]

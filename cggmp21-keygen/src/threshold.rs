@@ -13,7 +13,7 @@ use serde_with::serde_as;
 use crate::progress::Tracer;
 use crate::{
     errors::IoError,
-    key_share::{CoreKeyShare, DirtyCoreKeyShare, Validate, VssSetup},
+    key_share::{CoreKeyShare, DirtyCoreKeyShare, DirtyKeyInfo, Validate, VssSetup},
     security_level::SecurityLevel,
     utils, ExecutionId,
 };
@@ -424,14 +424,16 @@ where
     Ok(DirtyCoreKeyShare {
         curve: Default::default(),
         i,
-        shared_public_key: y,
-        public_shares: ys,
-        vss_setup: Some(VssSetup {
-            min_signers: t,
-            I: key_shares_indexes,
-        }),
-        #[cfg(feature = "hd-wallets")]
-        chain_code,
+        key_info: DirtyKeyInfo {
+            shared_public_key: y,
+            public_shares: ys,
+            vss_setup: Some(VssSetup {
+                min_signers: t,
+                I: key_shares_indexes,
+            }),
+            #[cfg(feature = "hd-wallets")]
+            chain_code,
+        },
         x: sigma,
     }
     .validate()

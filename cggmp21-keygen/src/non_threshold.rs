@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::progress::Tracer;
 use crate::{
     errors::IoError,
-    key_share::{CoreKeyShare, DirtyCoreKeyShare, Validate},
+    key_share::{CoreKeyShare, DirtyCoreKeyShare, DirtyKeyInfo, Validate},
     security_level::SecurityLevel,
     utils, ExecutionId,
 };
@@ -339,18 +339,20 @@ where
     Ok(DirtyCoreKeyShare {
         curve: Default::default(),
         i,
-        shared_public_key: decommitments
-            .iter_including_me(&my_decommitment)
-            .map(|d| d.X)
-            .sum(),
-        public_shares: decommitments
-            .iter_including_me(&my_decommitment)
-            .map(|d| d.X)
-            .collect(),
+        key_info: DirtyKeyInfo {
+            shared_public_key: decommitments
+                .iter_including_me(&my_decommitment)
+                .map(|d| d.X)
+                .sum(),
+            public_shares: decommitments
+                .iter_including_me(&my_decommitment)
+                .map(|d| d.X)
+                .collect(),
+            vss_setup: None,
+            #[cfg(feature = "hd-wallets")]
+            chain_code,
+        },
         x: x_i,
-        vss_setup: None,
-        #[cfg(feature = "hd-wallets")]
-        chain_code,
     }
     .validate()
     .map_err(|e| Bug::InvalidKeyShare(e.into_error()))?)
