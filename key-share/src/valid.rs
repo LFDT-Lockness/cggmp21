@@ -7,12 +7,12 @@ use std::fmt;
 /// `Valid<T>` provides only immutable access to `T`. For instance, if you want to change content of `T`, you
 /// need to [deconstruct](Valid::into_inner) it, do necessary modifications, and then validate it again.
 ///
-/// ## Transitive "validness" through `AsRef`
+/// ## Transitive "valideness" through `AsRef`
 /// `Valid<T>` assumes that if `T` implements `AsRef<K>` and `K` can be validated (i.e. `K` implements [`Validate`]),
 /// then `K` has been validated when `T` was validated. Thus, if you have value of type `Valid<T>`, you can obtain
 /// `&Valid<K>` via `AsRef` trait.
 ///
-/// Example of transitive validness is demostrated below:
+/// Example of transitive valideness is demostrated below:
 /// ```rust
 /// use key_share::{Validate, Valid};
 ///

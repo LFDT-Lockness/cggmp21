@@ -291,18 +291,17 @@ impl<E: Curve> DirtyKeyInfo<E> {
     ///
     /// Note: if you have no idea what it is, probably you don't need it.
     pub fn share_id(&self, j: u16) -> Option<NonZero<Scalar<E>>> {
-        let Some(vss_setup) = self.vss_setup.as_ref() else {
-            return if usize::from(j) < self.public_shares.len() {
-                #[allow(clippy::expect_used)]
-                Some(
-                    NonZero::from_scalar(Scalar::one() + Scalar::from(j))
-                        .expect("1 + i_u16 is guaranteed to be nonzero"),
-                )
-            } else {
-                None
-            };
-        };
-        vss_setup.I.get(usize::from(j)).copied()
+        if let Some(vss_setup) = self.vss_setup.as_ref() {
+            vss_setup.I.get(usize::from(j)).copied()
+        } else if usize::from(j) < self.public_shares.len() {
+            #[allow(clippy::expect_used)]
+            Some(
+                NonZero::from_scalar(Scalar::one() + Scalar::from(j))
+                    .expect("1 + i_u16 is guaranteed to be nonzero"),
+            )
+        } else {
+            None
+        }
     }
 }
 
