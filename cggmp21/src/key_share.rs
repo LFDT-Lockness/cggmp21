@@ -286,6 +286,11 @@ impl<E: Curve, L: SecurityLevel> AsRef<DirtyIncompleteKeyShare<E>> for DirtyKeyS
         &self.core
     }
 }
+impl<E: Curve, L: SecurityLevel> AsRef<DirtyAuxInfo<L>> for DirtyKeyShare<E, L> {
+    fn as_ref(&self) -> &DirtyAuxInfo<L> {
+        &self.aux
+    }
+}
 
 impl<E: Curve, L: SecurityLevel> ops::Deref for DirtyKeyShare<E, L> {
     type Target = DirtyIncompleteKeyShare<E>;
