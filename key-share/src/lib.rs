@@ -282,30 +282,6 @@ fn validate_non_vss_key_info<E: Curve>(
     Ok(())
 }
 
-impl<E: Curve> DirtyCoreKeyShare<E> {
-    /// Returns share index of j-th signer
-    ///
-    /// * For additive shares, share id is `j+1`
-    /// * For VSS-shares, share id is scalar $I_j$ such that $x_j = F(I_j)$ where
-    ///   $F(x)$ is polynomial co-shared by the signers
-    ///
-    /// Note: if you have no idea what it is, probably you don't need it.
-    pub fn share_id(&self, j: u16) -> Option<NonZero<Scalar<E>>> {
-        let Some(vss_setup) = self.vss_setup.as_ref() else {
-            return if usize::from(j) < self.public_shares.len() {
-                #[allow(clippy::expect_used)]
-                Some(
-                    NonZero::from_scalar(Scalar::one() + Scalar::from(j))
-                        .expect("1 + i_u16 is guaranteed to be nonzero"),
-                )
-            } else {
-                None
-            };
-        };
-        vss_setup.I.get(usize::from(j)).copied()
-    }
-}
-
 impl<E: Curve> DirtyKeyInfo<E> {
     /// Returns share index of j-th signer
     ///
