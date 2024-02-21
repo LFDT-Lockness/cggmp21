@@ -13,7 +13,7 @@
 //! use cggmp21::{supported_curves::Secp256k1, security_level::SecurityLevel128};
 //! use cggmp21::generic_ec::SecretScalar;
 //!
-//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut OsRng);
+//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut rng);
 //!
 //! let key_shares = cggmp21::trusted_dealer::builder::<Secp256k1, SecurityLevel128>(5)
 //!     .set_threshold(Some(3))
@@ -49,11 +49,11 @@ pub fn builder<E: Curve, L: SecurityLevel>(n: u16) -> TrustedDealerBuilder<E, L>
     TrustedDealerBuilder::new(n)
 }
 
-type Inner<E> = key_share::trusted_dealer::TrustedDealerBuilder<E>;
+type CoreBuilder<E> = key_share::trusted_dealer::TrustedDealerBuilder<E>;
 
 /// Trusted dealer builder
 pub struct TrustedDealerBuilder<E: Curve, L: SecurityLevel> {
-    inner: Inner<E>,
+    inner: CoreBuilder<E>,
     n: u16,
     pregenerated_primes: Option<Vec<(Integer, Integer)>>,
     enable_mulitexp: bool,
@@ -67,7 +67,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Takes amount of key shares `n` to be generated
     pub fn new(n: u16) -> Self {
         TrustedDealerBuilder {
-            inner: Inner::new(n),
+            inner: CoreBuilder::new(n),
             n,
             pregenerated_primes: None,
             enable_mulitexp: false,
@@ -155,7 +155,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     ) -> Result<Vec<IncompleteKeyShare<E>>, TrustedDealerError> {
         self.inner
             .generate_shares(rng)
-            .map_err(Reason::Inner)
+            .map_err(Reason::CoreError)
             .map_err(TrustedDealerError)
     }
 
@@ -172,7 +172,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         let enable_crt = self.enable_crt;
 
         let primes = self.pregenerated_primes.take();
-        let core_key_shares = self.inner.generate_shares(rng).map_err(Reason::Inner)?;
+        let core_key_shares = self.inner.generate_shares(rng).map_err(Reason::CoreError)?;
         let aux_data = if let Some(primes) = primes {
             generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)?
         } else {
@@ -290,5 +290,5 @@ enum Reason {
     #[error("couldn't build multiexp tables")]
     BuildMultiexp(#[source] InvalidKeyShare),
     #[error(transparent)]
-    Inner(#[from] key_share::trusted_dealer::TrustedDealerError),
+    CoreError(#[from] key_share::trusted_dealer::TrustedDealerError),
 }

@@ -11,7 +11,7 @@
 //! # let mut rng = OsRng;
 //! use generic_ec::{curves::Secp256k1, SecretScalar};
 //!
-//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut OsRng);
+//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut rng);
 //!
 //! let key_shares = key_share::trusted_dealer::builder::<Secp256k1>(5)
 //!     .set_threshold(Some(3))
@@ -126,7 +126,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
             shares.push(SecretScalar::new(
                 &mut (shared_secret_key - shares.iter().sum::<Scalar<E>>()),
             ));
-            let pk = shares.iter().map(|x_j| Point::generator() * x_j).sum();
+            let pk = shares.iter().sum::<Scalar<E>>() * Point::generator();
             (pk, shares)
         };
 
