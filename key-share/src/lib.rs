@@ -377,6 +377,11 @@ impl<E: Curve> AsRef<DirtyKeyInfo<E>> for DirtyCoreKeyShare<E> {
         &self.key_info
     }
 }
+impl<E: Curve> AsRef<CoreKeyShare<E>> for CoreKeyShare<E> {
+    fn as_ref(&self) -> &CoreKeyShare<E> {
+        self
+    }
+}
 
 /// Error indicating that key share is not valid
 #[derive(Debug, thiserror::Error)]
@@ -420,4 +425,95 @@ impl<T> From<ValidateError<T, InvalidCoreShare>> for InvalidCoreShare {
     fn from(err: ValidateError<T, InvalidCoreShare>) -> Self {
         err.into_error()
     }
+}
+
+/// Reconstructs a secret key from set of at least
+/// [`min_signers`](KeyShare::min_signers) key shares
+///
+/// Requires at least [`min_signers`](KeyShare::min_signers) distinct key shares
+/// from the same generation (key refresh produces key shares of the next
+/// generation). Accepts both [`KeyShare`] and [`IncompleteKeyShare`].
+/// Returns error if input is invalid.
+///
+/// Note that, normally, secret key is not supposed to be reconstructed, and key
+/// shares should never be at one place. This basically defeats purpose of MPC and
+/// creates single point of failure/trust.
+#[cfg(feature = "spof")]
+pub fn reconstruct_secret_key<E: Curve>(
+    key_shares: &[impl AsRef<CoreKeyShare<E>>],
+) -> Result<SecretScalar<E>, ReconstructError> {
+    use crate::utils::subset;
+
+    if key_shares.is_empty() {
+        return Err(ReconstructErrorReason::NoKeyShares.into());
+    }
+
+    let t = key_shares[0].as_ref().min_signers();
+    let pk = key_shares[0].as_ref().shared_public_key;
+    let vss = &key_shares[0].as_ref().vss_setup;
+    let X = &key_shares[0].as_ref().public_shares;
+
+    if key_shares[1..].iter().any(|s| {
+        t != s.as_ref().min_signers()
+            || pk != s.as_ref().shared_public_key
+            || *vss != s.as_ref().vss_setup
+            || *X != s.as_ref().public_shares
+    }) {
+        return Err(ReconstructErrorReason::DifferentKeyShares.into());
+    }
+
+    if key_shares.len() < usize::from(t) {
+        return Err(ReconstructErrorReason::TooFewKeyShares {
+            len: key_shares.len(),
+            t,
+        }
+        .into());
+    }
+
+    if let Some(VssSetup { I, .. }) = vss {
+        let S = key_shares.iter().map(|s| s.as_ref().i).collect::<Vec<_>>();
+        let I = subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
+        let lagrange_coefficients =
+            (0..).map(|j| generic_ec_zkp::polynomial::lagrange_coefficient(Scalar::zero(), j, &I));
+        let mut sk = lagrange_coefficients
+            .zip(key_shares)
+            .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
+                Some(acc + lambda_j? * &key_share_j.as_ref().x)
+            })
+            .ok_or(ReconstructErrorReason::Interpolation)?;
+        Ok(SecretScalar::new(&mut sk))
+    } else {
+        let mut sk = key_shares
+            .iter()
+            .map(|s| &s.as_ref().x)
+            .fold(Scalar::zero(), |acc, x_j| acc + x_j);
+        Ok(SecretScalar::new(&mut sk))
+    }
+}
+
+/// Error indicating that [key reconstruction](reconstruct_secret_key) failed
+#[cfg(feature = "spof")]
+#[derive(Debug, thiserror::Error)]
+#[error("secret key reconstruction error")]
+pub struct ReconstructError(
+    #[source]
+    #[from]
+    ReconstructErrorReason,
+);
+
+#[cfg(feature = "spof")]
+#[derive(Debug, thiserror::Error)]
+enum ReconstructErrorReason {
+    #[error("no key shares provided")]
+    NoKeyShares,
+    #[error(
+        "provided key shares doesn't seem to share the same key or belong to the same generation"
+    )]
+    DifferentKeyShares,
+    #[error("expected at least `t={t}` key shares, but {len} key shares were provided")]
+    TooFewKeyShares { len: usize, t: u16 },
+    #[error("subset function returned error (seems like a bug)")]
+    Subset,
+    #[error("interpolation failed (seems like a bug)")]
+    Interpolation,
 }

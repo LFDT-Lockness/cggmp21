@@ -3,8 +3,7 @@
 use std::ops;
 use std::sync::Arc;
 
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
-use generic_ec_zkp::polynomial::lagrange_coefficient;
+use generic_ec::{Curve, Point, SecretScalar};
 use paillier_zk::paillier_encryption_in_range as π_enc;
 use paillier_zk::rug::{Complete, Integer};
 use serde::{Deserialize, Serialize};
@@ -308,14 +307,11 @@ mod sealed {
 ///
 /// Implemented for both [KeyShare] and [IncompleteKeyShare]. Used in methods
 /// that accept both types of key shares, like [reconstruct_secret_key].
-pub trait AnyKeyShare<E: Curve>: sealed::Sealed {
-    /// Returns “core” key share
-    fn core(&self) -> &DirtyIncompleteKeyShare<E>;
-
+pub trait AnyKeyShare<E: Curve>: AsRef<IncompleteKeyShare<E>> + sealed::Sealed {
     /// Returns amount of key co-holders
     fn n(&self) -> u16 {
         #[allow(clippy::expect_used)]
-        self.core()
+        self.as_ref()
             .public_shares
             .len()
             .try_into()
@@ -327,7 +323,7 @@ pub trait AnyKeyShare<E: Curve>: sealed::Sealed {
     /// Threshold is an amount of signers required to cooperate in order to sign a message
     /// and/or generate presignature
     fn min_signers(&self) -> u16 {
-        self.core()
+        self.as_ref()
             .vss_setup
             .as_ref()
             .map(|s| s.min_signers)
@@ -336,31 +332,16 @@ pub trait AnyKeyShare<E: Curve>: sealed::Sealed {
 
     /// Returns public key shared by signers
     fn shared_public_key(&self) -> Point<E> {
-        self.core().shared_public_key
+        self.as_ref().shared_public_key
     }
 }
 
 impl<E: Curve, L: SecurityLevel> sealed::Sealed for KeyShare<E, L> {}
-impl<E: Curve, L: SecurityLevel> AnyKeyShare<E> for KeyShare<E, L> {
-    fn core(&self) -> &DirtyIncompleteKeyShare<E> {
-        &self.core
-    }
-}
+impl<E: Curve, L: SecurityLevel> AnyKeyShare<E> for KeyShare<E, L> {}
 impl<E: Curve> sealed::Sealed for IncompleteKeyShare<E> {}
-impl<E: Curve> AnyKeyShare<E> for IncompleteKeyShare<E> {
-    fn core(&self) -> &DirtyIncompleteKeyShare<E> {
-        self
-    }
-}
+impl<E: Curve> AnyKeyShare<E> for IncompleteKeyShare<E> {}
 impl<T> sealed::Sealed for &T where T: sealed::Sealed {}
-impl<E: Curve, T> AnyKeyShare<E> for &T
-where
-    T: AnyKeyShare<E>,
-{
-    fn core(&self) -> &DirtyIncompleteKeyShare<E> {
-        <T as AnyKeyShare<E>>::core(self)
-    }
-}
+impl<E: Curve, T> AnyKeyShare<E> for &T where T: AnyKeyShare<E> {}
 
 /// Reconstructs a secret key from set of at least [`min_signers`](KeyShare::min_signers) key shares
 ///
@@ -375,52 +356,7 @@ where
 pub fn reconstruct_secret_key<E: Curve>(
     key_shares: &[impl AnyKeyShare<E>],
 ) -> Result<SecretScalar<E>, ReconstructError> {
-    use crate::utils::subset;
-
-    if key_shares.is_empty() {
-        return Err(ReconstructErrorReason::NoKeyShares.into());
-    }
-
-    let t = key_shares[0].min_signers();
-    let pk = key_shares[0].core().shared_public_key;
-    let vss = &key_shares[0].core().vss_setup;
-    let X = &key_shares[0].core().public_shares;
-
-    if key_shares[1..].iter().any(|s| {
-        t != s.min_signers()
-            || pk != s.core().shared_public_key
-            || *vss != s.core().vss_setup
-            || *X != s.core().public_shares
-    }) {
-        return Err(ReconstructErrorReason::DifferentKeyShares.into());
-    }
-
-    if key_shares.len() < usize::from(t) {
-        return Err(ReconstructErrorReason::TooFewKeyShares {
-            len: key_shares.len(),
-            t,
-        }
-        .into());
-    }
-
-    if let Some(VssSetup { I, .. }) = vss {
-        let S = key_shares.iter().map(|s| s.core().i).collect::<Vec<_>>();
-        let I = subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
-        let lagrange_coefficients = (0..).map(|j| lagrange_coefficient(Scalar::zero(), j, &I));
-        let mut sk = lagrange_coefficients
-            .zip(key_shares)
-            .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {
-                Some(acc + lambda_j? * &key_share_j.core().x)
-            })
-            .ok_or(ReconstructErrorReason::Interpolation)?;
-        Ok(SecretScalar::new(&mut sk))
-    } else {
-        let mut sk = key_shares
-            .iter()
-            .map(|s| &s.core().x)
-            .fold(Scalar::zero(), |acc, x_j| acc + x_j);
-        Ok(SecretScalar::new(&mut sk))
-    }
+    key_share::reconstruct_secret_key(key_shares)
 }
 
 impl From<&PartyAux> for π_enc::Aux {
@@ -466,30 +402,7 @@ enum InvalidKeyShareReason {
 
 /// Error indicating that [key reconstruction](reconstruct_secret_key) failed
 #[cfg(feature = "spof")]
-#[derive(Debug, Error)]
-#[error("secret key reconstruction error")]
-pub struct ReconstructError(
-    #[source]
-    #[from]
-    ReconstructErrorReason,
-);
-
-#[cfg(feature = "spof")]
-#[derive(Debug, Error)]
-enum ReconstructErrorReason {
-    #[error("no key shares provided")]
-    NoKeyShares,
-    #[error(
-        "provided key shares doesn't seem to share the same key or belong to the same generation"
-    )]
-    DifferentKeyShares,
-    #[error("expected at least `t={t}` key shares, but {len} key shares were provided")]
-    TooFewKeyShares { len: usize, t: u16 },
-    #[error("subset function returned error (seems like a bug)")]
-    Subset,
-    #[error("interpolation failed (seems like a bug)")]
-    Interpolation,
-}
+pub use key_share::ReconstructError;
 
 impl From<InvalidIncompleteKeyShare> for InvalidKeyShare {
     fn from(err: InvalidIncompleteKeyShare) -> Self {

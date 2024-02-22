@@ -138,7 +138,7 @@ where
         pregenerated: PregeneratedPrimes<L>,
     ) -> Self {
         Self {
-            target: RefreshShare(key_share.core()),
+            target: RefreshShare(key_share.as_ref()),
             execution_id: eid,
             pregenerated,
             tracer: None,
