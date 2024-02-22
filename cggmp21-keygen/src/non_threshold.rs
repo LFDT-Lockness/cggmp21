@@ -337,9 +337,9 @@ where
     tracer.protocol_ends();
 
     Ok(DirtyCoreKeyShare {
-        curve: Default::default(),
         i,
         key_info: DirtyKeyInfo {
+            curve: Default::default(),
             shared_public_key: decommitments
                 .iter_including_me(&my_decommitment)
                 .map(|d| d.X)

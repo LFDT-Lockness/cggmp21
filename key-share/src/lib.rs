@@ -90,8 +90,6 @@ use serde_with::As;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound = ""))]
 pub struct DirtyCoreKeyShare<E: Curve> {
-    /// Guard that ensures curve consistency for deseraization
-    pub curve: CurveName<E>,
     /// Index of local party in key generation protocol
     pub i: u16,
     /// Public key info
@@ -111,6 +109,9 @@ pub struct DirtyCoreKeyShare<E: Curve> {
 #[cfg_attr(feature = "serde", serde(bound = ""))]
 #[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
 pub struct DirtyKeyInfo<E: Curve> {
+    /// Guard that ensures curve consistency for deseraization
+    #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::curve_name))]
+    pub curve: CurveName<E>,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
     pub shared_public_key: Point<E>,
@@ -185,12 +186,7 @@ impl<E: Curve> ValidateFromParts<(u16, DirtyKeyInfo<E>, SecretScalar<E>)> for Di
     }
 
     fn from_parts((i, key_info, x): (u16, DirtyKeyInfo<E>, SecretScalar<E>)) -> Self {
-        Self {
-            curve: Default::default(),
-            i,
-            key_info,
-            x,
-        }
+        Self { i, key_info, x }
     }
 }
 

@@ -209,9 +209,9 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             .zip(secret_shares)
             .map(|(i, x_i)| {
                 DirtyIncompleteKeyShare::<E> {
-                    curve: Default::default(),
                     i,
                     key_info: DirtyKeyInfo {
+                        curve: Default::default(),
                         shared_public_key,
                         public_shares: public_shares.clone(),
                         vss_setup: vss_setup.clone(),

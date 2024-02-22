@@ -422,9 +422,9 @@ where
     tracer.protocol_ends();
 
     Ok(DirtyCoreKeyShare {
-        curve: Default::default(),
         i,
         key_info: DirtyKeyInfo {
+            curve: Default::default(),
             shared_public_key: y,
             public_shares: ys,
             vss_setup: Some(VssSetup {
