@@ -35,8 +35,8 @@ use thiserror::Error;
 
 use crate::{
     key_share::{
-        AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, IncompleteKeyShare, InvalidKeyShare,
-        KeyShare, PartyAux, Validate, VssSetup,
+        AuxInfo, DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyInfo, IncompleteKeyShare,
+        InvalidKeyShare, KeyShare, PartyAux, Validate, VssSetup,
     },
     security_level::SecurityLevel,
     utils,
@@ -209,14 +209,16 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
             .zip(secret_shares)
             .map(|(i, x_i)| {
                 DirtyIncompleteKeyShare::<E> {
-                    curve: Default::default(),
                     i,
-                    shared_public_key,
-                    public_shares: public_shares.clone(),
+                    key_info: DirtyKeyInfo {
+                        curve: Default::default(),
+                        shared_public_key,
+                        public_shares: public_shares.clone(),
+                        vss_setup: vss_setup.clone(),
+                        #[cfg(feature = "hd-wallets")]
+                        chain_code,
+                    },
                     x: x_i,
-                    vss_setup: vss_setup.clone(),
-                    #[cfg(feature = "hd-wallets")]
-                    chain_code,
                 }
                 .validate()
                 .map_err(|err| Reason::InvalidKeyShare(err.into_error().into()))

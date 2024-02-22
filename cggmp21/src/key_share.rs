@@ -14,9 +14,9 @@ use crate::security_level::SecurityLevel;
 
 #[doc(inline)]
 pub use cggmp21_keygen::key_share::{
-    CoreKeyShare as IncompleteKeyShare, DirtyCoreKeyShare as DirtyIncompleteKeyShare, HdError,
-    InvalidCoreShare as InvalidIncompleteKeyShare, Valid, Validate, ValidateError,
-    ValidateFromParts, VssSetup,
+    CoreKeyShare as IncompleteKeyShare, DirtyCoreKeyShare as DirtyIncompleteKeyShare, DirtyKeyInfo,
+    HdError, InvalidCoreShare as InvalidIncompleteKeyShare, KeyInfo, Valid, Validate,
+    ValidateError, ValidateFromParts, VssSetup,
 };
 
 /// Key share
@@ -284,6 +284,11 @@ impl<E: Curve> DirtyKeyShare<E> {
 impl<E: Curve, L: SecurityLevel> AsRef<DirtyIncompleteKeyShare<E>> for DirtyKeyShare<E, L> {
     fn as_ref(&self) -> &DirtyIncompleteKeyShare<E> {
         &self.core
+    }
+}
+impl<E: Curve, L: SecurityLevel> AsRef<DirtyAuxInfo<L>> for DirtyKeyShare<E, L> {
+    fn as_ref(&self) -> &DirtyAuxInfo<L> {
+        &self.aux
     }
 }
 

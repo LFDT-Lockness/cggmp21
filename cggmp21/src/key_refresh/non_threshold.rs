@@ -20,7 +20,9 @@ use serde::{Deserialize, Serialize};
 use super::{Bug, KeyRefreshError, PregeneratedPrimes, ProtocolAborted};
 use crate::{
     errors::IoError,
-    key_share::{DirtyAuxInfo, DirtyIncompleteKeyShare, KeyShare, PartyAux, Validate},
+    key_share::{
+        DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyInfo, KeyShare, PartyAux, Validate,
+    },
     progress::Tracer,
     security_level::SecurityLevel,
     utils,
@@ -649,6 +651,7 @@ where
             .sum::<Point<E>>()
     });
     let X_stars = old_core_share
+        .key_info
         .public_shares
         .into_iter()
         .zip(X_sums)
@@ -657,7 +660,10 @@ where
 
     tracer.stage("Assemble new core share");
     let new_core_share: IncompleteKeyShare<E> = DirtyIncompleteKeyShare {
-        public_shares: X_stars,
+        key_info: DirtyKeyInfo {
+            public_shares: X_stars,
+            ..old_core_share.key_info
+        },
         x: SecretScalar::new(&mut x_star),
         ..old_core_share
     }

@@ -5,8 +5,71 @@ use std::fmt;
 /// `Valid<T>` wraps a value `T` that has been validated using [`Validate`] trait.
 ///
 /// `Valid<T>` provides only immutable access to `T`. For instance, if you want to change content of `T`, you
-/// need to [deconstruct](Valid::into_inner) it, do necessary modifications, and then validate it again using `TryFrom`.
+/// need to [deconstruct](Valid::into_inner) it, do necessary modifications, and then validate it again.
+///
+/// ## Transitive "valideness" through `AsRef`
+/// `Valid<T>` assumes that if `T` implements `AsRef<K>` and `K` can be validated (i.e. `K` implements [`Validate`]),
+/// then `K` has been validated when `T` was validated. Thus, if you have value of type `Valid<T>`, you can obtain
+/// `&Valid<K>` via `AsRef` trait.
+///
+/// Example of transitive valideness is demostrated below:
+/// ```rust
+/// use key_share::{Validate, Valid};
+///
+/// pub type CoreKeyShare = Valid<DirtyCoreKeyShare>;
+/// pub type KeyInfo = Valid<DirtyKeyInfo>;
+/// # use key_share::InvalidCoreShare as InvalidKeyShare;
+///
+/// # type SecretScalar = u128;
+/// pub struct DirtyCoreKeyShare {
+///     i: u16,
+///     key_info: DirtyKeyInfo,
+///     x: SecretScalar,
+/// }
+/// pub struct DirtyKeyInfo { /* ... */ }
+///
+/// // Key info can be validated separately
+/// impl Validate for DirtyKeyInfo {
+///     type Error = InvalidKeyShare;
+///     fn is_valid(&self) -> Result<(), Self::Error> {
+///         // ...
+///         # Ok(())
+///     }
+/// }
+///
+/// // CoreKeyShare can be validated as well
+/// impl Validate for DirtyCoreKeyShare {
+///     type Error = InvalidKeyShare;
+///     fn is_valid(&self) -> Result<(), Self::Error> {
+///         // Since `key_info` is part of key share, it **must be** validated when
+///         // the key share is validated
+///         self.key_info.is_valid();
+///         // ...
+///         # Ok(())
+///     }
+/// }
+/// impl AsRef<DirtyKeyInfo> for DirtyCoreKeyShare {
+///     fn as_ref(&self) -> &DirtyKeyInfo {
+///         &self.key_info
+///     }
+/// }
+///
+/// # let (i, key_info, x) = (0, DirtyKeyInfo {}, 42);
+/// let key_share: CoreKeyShare = DirtyCoreKeyShare { i, key_info, x }.validate()?;
+///
+/// // Since `key_share` is validated, and it contains `key_info`, we can obtain a `&KeyInfo`.
+/// // `Valid<T>` trusts that `<DirtyCoreKeyShare as Validate>::is_valid` has validated `key_info`.
+/// let key_info: &KeyInfo = key_share.as_ref();
+/// #
+/// # Ok::<_, Box<dyn std::error::Error>>(())
+/// ```
+///
+/// This mechanism allow to improve performance by not validating what's already been validated. However, incorrect
+/// implementation of `Validate` trait may lead to obtaining `Valid<K>` that's actually invalid. It may, in return,
+/// lead to runtime panic and/or compromised security of the application. Make sure that all implementations of
+/// [`Validate`] trait are correct and aligned with `AsRef` implementations.
 #[derive(Debug, Clone)]
+#[repr(transparent)]
 pub struct Valid<T>(T);
 
 impl<T> Valid<T>
@@ -28,6 +91,18 @@ where
         }
     }
 
+    /// Validates a reference to value `&T` returning `&Valid<T>` if it's valid
+    pub fn validate_ref(value: &T) -> Result<&Self, ValidateError<&T, <T as Validate>::Error>> {
+        if let Err(err) = value.is_valid() {
+            Err(ValidateError {
+                invalid_value: value,
+                error: err,
+            })
+        } else {
+            Ok(Self::from_ref_unchecked(value))
+        }
+    }
+
     /// Constructs and validates value from parts
     ///
     /// Refer to [`ValidateFromParts`] trait documentation
@@ -45,6 +120,22 @@ where
         } else {
             Ok(Self(T::from_parts(parts)))
         }
+    }
+
+    /// Constructs `&Valid<T>` from `&T`, assumes that `T` has been validated
+    ///
+    /// Performs a debug assertion that `T` is validated
+    fn from_ref_unchecked(value: &T) -> &Self {
+        #[cfg(debug_assertions)]
+        #[allow(clippy::expect_used)]
+        value
+            .is_valid()
+            .expect("debug assertions: value is invalid, but was assumed to be valid");
+
+        // SAFETY: &T and &Valid<T> have exactly the same in-memory representation
+        // thanks to `repr(transparent)`, so it's sound to transmute the references.
+        // Note also that input and output references have exactly the same lifetime.
+        unsafe { core::mem::transmute(value) }
     }
 }
 
@@ -68,10 +159,21 @@ impl<T> core::ops::Deref for Valid<T> {
     }
 }
 
+impl<T, K> AsRef<Valid<K>> for Valid<T>
+where
+    T: Validate + AsRef<K>,
+    K: Validate,
+{
+    fn as_ref(&self) -> &Valid<K> {
+        let sub_value = self.0.as_ref();
+        Valid::from_ref_unchecked(sub_value)
+    }
+}
+
 /// Represents a type that can be validated
 pub trait Validate {
     /// Validation error
-    type Error;
+    type Error: fmt::Debug;
 
     /// Checks whether value is valid
     ///
@@ -87,6 +189,23 @@ pub trait Validate {
         Self: Sized,
     {
         Valid::validate(self)
+    }
+
+    /// Validates the value by reference
+    ///
+    /// If value is valid, returns [`&Valid<Self>`](Valid), otherwise returns validation error
+    fn validate_ref(&self) -> Result<&Valid<Self>, Self::Error>
+    where
+        Self: Sized,
+    {
+        Valid::validate_ref(self).map_err(|err| err.into_error())
+    }
+}
+
+impl<T: Validate> Validate for &T {
+    type Error = <T as Validate>::Error;
+    fn is_valid(&self) -> Result<(), Self::Error> {
+        (*self).is_valid()
     }
 }
 

@@ -20,7 +20,7 @@ let # Rust
 in pkgs.stdenv.mkDerivation {
   name = "signers-env";
   nativeBuildInputs = [
-    rust pkgs.rust-analyzer tex
+    rust pkgs.rust-analyzer tex pkgs.gnum4
   ];
   buildInputs = lib.optionals isDarwin [pkgs.darwin.apple_sdk.frameworks.Security];
 }
