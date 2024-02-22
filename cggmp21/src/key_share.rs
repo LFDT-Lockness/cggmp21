@@ -299,15 +299,11 @@ impl<E: Curve, L: SecurityLevel> ops::Deref for DirtyKeyShare<E, L> {
     }
 }
 
-mod sealed {
-    pub trait Sealed {}
-}
-
 /// Any (validated) key share
 ///
 /// Implemented for both [KeyShare] and [IncompleteKeyShare]. Used in methods
 /// that accept both types of key shares, like [reconstruct_secret_key].
-pub trait AnyKeyShare<E: Curve>: AsRef<IncompleteKeyShare<E>> + sealed::Sealed {
+pub trait AnyKeyShare<E: Curve>: AsRef<IncompleteKeyShare<E>> {
     /// Returns amount of key co-holders
     fn n(&self) -> u16 {
         #[allow(clippy::expect_used)]
@@ -336,12 +332,7 @@ pub trait AnyKeyShare<E: Curve>: AsRef<IncompleteKeyShare<E>> + sealed::Sealed {
     }
 }
 
-impl<E: Curve, L: SecurityLevel> sealed::Sealed for KeyShare<E, L> {}
-impl<E: Curve, L: SecurityLevel> AnyKeyShare<E> for KeyShare<E, L> {}
-impl<E: Curve> sealed::Sealed for IncompleteKeyShare<E> {}
-impl<E: Curve> AnyKeyShare<E> for IncompleteKeyShare<E> {}
-impl<T> sealed::Sealed for &T where T: sealed::Sealed {}
-impl<E: Curve, T> AnyKeyShare<E> for &T where T: AnyKeyShare<E> {}
+impl<E: Curve, T: AsRef<IncompleteKeyShare<E>>> AnyKeyShare<E> for T {}
 
 /// Reconstructs a secret key from set of at least [`min_signers`](KeyShare::min_signers) key shares
 ///
