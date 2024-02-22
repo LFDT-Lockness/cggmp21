@@ -28,3 +28,13 @@ pub mod encoding {
         m.as_ref().map(udigest::Bytes).unambiguously_encode(encoder)
     }
 }
+
+/// Returns `[list[indexes[0]], list[indexes[1]], ..., list[indexes[n-1]]]`
+///
+/// Result is `None` if any of `indexes[i]` is out of range of `list`
+pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Option<Vec<T>> {
+    indexes
+        .iter()
+        .map(|&i| list.get(i.into()).map(T::clone))
+        .collect()
+}

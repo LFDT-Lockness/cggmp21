@@ -110,7 +110,7 @@ where
             execution_id: eid,
             tracer: None,
             #[cfg(feature = "hd-wallets")]
-            hd_enabled: false,
+            hd_enabled: true,
             _params: std::marker::PhantomData,
         }
     }

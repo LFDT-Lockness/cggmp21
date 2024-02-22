@@ -61,6 +61,16 @@ jobs:
       run: cargo clippy --all --all-features --lib --exclude cggmp21-tests -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
     - name: Run clippy tests
       run: cargo clippy --tests --all-features --lib -- -D clippy::all
+  check-doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: dtolnay/rust-toolchain@nightly
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Check docs
+      run: RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo +nightly doc --workspace --all-features --no-deps
   bench:
     runs-on: ubuntu-latest
     permissions:

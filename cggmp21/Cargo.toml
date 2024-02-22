@@ -13,6 +13,7 @@ readme = "../README.md"
 
 [dependencies]
 cggmp21-keygen = { path = "../cggmp21-keygen", version = "0.1" }
+key-share = { path = "../key-share", version = "0.1" }
 
 generic-ec = { version = "0.1", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.1", features = ["serde", "udigest"] }
@@ -51,7 +52,7 @@ curve-secp256k1 = ["generic-ec/curve-secp256k1"]
 curve-secp256r1 = ["generic-ec/curve-secp256r1"]
 curve-stark = ["generic-ec/curve-stark"]
 hd-wallets = ["dep:slip-10", "cggmp21-keygen/hd-wallets"]
-spof = []
+spof = ["key-share/spof"]
 
 [package.metadata.docs.rs]
 all-features = true

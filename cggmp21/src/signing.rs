@@ -294,7 +294,7 @@ where
     /// Specifies HD derivation path
     ///
     /// Note: when generating a presignature, derivation path doesn't need to be known in advance. Instead
-    /// of using this method, [`Presingature::set_derivation_path`] could be used to set derivation path
+    /// of using this method, [`Presignature::set_derivation_path`] could be used to set derivation path
     /// after presignature was generated.
     ///
     /// ## Example
@@ -1152,13 +1152,15 @@ where
 impl<E: Curve> Presignature<E> {
     /// Specifies HD derivation path
     ///
-    /// Outputs a presignature that can be used to sign a message with a child key derived from master
-    /// `epub` using `derivation_path`. Note that all signers need to set the same derivation path,
-    /// otherwise output signature will be invalid.
+    /// Outputs a presignature that can be used to sign a message with a child
+    /// key derived from master `epub` using `derivation_path`. Note that all
+    /// signers need to set the same derivation path, otherwise output signature
+    /// will be invalid.
     ///
-    /// `epub` must be an [extended public key](DirtyIncompleteKeyShare::extended_public_key) assoicated
-    /// with the key share that was used to generate presignature. Using wrong `epub` will simply
-    /// lead to invalid signature.
+    /// `epub` must be an [extended public
+    /// key](crate::key_share::DirtyIncompleteKeyShare::extended_public_key)
+    /// assoicated with the key share that was used to generate presignature.
+    /// Using wrong `epub` will simply lead to invalid signature.
     #[cfg(feature = "hd-wallets")]
     pub fn set_derivation_path<Index>(
         mut self,
