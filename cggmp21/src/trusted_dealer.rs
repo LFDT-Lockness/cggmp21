@@ -1,7 +1,7 @@
 //! Trusted dealer
 //!
 //! Trusted dealer can be used to generate key shares in one place. Note
-//! that in creates SPOF/T (single point of failure/trust). Trusted
+//! that it creates an SPOF/T (single point of failure/trust). Trusted
 //! dealer is mainly intended to be used in tests, or it can be used to
 //! import key into TSS.
 //!

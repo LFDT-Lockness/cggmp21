@@ -71,7 +71,7 @@ use serde_with::As;
 ///   * Signer with index $i$ (index is in range $0 \le i < n$) holds secret share $x_i = F(I_i)$
 ///   * Shared secret key is $\sk = F(0)$.
 ///
-///   If key share is polynomial, [`vss_setup`](Self::vss_setup) fiels should be `Some(_)`.
+///   If key share is polynomial, [`vss_setup`](DirtyKeyInfo::vss_setup) fiels should be `Some(_)`.
 ///
 ///   $I_j$ mentioned above is defined in [`VssSetup::I`]. Reasonable default would be $I_j = j+1$.
 /// * Additive key share:
@@ -83,7 +83,7 @@ use serde_with::As;
 ///
 /// # HD wallets support
 /// If `hd-wallets` feature is enabled, key share provides basic support of deterministic key derivation:
-/// * [`chain_code`](Self::chain_code) field is added. If it's `Some(_)`, then the key is HD-capable.
+/// * [`chain_code`](DirtyKeyInfo::chain_code) field is added. If it's `Some(_)`, then the key is HD-capable.
 ///   `(shared_public_key, chain_code)` is extended public key of the wallet (can be retrieved via
 ///   [extended_public_key](DirtyCoreKeyShare::extended_public_key) method).
 ///   * Setting `chain_code` to `None` disables HD wallets support for the key
@@ -428,12 +428,10 @@ impl<T> From<ValidateError<T, InvalidCoreShare>> for InvalidCoreShare {
 }
 
 /// Reconstructs a secret key from set of at least
-/// [`min_signers`](KeyShare::min_signers) key shares
+/// [`min_signers`](CoreKeyShare::min_signers) key shares
 ///
-/// Requires at least [`min_signers`](KeyShare::min_signers) distinct key shares
-/// from the same generation (key refresh produces key shares of the next
-/// generation). Accepts both [`KeyShare`] and [`IncompleteKeyShare`].
-/// Returns error if input is invalid.
+/// Requires at least [`min_signers`](CoreKeyShare::min_signers) distinct key
+/// shares. Returns error if input is invalid.
 ///
 /// Note that, normally, secret key is not supposed to be reconstructed, and key
 /// shares should never be at one place. This basically defeats purpose of MPC and
@@ -442,8 +440,6 @@ impl<T> From<ValidateError<T, InvalidCoreShare>> for InvalidCoreShare {
 pub fn reconstruct_secret_key<E: Curve>(
     key_shares: &[impl AsRef<CoreKeyShare<E>>],
 ) -> Result<SecretScalar<E>, ReconstructError> {
-    use crate::utils::subset;
-
     if key_shares.is_empty() {
         return Err(ReconstructErrorReason::NoKeyShares.into());
     }
@@ -472,7 +468,7 @@ pub fn reconstruct_secret_key<E: Curve>(
 
     if let Some(VssSetup { I, .. }) = vss {
         let S = key_shares.iter().map(|s| s.as_ref().i).collect::<Vec<_>>();
-        let I = subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
+        let I = crate::utils::subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
         let lagrange_coefficients =
             (0..).map(|j| generic_ec_zkp::polynomial::lagrange_coefficient(Scalar::zero(), j, &I));
         let mut sk = lagrange_coefficients

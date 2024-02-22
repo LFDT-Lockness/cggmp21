@@ -1,7 +1,7 @@
 //! Trusted dealer
 //!
 //! Trusted dealer can be used to generate key shares in one place. Note
-//! that in creates SPOF/T (single point of failure/trust). Trusted
+//! that it creates an SPOF/T (single point of failure/trust). Trusted
 //! dealer is mainly intended to be used in tests.
 //!
 //! ## Example
@@ -52,7 +52,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
             n,
             shared_secret_key: None,
             #[cfg(feature = "hd-wallets")]
-            enable_hd: false,
+            enable_hd: true,
         }
     }
 
