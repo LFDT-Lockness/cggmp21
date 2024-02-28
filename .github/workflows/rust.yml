@@ -24,6 +24,7 @@ jobs:
       with:
         name: benchmark-tool
         path: target/release/measure_perf
+
   # Run tests without HD wallets support
   test:
     runs-on: ubuntu-latest
@@ -44,6 +45,7 @@ jobs:
         cache-on-failure: "true"
     - name: Run tests
       run: cargo test -r --all-features
+
   fmt:
     runs-on: ubuntu-latest
     steps:
@@ -61,6 +63,7 @@ jobs:
       run: cargo clippy --all --all-features --lib --exclude cggmp21-tests -- --no-deps -D clippy::all -D clippy::unwrap_used -D clippy::expect_used
     - name: Run clippy tests
       run: cargo clippy --tests --all-features --lib -- -D clippy::all
+
   check-doc:
     runs-on: ubuntu-latest
     steps:
@@ -71,6 +74,7 @@ jobs:
         cache-on-failure: "true"
     - name: Check docs
       run: RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo +nightly doc --workspace --all-features --no-deps
+
   bench:
     runs-on: ubuntu-latest
     permissions:
@@ -92,3 +96,19 @@ jobs:
       with:
         header: bench
         path: pr-comment
+
+  check-publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+        - key-share
+        - cggmp21-keygen
+        - cggmp21
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Dry-run publish
+      run: cargo publish --dry-run -p ${{ matrix.package }}
