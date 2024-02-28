@@ -9,9 +9,9 @@
 //! ```rust,no_run
 //! # use rand_core::OsRng;
 //! # let mut rng = OsRng;
-//! use generic_ec::{curves::Secp256k1, SecretScalar};
+//! use generic_ec::{curves::Secp256k1, SecretScalar, NonZero};
 //!
-//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut rng);
+//! let secret_key_to_be_imported = NonZero::<SecretScalar<Secp256k1>>::random(&mut rng);
 //!
 //! let key_shares = key_share::trusted_dealer::builder::<Secp256k1>(5)
 //!     .set_threshold(Some(3))
