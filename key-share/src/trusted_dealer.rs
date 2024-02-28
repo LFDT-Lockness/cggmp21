@@ -117,13 +117,13 @@ impl<E: Curve> TrustedDealerBuilder<E> {
                 shared_public_key,
                 Point::generator() * f.value::<_, Scalar<_>>(&Scalar::zero())
             );
-            let shares = key_shares_indexes
+
+            key_shares_indexes
                 .iter()
                 .map(|I_i| f.value(I_i))
                 .map(|mut x_i| SecretScalar::new(&mut x_i))
                 .map(|x| NonZero::from_secret_scalar(x).ok_or(Reason::ZeroShare))
-                .collect::<Result<Vec<_>, _>>()?;
-            shares
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             let mut shares = std::iter::repeat_with(|| NonZero::<SecretScalar<E>>::random(rng))
                 .take((self.n - 1).into())
