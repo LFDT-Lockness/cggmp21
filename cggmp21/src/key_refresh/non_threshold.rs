@@ -1,6 +1,6 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::schnorr_pok;
 use paillier_zk::{
     fast_paillier,
@@ -655,8 +655,8 @@ where
         .public_shares
         .into_iter()
         .zip(X_sums)
-        .map(|(x, p)| x + p)
-        .collect();
+        .map(|(x, p)| NonZero::from_point(x + p).ok_or(Bug::ZeroShare))
+        .collect::<Result<_, _>>()?;
 
     tracer.stage("Assemble new core share");
     let new_core_share: IncompleteKeyShare<E> = DirtyIncompleteKeyShare {
@@ -664,7 +664,7 @@ where
             public_shares: X_stars,
             ..old_core_share.key_info
         },
-        x: SecretScalar::new(&mut x_star),
+        x: NonZero::from_secret_scalar(SecretScalar::new(&mut x_star)).ok_or(Bug::ZeroShare)?,
         ..old_core_share
     }
     .validate()

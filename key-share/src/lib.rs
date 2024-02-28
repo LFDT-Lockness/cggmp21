@@ -99,7 +99,7 @@ pub struct DirtyCoreKeyShare<E: Curve> {
     pub key_info: DirtyKeyInfo<E>,
     /// Secret share $x_i$
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
-    pub x: SecretScalar<E>,
+    pub x: NonZero<SecretScalar<E>>,
 }
 
 /// Public Key Info
@@ -116,7 +116,7 @@ pub struct DirtyKeyInfo<E: Curve> {
     pub curve: CurveName<E>,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
-    pub shared_public_key: Point<E>,
+    pub shared_public_key: NonZero<Point<E>>,
     /// Public shares of all signers sharing the key
     ///
     /// `public_shares[i]` corresponds to public share (or public commitment) of $\ith$ party.
@@ -124,7 +124,7 @@ pub struct DirtyKeyInfo<E: Curve> {
         feature = "serde",
         serde(with = "As::<Vec<generic_ec::serde::Compact>>")
     )]
-    pub public_shares: Vec<Point<E>>,
+    pub public_shares: Vec<NonZero<Point<E>>>,
     /// Verifiable secret sharing setup, present if key was generated using VSS scheme
     pub vss_setup: Option<VssSetup<E>>,
     /// Chain code associated with the key, if HD wallets support was enabled
@@ -172,9 +172,11 @@ impl<E: Curve> Validate for DirtyCoreKeyShare<E> {
     }
 }
 
-impl<E: Curve> ValidateFromParts<(u16, DirtyKeyInfo<E>, SecretScalar<E>)> for DirtyCoreKeyShare<E> {
+impl<E: Curve> ValidateFromParts<(u16, DirtyKeyInfo<E>, NonZero<SecretScalar<E>>)>
+    for DirtyCoreKeyShare<E>
+{
     fn validate_parts(
-        (i, key_info, x): &(u16, DirtyKeyInfo<E>, SecretScalar<E>),
+        (i, key_info, x): &(u16, DirtyKeyInfo<E>, NonZero<SecretScalar<E>>),
     ) -> Result<(), Self::Error> {
         let party_public_share = key_info
             .public_shares
@@ -187,7 +189,7 @@ impl<E: Curve> ValidateFromParts<(u16, DirtyKeyInfo<E>, SecretScalar<E>)> for Di
         Ok(())
     }
 
-    fn from_parts((i, key_info, x): (u16, DirtyKeyInfo<E>, SecretScalar<E>)) -> Self {
+    fn from_parts((i, key_info, x): (u16, DirtyKeyInfo<E>, NonZero<SecretScalar<E>>)) -> Self {
         Self { i, key_info, x }
     }
 }
@@ -207,8 +209,8 @@ impl<E: Curve> Validate for DirtyKeyInfo<E> {
 
 #[allow(clippy::nonminimal_bool)]
 fn validate_vss_key_info<E: Curve>(
-    shared_public_key: Point<E>,
-    public_shares: &[Point<E>],
+    shared_public_key: NonZero<Point<E>>,
+    public_shares: &[NonZero<Point<E>>],
     vss_setup: &VssSetup<E>,
 ) -> Result<(), InvalidCoreShare> {
     let n: u16 = public_shares
@@ -264,8 +266,8 @@ fn validate_vss_key_info<E: Curve>(
 }
 
 fn validate_non_vss_key_info<E: Curve>(
-    shared_public_key: Point<E>,
-    public_shares: &[Point<E>],
+    shared_public_key: NonZero<Point<E>>,
+    public_shares: &[NonZero<Point<E>>],
 ) -> Result<(), InvalidCoreShare> {
     let n: u16 = public_shares
         .len()
@@ -314,7 +316,7 @@ impl<E: Curve> DirtyCoreKeyShare<E> {
     /// Returns extended public key, if HD support was enabled
     pub fn extended_public_key(&self) -> Option<slip_10::ExtendedPublicKey<E>> {
         Some(slip_10::ExtendedPublicKey {
-            public_key: self.shared_public_key,
+            public_key: self.shared_public_key.into_inner(),
             chain_code: self.chain_code?,
         })
     }
@@ -361,7 +363,7 @@ impl<E: Curve> CoreKeyShare<E> {
     }
 
     /// Returns public key shared by signers
-    pub fn shared_public_key(&self) -> Point<E> {
+    pub fn shared_public_key(&self) -> NonZero<Point<E>> {
         self.shared_public_key
     }
 }

@@ -3,7 +3,7 @@
 use std::ops;
 use std::sync::Arc;
 
-use generic_ec::{Curve, Point, SecretScalar};
+use generic_ec::{Curve, NonZero, Point, SecretScalar};
 use paillier_zk::paillier_encryption_in_range as π_enc;
 use paillier_zk::rug::{Complete, Integer};
 use serde::{Deserialize, Serialize};
@@ -327,7 +327,7 @@ pub trait AnyKeyShare<E: Curve>: AsRef<IncompleteKeyShare<E>> {
     }
 
     /// Returns public key shared by signers
-    fn shared_public_key(&self) -> Point<E> {
+    fn shared_public_key(&self) -> NonZero<Point<E>> {
         self.as_ref().shared_public_key
     }
 }

@@ -24,7 +24,7 @@
 
 use std::{iter, marker::PhantomData};
 
-use generic_ec::{Curve, SecretScalar};
+use generic_ec::{Curve, NonZero, SecretScalar};
 use paillier_zk::{
     rug::{Complete, Integer},
     IntegerExt,
@@ -98,7 +98,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Sets shared secret key to be generated
     ///
     /// Resulting key shares will share specified secret key.
-    pub fn set_shared_secret_key(self, sk: SecretScalar<E>) -> Self {
+    pub fn set_shared_secret_key(self, sk: NonZero<SecretScalar<E>>) -> Self {
         Self {
             inner: self.inner.set_shared_secret_key(sk),
             ..self

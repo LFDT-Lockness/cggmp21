@@ -307,6 +307,10 @@ enum Bug {
     #[cfg(feature = "hd-wallets")]
     #[error("chain code is missing although we checked that it should be present")]
     NoChainCode,
+    #[error("key share of one of the signers is zero - probability of that is negligible")]
+    ZeroShare,
+    #[error("shared public key is zero - probability of that is negligible")]
+    ZeroPk,
 }
 
 /// Distributed key generation protocol

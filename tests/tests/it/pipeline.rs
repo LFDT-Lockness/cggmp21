@@ -1,6 +1,6 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case, cfg_attr))]
 mod generic {
-    use generic_ec::{Curve, Point};
+    use generic_ec::{Curve, NonZero, Point};
     use rand::{seq::SliceRandom, Rng, RngCore};
     use rand_dev::DevRng;
     use round_based::simulation::Simulation;
@@ -167,10 +167,13 @@ mod generic {
 
         #[cfg(feature = "hd-wallets")]
         let public_key = if let Some(path) = &derivation_path {
-            shares[0]
-                .derive_child_public_key(path.iter().cloned())
-                .unwrap()
-                .public_key
+            NonZero::from_point(
+                shares[0]
+                    .derive_child_public_key(path.iter().cloned())
+                    .unwrap()
+                    .public_key,
+            )
+            .unwrap()
         } else {
             shares[0].shared_public_key
         };
