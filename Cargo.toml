@@ -7,6 +7,6 @@ members = [
     "tests",
 ]
 
-[patch.crates-io.generic-ec]
-git = "https://github.com/dfns/generic-ec"
-branch = "nonzero-cmp"
+[patch.crates-io.paillier-zk]
+git = "https://github.com/dfns/paillier-zk"
+branch = "update-generic-ec"

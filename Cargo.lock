@@ -276,7 +276,7 @@ dependencies = [
  "cggmp21-keygen",
  "digest",
  "futures",
- "generic-ec",
+ "generic-ec 0.2.0",
  "generic-ec-zkp",
  "generic-tests",
  "hex",
@@ -301,7 +301,7 @@ version = "0.1.0"
 dependencies = [
  "digest",
  "futures",
- "generic-ec",
+ "generic-ec 0.2.0",
  "generic-ec-zkp",
  "hex",
  "key-share",
@@ -323,7 +323,7 @@ dependencies = [
  "bpaf",
  "cggmp21",
  "futures",
- "generic-ec",
+ "generic-ec 0.2.0",
  "generic-tests",
  "lazy_static",
  "rand",
@@ -893,7 +893,21 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.1.4"
-source = "git+https://github.com/dfns/generic-ec?branch=nonzero-cmp#59d850ee920e0b34219b348a5a5066034de47db9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f20aec40cfb745f7af3d8e889bbfedbe1565cd383a645ceae86b32e8766d5060"
+dependencies = [
+ "generic-ec-core",
+ "phantom-type 0.4.2",
+ "rand_core",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "generic-ec"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f315ffeaae6a05691c5a27028b4ae960d3a430e406d0109ff8502e2f84ae97b"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -909,8 +923,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-core"
-version = "0.1.2"
-source = "git+https://github.com/dfns/generic-ec?branch=nonzero-cmp#59d850ee920e0b34219b348a5a5066034de47db9"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22cab102fc88bfc017c16e69d21edae6f41ab58bfe69eed09ed0a2cf10ec923f"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -921,8 +936,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-curves"
-version = "0.1.3"
-source = "git+https://github.com/dfns/generic-ec?branch=nonzero-cmp#59d850ee920e0b34219b348a5a5066034de47db9"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a133d38cde4fef7aea4e367ca51f291db0248495a424ec4208cdace08ba59f4"
 dependencies = [
  "crypto-bigint",
  "curve25519-dalek",
@@ -940,12 +956,12 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f98645d68f62951789a4aec46ef4416878c2827b2353f5267cf96b096eae60d9"
+checksum = "a9b631ea71fa0294e80d479c5b952e276776c9abf1b1a542b48e66b83fe1828c"
 dependencies = [
  "generic-array",
- "generic-ec",
+ "generic-ec 0.2.0",
  "rand_core",
  "serde",
  "subtle",
@@ -1285,7 +1301,7 @@ dependencies = [
 name = "key-share"
 version = "0.1.0"
 dependencies = [
- "generic-ec",
+ "generic-ec 0.2.0",
  "generic-ec-zkp",
  "hex",
  "rand_core",
@@ -1416,12 +1432,11 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4956496b1cb7ecf45e86844ae50a5c0ade430dd4d491de8d020adb95ca6f328"
+source = "git+https://github.com/dfns/paillier-zk?branch=update-generic-ec#283e3d60d595d696bfba56c86a5af22acc694c4f"
 dependencies = [
  "digest",
  "fast-paillier",
- "generic-ec",
+ "generic-ec 0.2.0",
  "rand_core",
  "rug",
  "serde",
@@ -2019,7 +2034,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4670651d286d5714497971c12d36b83d75679c39da5d5ed757ff5e1e1d45855c"
 dependencies = [
  "generic-array",
- "generic-ec",
+ "generic-ec 0.1.4",
  "hmac",
  "sha2",
  "subtle",
