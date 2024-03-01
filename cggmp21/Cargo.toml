@@ -19,7 +19,7 @@ generic-ec = { version = "0.2", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.2", features = ["serde", "udigest"] }
 round-based = { version = "0.2", features = ["derive"] }
 
-paillier-zk = { version = "0.1", features = ["serde"] }
+paillier-zk = { version = "0.2", features = ["serde"] }
 udigest = { version = "0.1", features = ["std", "derive"]}
 
 digest = "0.10"
@@ -35,7 +35,7 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_with = { version = "2" }
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
-slip-10 = { version = "0.1", optional = true, features = ["std"] }
+slip-10 = { version = "0.2", optional = true, features = ["std"] }
 
 [dev-dependencies]
 round-based = { version = "0.2", features = ["derive", "dev"] }

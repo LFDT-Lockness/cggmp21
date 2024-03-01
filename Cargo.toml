@@ -7,6 +7,3 @@ members = [
     "tests",
 ]
 
-[patch.crates-io.paillier-zk]
-git = "https://github.com/dfns/paillier-zk"
-branch = "update-generic-ec"

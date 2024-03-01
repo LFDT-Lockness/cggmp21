@@ -276,7 +276,7 @@ dependencies = [
  "cggmp21-keygen",
  "digest",
  "futures",
- "generic-ec 0.2.0",
+ "generic-ec",
  "generic-ec-zkp",
  "generic-tests",
  "hex",
@@ -301,7 +301,7 @@ version = "0.1.0"
 dependencies = [
  "digest",
  "futures",
- "generic-ec 0.2.0",
+ "generic-ec",
  "generic-ec-zkp",
  "hex",
  "key-share",
@@ -323,7 +323,7 @@ dependencies = [
  "bpaf",
  "cggmp21",
  "futures",
- "generic-ec 0.2.0",
+ "generic-ec",
  "generic-tests",
  "lazy_static",
  "rand",
@@ -892,19 +892,6 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f20aec40cfb745f7af3d8e889bbfedbe1565cd383a645ceae86b32e8766d5060"
-dependencies = [
- "generic-ec-core",
- "phantom-type 0.4.2",
- "rand_core",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "generic-ec"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f315ffeaae6a05691c5a27028b4ae960d3a430e406d0109ff8502e2f84ae97b"
@@ -961,7 +948,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9b631ea71fa0294e80d479c5b952e276776c9abf1b1a542b48e66b83fe1828c"
 dependencies = [
  "generic-array",
- "generic-ec 0.2.0",
+ "generic-ec",
  "rand_core",
  "serde",
  "subtle",
@@ -1301,7 +1288,7 @@ dependencies = [
 name = "key-share"
 version = "0.1.0"
 dependencies = [
- "generic-ec 0.2.0",
+ "generic-ec",
  "generic-ec-zkp",
  "hex",
  "rand_core",
@@ -1431,12 +1418,13 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.1.0"
-source = "git+https://github.com/dfns/paillier-zk?branch=update-generic-ec#283e3d60d595d696bfba56c86a5af22acc694c4f"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "390990e7d2f9a189043a2ce042cce3107955046561d5a89ae717dfc31b9c1ca4"
 dependencies = [
  "digest",
  "fast-paillier",
- "generic-ec 0.2.0",
+ "generic-ec",
  "rand_core",
  "rug",
  "serde",
@@ -2029,12 +2017,12 @@ dependencies = [
 
 [[package]]
 name = "slip-10"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4670651d286d5714497971c12d36b83d75679c39da5d5ed757ff5e1e1d45855c"
+checksum = "f20f0918d675ab26ca9fa3e2c42548356f54b7a09fb4633313756522ddd59f75"
 dependencies = [
  "generic-array",
- "generic-ec 0.1.4",
+ "generic-ec",
  "hmac",
  "sha2",
  "subtle",
