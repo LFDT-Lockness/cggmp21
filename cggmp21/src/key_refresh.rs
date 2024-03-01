@@ -24,7 +24,7 @@ use crate::{fast_paillier, rug::Integer};
 #[doc(no_inline)]
 pub use self::msg::{aux_only::Msg as AuxOnlyMsg, non_threshold::Msg as NonThresholdMsg};
 
-#[doc = include_str!("../../docs/mpc_message.md")]
+#[doc = include_str!("../docs/mpc_message.md")]
 pub mod msg {
     /// Messages types related to aux information generation protocol
     pub mod aux_only {
@@ -248,7 +248,7 @@ where
         self
     }
 
-    #[doc = include_str!("../../docs/enforce_reliable_broadcast.md")]
+    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
     pub fn enforce_reliable_broadcast(self, v: bool) -> Self {
         Self {
             enforce_reliable_broadcast: v,
