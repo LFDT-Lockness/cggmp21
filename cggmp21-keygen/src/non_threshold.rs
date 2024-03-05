@@ -1,6 +1,6 @@
 use digest::Digest;
 use futures::SinkExt;
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::schnorr_pok;
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
@@ -55,7 +55,7 @@ pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     #[udigest(as_bytes)]
     pub rid: L::Rid,
     /// $X_i$
-    pub X: Point<E>,
+    pub X: NonZero<Point<E>>,
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
     /// Party contribution to chain code
@@ -140,7 +140,7 @@ where
     let tag_i = tag(i);
 
     tracer.stage("Sample x_i, rid_i, chain_code");
-    let x_i = SecretScalar::<E>::random(rng);
+    let x_i = NonZero::<SecretScalar<E>>::random(rng);
     let X_i = Point::generator() * &x_i;
 
     let mut rid = L::Rid::default();
@@ -340,10 +340,13 @@ where
         i,
         key_info: DirtyKeyInfo {
             curve: Default::default(),
-            shared_public_key: decommitments
-                .iter_including_me(&my_decommitment)
-                .map(|d| d.X)
-                .sum(),
+            shared_public_key: NonZero::from_point(
+                decommitments
+                    .iter_including_me(&my_decommitment)
+                    .map(|d| d.X)
+                    .sum(),
+            )
+            .ok_or(Bug::ZeroPk)?,
             public_shares: decommitments
                 .iter_including_me(&my_decommitment)
                 .map(|d| d.X)

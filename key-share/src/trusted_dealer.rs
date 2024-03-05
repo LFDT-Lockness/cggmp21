@@ -9,9 +9,9 @@
 //! ```rust,no_run
 //! # use rand_core::OsRng;
 //! # let mut rng = OsRng;
-//! use generic_ec::{curves::Secp256k1, SecretScalar};
+//! use generic_ec::{curves::Secp256k1, SecretScalar, NonZero};
 //!
-//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut rng);
+//! let secret_key_to_be_imported = NonZero::<SecretScalar<Secp256k1>>::random(&mut rng);
 //!
 //! let key_shares = key_share::trusted_dealer::builder::<Secp256k1>(5)
 //!     .set_threshold(Some(3))
@@ -20,7 +20,7 @@
 //! # Ok::<_, key_share::trusted_dealer::TrustedDealerError>(())
 //! ```
 
-use generic_ec::{Curve, Point, Scalar, SecretScalar};
+use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{CoreKeyShare, VssSetup};
 
@@ -37,7 +37,7 @@ pub fn builder<E: Curve>(n: u16) -> TrustedDealerBuilder<E> {
 pub struct TrustedDealerBuilder<E: Curve> {
     t: Option<u16>,
     n: u16,
-    shared_secret_key: Option<SecretScalar<E>>,
+    shared_secret_key: Option<NonZero<SecretScalar<E>>>,
     #[cfg(feature = "hd-wallets")]
     enable_hd: bool,
 }
@@ -75,7 +75,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
     /// Sets shared secret key to be generated
     ///
     /// Resulting key shares will share specified secret key.
-    pub fn set_shared_secret_key(self, sk: SecretScalar<E>) -> Self {
+    pub fn set_shared_secret_key(self, sk: NonZero<SecretScalar<E>>) -> Self {
         Self {
             shared_secret_key: Some(sk),
             ..self
@@ -101,33 +101,44 @@ impl<E: Curve> TrustedDealerBuilder<E> {
     ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
         let shared_secret_key = self
             .shared_secret_key
-            .unwrap_or_else(|| SecretScalar::random(rng));
+            .unwrap_or_else(|| NonZero::<SecretScalar<_>>::random(rng));
+        let shared_public_key = Point::generator() * &shared_secret_key;
         let key_shares_indexes = (1..=self.n)
             .map(|i| generic_ec::NonZero::from_scalar(Scalar::from(i)))
             .collect::<Option<Vec<_>>>()
             .ok_or(Reason::DeriveKeyShareIndex)?;
-        let (shared_public_key, secret_shares) = if let Some(t) = self.t {
+        let secret_shares = if let Some(t) = self.t {
             let f = generic_ec_zkp::polynomial::Polynomial::sample_with_const_term(
                 rng,
                 usize::from(t) - 1,
                 shared_secret_key,
             );
-            let pk = Point::generator() * f.value::<_, Scalar<_>>(&Scalar::zero());
-            let shares = key_shares_indexes
+            debug_assert_eq!(
+                shared_public_key,
+                Point::generator() * f.value::<_, Scalar<_>>(&Scalar::zero())
+            );
+
+            key_shares_indexes
                 .iter()
                 .map(|I_i| f.value(I_i))
                 .map(|mut x_i| SecretScalar::new(&mut x_i))
-                .collect::<Vec<_>>();
-            (pk, shares)
+                .map(|x| NonZero::from_secret_scalar(x).ok_or(Reason::ZeroShare))
+                .collect::<Result<Vec<_>, _>>()?
         } else {
-            let mut shares = std::iter::repeat_with(|| SecretScalar::<E>::random(rng))
+            let mut shares = std::iter::repeat_with(|| NonZero::<SecretScalar<E>>::random(rng))
                 .take((self.n - 1).into())
                 .collect::<Vec<_>>();
-            shares.push(SecretScalar::new(
-                &mut (shared_secret_key - shares.iter().sum::<Scalar<E>>()),
-            ));
-            let pk = shares.iter().sum::<Scalar<E>>() * Point::generator();
-            (pk, shares)
+            shares.push(
+                NonZero::from_secret_scalar(SecretScalar::new(
+                    &mut (shared_secret_key - shares.iter().sum::<SecretScalar<E>>()),
+                ))
+                .ok_or(Reason::ZeroShare)?,
+            );
+            debug_assert_eq!(
+                shared_public_key,
+                shares.iter().sum::<SecretScalar<E>>() * Point::generator()
+            );
+            shares
         };
 
         let public_shares = secret_shares
@@ -181,4 +192,6 @@ enum Reason {
     InvalidKeyShare(#[source] crate::InvalidCoreShare),
     #[error("deriving key share index failed")]
     DeriveKeyShareIndex,
+    #[error("randomly generated share is zero - probability of that is negligible")]
+    ZeroShare,
 }

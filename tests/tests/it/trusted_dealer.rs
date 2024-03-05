@@ -1,7 +1,7 @@
 #[generic_tests::define]
 mod test {
     use cggmp21::{define_security_level, key_share::reconstruct_secret_key};
-    use generic_ec::{Curve, Point, SecretScalar};
+    use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
     use rand::{seq::SliceRandom, Rng};
     use rand_dev::DevRng;
 
@@ -30,7 +30,7 @@ mod test {
                 .filter(|t| t.map(|t| t <= n).unwrap_or(true))
             {
                 println!("t={t:?} n={n}");
-                let sk = SecretScalar::random(&mut rng);
+                let sk = NonZero::<SecretScalar<_>>::random(&mut rng);
                 let shares = trusted_dealer::builder::<E, DummyLevel>(n)
                     .set_threshold(t)
                     .set_shared_secret_key(sk.clone())
@@ -45,7 +45,13 @@ mod test {
                     .collect::<Vec<_>>();
 
                 let sk_reconstructed = reconstruct_secret_key(&t_shares).unwrap();
-                assert_eq!(sk.as_ref(), sk_reconstructed.as_ref());
+                assert_eq!(
+                    {
+                        let sk: &Scalar<E> = sk.as_ref();
+                        sk
+                    },
+                    sk_reconstructed.as_ref()
+                );
                 assert_eq!(
                     Point::generator() * &sk_reconstructed,
                     shares[0].core.shared_public_key

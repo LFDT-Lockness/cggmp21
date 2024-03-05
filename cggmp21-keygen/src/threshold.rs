@@ -342,11 +342,12 @@ where
         .sum::<Polynomial<_>>();
     let ys = (0..n)
         .map(|l| polynomial_sum.value(&Scalar::from(l + 1)))
-        .collect::<Vec<_>>();
+        .map(|y_j: Point<E>| NonZero::from_point(y_j).ok_or(Bug::ZeroShare))
+        .collect::<Result<Vec<_>, _>>()?;
     tracer.stage("Compute sigma");
     let sigma: Scalar<E> = sigmas_msg.iter().map(|msg| msg.sigma).sum();
     let mut sigma = sigma + sigmas[usize::from(i)];
-    let sigma = SecretScalar::new(&mut sigma);
+    let sigma = NonZero::from_secret_scalar(SecretScalar::new(&mut sigma)).ok_or(Bug::ZeroShare)?;
     debug_assert_eq!(Point::generator() * &sigma, ys[usize::from(i)]);
 
     tracer.stage("Calculate challenge");
@@ -425,7 +426,7 @@ where
         i,
         key_info: DirtyKeyInfo {
             curve: Default::default(),
-            shared_public_key: y,
+            shared_public_key: NonZero::from_point(y).ok_or(Bug::ZeroPk)?,
             public_shares: ys,
             vss_setup: Some(VssSetup {
                 min_signers: t,

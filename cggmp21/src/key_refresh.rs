@@ -326,6 +326,8 @@ enum Bug {
     BuildMultiexpTables(#[source] crate::key_share::InvalidKeyShare),
     #[error("couldn't build CRT")]
     BuildCrt,
+    #[error("updated share is zero - probability of that is negligible")]
+    ZeroShare,
 }
 
 /// Error indicating that protocol was aborted by malicious party

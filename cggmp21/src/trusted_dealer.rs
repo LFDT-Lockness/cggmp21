@@ -11,9 +11,9 @@
 //! # use rand::rngs::OsRng;
 //! # let mut rng = OsRng;
 //! use cggmp21::{supported_curves::Secp256k1, security_level::SecurityLevel128};
-//! use cggmp21::generic_ec::SecretScalar;
+//! use cggmp21::generic_ec::{SecretScalar, NonZero};
 //!
-//! let secret_key_to_be_imported = SecretScalar::<Secp256k1>::random(&mut rng);
+//! let secret_key_to_be_imported = NonZero::<SecretScalar<Secp256k1>>::random(&mut rng);
 //!
 //! let key_shares = cggmp21::trusted_dealer::builder::<Secp256k1, SecurityLevel128>(5)
 //!     .set_threshold(Some(3))
@@ -24,7 +24,7 @@
 
 use std::{iter, marker::PhantomData};
 
-use generic_ec::{Curve, SecretScalar};
+use generic_ec::{Curve, NonZero, SecretScalar};
 use paillier_zk::{
     rug::{Complete, Integer},
     IntegerExt,
@@ -98,7 +98,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Sets shared secret key to be generated
     ///
     /// Resulting key shares will share specified secret key.
-    pub fn set_shared_secret_key(self, sk: SecretScalar<E>) -> Self {
+    pub fn set_shared_secret_key(self, sk: NonZero<SecretScalar<E>>) -> Self {
         Self {
             inner: self.inner.set_shared_secret_key(sk),
             ..self

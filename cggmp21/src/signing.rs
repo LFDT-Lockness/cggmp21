@@ -459,7 +459,7 @@ where
 
         let lambda_i =
             lagrange_coefficient(Scalar::zero(), usize::from(i), &I).ok_or(Bug::LagrangeCoef)?;
-        let x_i = SecretScalar::new(&mut (lambda_i * &key_share.core.x));
+        let x_i = (lambda_i * &key_share.core.x).into_secret();
 
         let lambda = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), usize::from(j), &I));
         let X = lambda
@@ -480,9 +480,11 @@ where
     let shift = additive_shift.unwrap_or(Scalar::zero());
     let Shift = Point::generator() * shift;
 
-    X[0] += Shift;
+    X[0] = NonZero::from_point(X[0] + Shift).ok_or(Bug::DerivedChildKeyZero)?;
     if i == 0 {
-        x_i = SecretScalar::new(&mut (x_i + shift));
+        x_i = NonZero::from_scalar(x_i + shift)
+            .ok_or(Bug::DerivedChildShareZero)?
+            .into_secret();
     }
     debug_assert_eq!(
         key_share.core.shared_public_key + Shift,
@@ -524,8 +526,8 @@ async fn signing_n_out_of_n<M, E, L, D, R>(
     sid: ExecutionId<'_>,
     i: PartyIndex,
     n: u16,
-    x_i: &SecretScalar<E>,
-    X: &[Point<E>],
+    x_i: &NonZero<SecretScalar<E>>,
+    X: &[NonZero<Point<E>>],
     pk: Point<E>,
     p_i: &Integer,
     q_i: &Integer,
@@ -974,7 +976,7 @@ where
             })?;
 
     let delta_i = gamma_i.as_ref() * k_i.as_ref() + alpha_sum + beta_sum;
-    let chi_i = x_i.as_ref() * k_i.as_ref() + hat_alpha_sum + hat_beta_sum;
+    let chi_i = x_i * k_i.as_ref() + hat_alpha_sum + hat_beta_sum;
     runtime.yield_now().await;
 
     for j in utils::iter_peers(i, n) {
@@ -1420,6 +1422,10 @@ enum Bug {
     LagrangeCoef,
     #[error("subset function returned error")]
     Subset,
+    #[error("derived child key is zero - probability of that is negligible")]
+    DerivedChildKeyZero,
+    #[error("derived child share is zero - probability of that is negligible")]
+    DerivedChildShareZero,
 }
 
 #[derive(Debug)]
