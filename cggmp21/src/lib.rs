@@ -109,7 +109,7 @@
 //!
 //! ### Auxiliary info generation
 //! After key generation, all signers need to take part in generation of auxiliary information. Make sure all signers occupy exactly
-//! the same indices as at keygen.
+//! the same indexes as at keygen.
 //! ```rust,no_run
 //! # async fn doc() -> Result<(), cggmp21::KeyRefreshError> {
 //! # type Msg = cggmp21::key_refresh::msg::aux_only::Msg<sha2::Sha256, cggmp21::security_level::SecurityLevel128>;
