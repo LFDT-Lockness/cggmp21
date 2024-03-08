@@ -60,7 +60,7 @@
 //! has a public key uniqely idenitifying that signer, you can assign unique indexes to the signers as follows:
 //! 1. Make a list of signers' public keys
 //! 2. Sort the list of public keys
-//! 3. Assign each signer an index `i` such that `i` corresponds to the position of the signer's public key in the 
+//! 3. Assign each signer an index `i` such that `i` corresponds to the position of the signer's public key in the
 //!    sorted list of public keys
 //!
 //! [security requirements]: #security
