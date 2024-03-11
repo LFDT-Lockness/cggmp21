@@ -201,10 +201,10 @@ However, you may opt for them by enabling `spof` feature, then you can use `trus
 for key import and `key_share::reconstruct_secret_key` for key export.
 
 ## Differences between the implementation and [CGGMP21]
-[CGGMP21] only defines a full threshold protocol. To support general thresholds,
+[CGGMP21] only defines a non-threshold protocol. To support general thresholds,
 we defined our own CGGMP21-like key generation and threshold signing
 protocols. However, we keep both
-general threshold and full threshold versions of the protocols in the crate, so if you opt for the full threshold
+threshold and non-threshold versions of the protocols in the crate, so if you opt for the non-threshold
 protocol, you will be running the original protocol defined in the paper.
 
 There are other (small) differences in the implementation compared to the original paper (mostly typo fixes);
