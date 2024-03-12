@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "UC-secure DKG implementation based on CGGMP21 paper"
 repository = "https://github.com/dfns/cggmp21"
 categories = ["algorithms", "cryptography"]
-keywords = ["mpc", "dkg", "threshold-signatures", "tss", "ecdsa", "t-ecdsa"]
+keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
