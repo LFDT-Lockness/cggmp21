@@ -1,7 +1,7 @@
 # Changelog
 
 ## v0.2.0
-* Add support of HD wallets compatible with BIP-32 and SLIP-10 [#68]
+* Add support of HD wallets compatible with BIP-32 and SLIP-10 [#68],
   [#74], [#75]
 * Restructure the library: move reusable structs and functionalities into separate
   sub-crates [#72], [#76], [#77], [#79]
