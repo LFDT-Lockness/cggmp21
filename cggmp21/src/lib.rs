@@ -27,6 +27,8 @@
 //! * Identifiable abort
 //! * The (5+1)-round signing protocol
 //!
+//! Our implementation has been audited by Kudelski. Report can be found [here][report].
+//!
 //! > About notion of threshold and non-threshold keys: originally, CGGMP21 paper does not have support of
 //! arbitrary `t` and only works with non-threshold n-out-of-n keys. We have added support of arbitrary
 //! threshold $2 \le t \le n$, however, we made it possible to opt out therhsoldness so original CGGMP21
@@ -257,6 +259,7 @@
 //! [security guidelines]: #security-guidelines
 //! [slip10]: https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 //! [bip32]: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
+//! [report]: https://github.com/dfns/cggmp21/blob/m/docs/audit_report.pdf
 //!
 //! ## Timing attacks
 //! Timing attacks are type of side-channel attacks that leak sensitive information through duration of
