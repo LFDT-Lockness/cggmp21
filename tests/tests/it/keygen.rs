@@ -131,6 +131,7 @@ mod generic {
                 Point::<E>::generator() * &key_share.x,
                 key_share.public_shares[usize::from(i)]
             );
+            bincode::serialize(&key_share).unwrap();
         }
 
         #[cfg(feature = "hd-wallets")]
