@@ -1,6 +1,6 @@
 [package]
 name = "key-share"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Key share of any Threshold Signature Scheme (TSS)"
@@ -32,3 +32,7 @@ serde = ["dep:serde", "serde_with", "hex"]
 hd-wallets = ["slip-10"]
 spof = ["dep:rand_core"]
 udigest = ["dep:udigest"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "katex-header.html"]

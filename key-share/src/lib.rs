@@ -88,6 +88,21 @@ use serde_with::As;
 ///   [extended_public_key](DirtyCoreKeyShare::extended_public_key) method).
 ///   * Setting `chain_code` to `None` disables HD wallets support for the key
 /// * Convenient methods are provided such as [derive_child_public_key](DirtyCoreKeyShare::derive_child_public_key)
+///
+/// # Serialization format via `serde`
+/// We make our best effort to keep serialization format the same between the versions (even with breaking changes),
+/// and so far we've never introduced breaking change into the serialization format. This ensures that newer versions
+/// of library are able to deserialize the key shares produced by the old version version of the library.
+///
+/// It's unlikely, but at some point, we might introduce a breaking change into the serialization format. In this case,
+/// we'll announce it and publish the migration instructions.
+///
+/// Not every serde backend is supported. We strongly advise using either [`serde_json`](https://docs.rs/serde_json/),
+/// if verbose/human-readable format is needed, or [`ciborium`](https://docs.rs/ciborium/latest/ciborium/), if you'd
+/// like to opt for binary format. Other serialization backends are not tested and disadvised to use.
+///
+/// If you need the smallest size of serialized key share, we advise implementing serialization manually (all fields of
+/// the key share are public!).
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound = ""))]
