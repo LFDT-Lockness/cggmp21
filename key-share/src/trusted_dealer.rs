@@ -182,16 +182,41 @@ impl<E: Curve> TrustedDealerBuilder<E> {
 }
 
 /// Error explaining why trusted dealer failed to generate shares
-#[derive(Debug, thiserror::Error)]
-#[error(transparent)]
-pub struct TrustedDealerError(#[from] Reason);
+#[derive(Debug)]
+pub struct TrustedDealerError(Reason);
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 enum Reason {
-    #[error("trusted dealer failed to generate shares due to internal error")]
-    InvalidKeyShare(#[source] crate::InvalidCoreShare),
-    #[error("deriving key share index failed")]
+    InvalidKeyShare(crate::InvalidCoreShare),
     DeriveKeyShareIndex,
-    #[error("randomly generated share is zero - probability of that is negligible")]
     ZeroShare,
+}
+
+impl From<Reason> for TrustedDealerError {
+    fn from(err: Reason) -> Self {
+        Self(err)
+    }
+}
+
+impl core::fmt::Display for TrustedDealerError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match &self.0 {
+            Reason::InvalidKeyShare(_) => {
+                f.write_str("trusted dealer failed to generate shares due to internal error")
+            }
+            Reason::DeriveKeyShareIndex => f.write_str("deriving key share index failed"),
+            Reason::ZeroShare => {
+                f.write_str("randomly generated share is zero - probability of that is negligible")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TrustedDealerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.0 {
+            Reason::InvalidKeyShare(err) => Some(err),
+            Reason::DeriveKeyShareIndex | Reason::ZeroShare => None,
+        }
+    }
 }
