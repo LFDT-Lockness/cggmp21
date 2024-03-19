@@ -24,6 +24,22 @@ jobs:
       with:
         name: benchmark-tool
         path: target/release/measure_perf
+  # Checks each library without default features
+  bare_check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+        - key-share
+        - cggmp21-keygen
+        - cggmp21
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Build
+      run: cargo check --no-default-features -p ${{ matrix.package }}
 
   # Run tests without HD wallets support
   test:
