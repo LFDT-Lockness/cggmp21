@@ -12,7 +12,7 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 
 [dependencies]
 generic-ec = { version = "0.2", default-features = false }
-generic-ec-zkp = { version = "0.2", default-features = false }
+generic-ec-zkp = { version = "0.2", default-features = false, features = ["alloc"] }
 rand_core = { version = "0.6", optional = true }
 
 slip-10 = { version = "0.2", optional = true }

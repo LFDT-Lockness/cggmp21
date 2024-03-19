@@ -33,7 +33,10 @@ pub mod encoding {
 ///
 /// Result is `None` if any of `indexes[i]` is out of range of `list`
 #[cfg(feature = "spof")]
-pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Option<Vec<T>> {
+pub fn subset<T: Clone, I: Into<usize> + Copy>(
+    indexes: &[I],
+    list: &[T],
+) -> Option<alloc::vec::Vec<T>> {
     indexes
         .iter()
         .map(|&i| list.get(i.into()).map(T::clone))

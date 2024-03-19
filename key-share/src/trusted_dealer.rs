@@ -20,6 +20,8 @@
 //! # Ok::<_, key_share::trusted_dealer::TrustedDealerError>(())
 //! ```
 
+use alloc::vec::Vec;
+
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{CoreKeyShare, VssSetup};
@@ -125,7 +127,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
                 .map(|x| NonZero::from_secret_scalar(x).ok_or(Reason::ZeroShare))
                 .collect::<Result<Vec<_>, _>>()?
         } else {
-            let mut shares = std::iter::repeat_with(|| NonZero::<SecretScalar<E>>::random(rng))
+            let mut shares = core::iter::repeat_with(|| NonZero::<SecretScalar<E>>::random(rng))
                 .take((self.n - 1).into())
                 .collect::<Vec<_>>();
             shares.push(
@@ -212,6 +214,7 @@ impl core::fmt::Display for TrustedDealerError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for TrustedDealerError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &self.0 {
