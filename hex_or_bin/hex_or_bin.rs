@@ -50,7 +50,7 @@ where
         struct Visitor<T> {
             expect_hex: bool,
             out: T,
-            _ph: std::marker::PhantomData<T>,
+            _ph: core::marker::PhantomData<T>,
         }
         impl<'de, T> serde::de::Visitor<'de> for Visitor<T>
         where
@@ -58,7 +58,7 @@ where
         {
             type Value = T;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
                 if self.expect_hex {
                     formatter.write_str("hex-encoded byte string")
                 } else {
@@ -119,7 +119,7 @@ where
 
 struct ExpectedLen(usize);
 impl serde::de::Expected for ExpectedLen {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(formatter, "{}", self.0)
     }
 }
