@@ -1345,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "generic-ec",
  "generic-ec-zkp",

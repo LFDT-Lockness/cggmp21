@@ -17,6 +17,7 @@ fn main() -> Result<()> {
 }
 
 #[derive(Clone, Debug)]
+#[allow(clippy::enum_variant_names)]
 enum Operation {
     GenShares,
     GenOldShares { out_dir: std::path::PathBuf },
