@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cggmp21::supported_curves::{Secp256k1, Secp256r1, Stark};
 use cggmp21::{
     security_level::{KeygenSecurityLevel, SecurityLevel128},
@@ -11,6 +11,7 @@ use rand::{rngs::OsRng, CryptoRng, RngCore};
 fn main() -> Result<()> {
     match args() {
         Operation::GenShares => precompute_shares(),
+        Operation::GenOldShares { out_dir } => generate_old_share(&out_dir),
         Operation::GenPrimes => precompute_primes(),
     }
 }
@@ -18,6 +19,7 @@ fn main() -> Result<()> {
 #[derive(Clone, Debug)]
 enum Operation {
     GenShares,
+    GenOldShares { out_dir: std::path::PathBuf },
     GenPrimes,
 }
 
@@ -27,7 +29,16 @@ fn args() -> Operation {
         .help("Pregenerate key shares");
     let primes = bpaf::command("primes", bpaf::pure(Operation::GenPrimes).to_options())
         .help("Pregenerate primes for key refresh");
-    bpaf::construct!([shares, primes])
+
+    let out_dir = bpaf::long("out-dir")
+        .help("path to an existing directory where to save generated shares")
+        .argument("PATH");
+    let old_shares = bpaf::construct!(Operation::GenOldShares { out_dir })
+        .to_options()
+        .command("old-shares")
+        .help("Generates old shares; see ./test-data/old-shares");
+
+    bpaf::construct!([shares, primes, old_shares])
         .to_options()
         .descr("Pregenerate test data and print it to stdout")
         .run()
@@ -87,5 +98,53 @@ fn precompute_shares_for_curve<E: Curve, R: RngCore + CryptoRng>(
             }
         }
     }
+    Ok(())
+}
+
+fn generate_old_share(out_dir: &std::path::Path) -> Result<()> {
+    let stats = out_dir.metadata().context("stat out-dir")?;
+    if !stats.is_dir() {
+        bail!("`out-dir` is not a dir")
+    }
+
+    generate_old_shares_for_curve::<cggmp21::supported_curves::Secp256k1>(out_dir, "secp256k1")?;
+    generate_old_shares_for_curve::<cggmp21::supported_curves::Secp256r1>(out_dir, "secp256r1")?;
+    generate_old_shares_for_curve::<cggmp21::supported_curves::Stark>(out_dir, "stark")
+}
+
+fn generate_old_shares_for_curve<E: Curve>(out_dir: &std::path::Path, prefix: &str) -> Result<()> {
+    for enable_threshold in [true, false] {
+        for enable_hd in [true, false] {
+            let key_shares =
+                cggmp21::trusted_dealer::builder::<E, cggmp21::security_level::SecurityLevel128>(5)
+                    .set_threshold(if enable_threshold { Some(3) } else { None })
+                    .hd_wallet(enable_hd)
+                    .generate_core_shares(&mut OsRng)
+                    .context("generate core shares")?;
+            let out_path = out_dir.join(format!(
+                "{prefix}-threshold-{enable_threshold}-hd-{enable_hd}"
+            ));
+
+            // serialize via json
+            {
+                let mut out_path = out_path.clone();
+                out_path.set_extension("json");
+
+                let json =
+                    serde_json::to_string_pretty(&key_shares[0]).context("serialize into json")?;
+                std::fs::write(out_path, json).context("save json to file")?
+            }
+            // serialize via cbor
+            {
+                let mut out_path = out_path.clone();
+                out_path.set_extension("cbor");
+
+                let mut cbor = vec![];
+                ciborium::into_writer(&key_shares[0], &mut cbor).context("serialize into cbor")?;
+                std::fs::write(out_path, cbor).context("save cbor to file")?
+            }
+        }
+    }
+
     Ok(())
 }
