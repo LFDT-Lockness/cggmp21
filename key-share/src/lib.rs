@@ -137,8 +137,8 @@ impl<E: Curve> serde::Serialize for DirtyCoreKeyShare<E> {
                     chain_code,
                 },
             x,
-        } = self.clone();
-        serde_fix::CoreKeyShare {
+        } = &self;
+        serde_fix::ser::CoreKeyShare {
             i,
             curve,
             shared_public_key,
@@ -159,7 +159,7 @@ impl<'de, E: Curve> serde::Deserialize<'de> for DirtyCoreKeyShare<E> {
         D: serde::Deserializer<'de>,
     {
         // See [`crate::serde_fix`] module docs
-        let serde_fix::CoreKeyShare {
+        let serde_fix::de::CoreKeyShare {
             curve,
             i,
             shared_public_key,

@@ -17,12 +17,34 @@
 //! We basically reimplement `flatten` attribute manually at the cost of extra allocations.
 
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, SecretScalar};
-use serde::{Deserialize, Serialize};
 use serde_with::As;
 
-#[derive(Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct CoreKeyShare<E: Curve> {
+macro_rules! core_key_share {
+    ($($(#[$attr:meta])*pub $field:ident: $ty:ty),+$(,)?) => {
+        pub mod ser {
+            use super::*;
+
+            #[derive(serde::Serialize)]
+            #[serde(bound = "")]
+            pub struct CoreKeyShare<'a, E: Curve> {$(
+                $(#[$attr])*
+                pub $field: &'a $ty,
+            )+}
+        }
+        pub mod de {
+            use super::*;
+
+            #[derive(serde::Deserialize)]
+            #[serde(bound = "")]
+            pub struct CoreKeyShare<E: Curve> {$(
+                $(#[$attr])*
+                pub $field: $ty,
+            )+}
+        }
+    };
+}
+
+core_key_share! {
     pub curve: CurveName<E>,
     pub i: u16,
     #[serde(with = "As::<generic_ec::serde::Compact>")]

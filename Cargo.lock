@@ -922,9 +922,8 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f315ffeaae6a05691c5a27028b4ae960d3a430e406d0109ff8502e2f84ae97b"
+version = "0.2.1"
+source = "git+https://github.com/dfns/generic-ec?branch=better-compact#2919a8506a2817c5b823b27f28ebc7b80589c033"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -941,8 +940,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22cab102fc88bfc017c16e69d21edae6f41ab58bfe69eed09ed0a2cf10ec923f"
+source = "git+https://github.com/dfns/generic-ec?branch=better-compact#2919a8506a2817c5b823b27f28ebc7b80589c033"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -954,8 +952,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a133d38cde4fef7aea4e367ca51f291db0248495a424ec4208cdace08ba59f4"
+source = "git+https://github.com/dfns/generic-ec?branch=better-compact#2919a8506a2817c5b823b27f28ebc7b80589c033"
 dependencies = [
  "crypto-bigint",
  "curve25519-dalek",
