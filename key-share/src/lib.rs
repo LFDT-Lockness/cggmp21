@@ -475,54 +475,34 @@ impl<E: Curve> AsRef<CoreKeyShare<E>> for CoreKeyShare<E> {
 }
 
 /// Error indicating that key share is not valid
-#[derive(Debug)]
-pub struct InvalidCoreShare(InvalidShareReason);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("invalid core key share")]
+pub struct InvalidCoreShare(#[cfg_attr(feature = "std", source)] InvalidShareReason);
 
-#[derive(Debug)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum InvalidShareReason {
+    /// "`n` overflows u16"
     NOverflowsU16,
+    /// "amount of parties `n` is less than 2: n < 2"
     TooFewParties,
+    /// "party secret share doesn't match its public share: public_shares[i] != G x"
     PartyIndexOutOfBounds,
+    /// "party secret share doesn't match its public share: public_shares[i] != G x"
     PartySecretShareDoesntMatchPublicShare,
+    /** list of public shares doesn't match shared public key:
+    `public_shares.sum() != shared_public_key` */
     SharesDontMatchPublicKey,
+    /// "threshold value is too small (can't be less than 2)"
     ThresholdTooSmall,
+    /// "threshold valud cannot exceed amount of signers"
     ThresholdTooLarge,
+    /// "mismatched length of I: I.len() != n"
     ILen,
+    /// "indexes of shares in I are not pairwise distinct"
     INotPairwiseDistinct,
 }
-
-impl fmt::Display for InvalidCoreShare {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            InvalidShareReason::NOverflowsU16 => f.write_str("`n` overflows u16"),
-            InvalidShareReason::TooFewParties => {
-                f.write_str("amount of parties `n` is less than 2: n < 2")
-            }
-            InvalidShareReason::PartyIndexOutOfBounds => {
-                f.write_str("party index `i` out of bounds: i >= n")
-            }
-            InvalidShareReason::PartySecretShareDoesntMatchPublicShare => f.write_str(
-                "party secret share doesn't match its public share: public_shares[i] != G x",
-            ),
-            InvalidShareReason::SharesDontMatchPublicKey => f.write_str(
-                "list of public shares doesn't match shared public key: \
-                public_shares.sum() != shared_public_key",
-            ),
-            InvalidShareReason::ThresholdTooSmall => {
-                f.write_str("threshold value is too small (can't be less than 2)")
-            }
-            InvalidShareReason::ThresholdTooLarge => {
-                f.write_str("threshold valud cannot exceed amount of signers")
-            }
-            InvalidShareReason::ILen => f.write_str("mismatched length of I: I.len() != n"),
-            InvalidShareReason::INotPairwiseDistinct => {
-                f.write_str("indexes of shares in I are not pairwise distinct")
-            }
-        }
-    }
-}
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidCoreShare {}
 
 impl From<InvalidShareReason> for InvalidCoreShare {
     fn from(err: InvalidShareReason) -> Self {
@@ -531,7 +511,7 @@ impl From<InvalidShareReason> for InvalidCoreShare {
 }
 
 /// Error related to HD key derivation
-#[derive(Debug)]
+#[derive(Debug, displaydoc::Display)]
 pub enum HdError<E> {
     /// HD derivation is disabled for the key
     DisabledHd,
@@ -539,14 +519,6 @@ pub enum HdError<E> {
     InvalidPath(E),
 }
 
-impl<E> fmt::Display for HdError<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::DisabledHd => f.write_str("HD derivation is disabled for the key"),
-            Self::InvalidPath(_) => f.write_str("derivation path is not valid"),
-        }
-    }
-}
 #[cfg(feature = "std")]
 impl<E> std::error::Error for HdError<E>
 where

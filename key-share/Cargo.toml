@@ -22,6 +22,9 @@ serde = { version = "1", default-features = false, features = ["alloc", "derive"
 hex = { version = "0.4", default-features = false, features = ["serde"], optional = true }
 serde_with = { version = "2", default-features = false, features = ["alloc"], optional = true }
 
+thiserror = { version = "1", optional = true }
+displaydoc = { version = "0.2", default-features = false }
+
 [dev-dependencies]
 rand_core = { version = "0.6", features = ["getrandom"] }
 
@@ -33,7 +36,7 @@ hd-wallets = ["slip-10"]
 spof = ["dep:rand_core"]
 udigest = ["dep:udigest", "generic-ec/udigest"]
 
-std = []
+std = ["dep:thiserror"]
 
 [package.metadata.docs.rs]
 all-features = true

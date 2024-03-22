@@ -16,6 +16,8 @@
 //! Until the issue in `serde` crate is addressed, we have to use a workaround in this module.
 //! We basically reimplement `flatten` attribute manually at the cost of extra allocations.
 
+use alloc::vec::Vec;
+
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, SecretScalar};
 use serde_with::As;
 
