@@ -184,42 +184,24 @@ impl<E: Curve> TrustedDealerBuilder<E> {
 }
 
 /// Error explaining why trusted dealer failed to generate shares
-#[derive(Debug)]
-pub struct TrustedDealerError(Reason);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("{0}")]
+pub struct TrustedDealerError(#[cfg_attr(feature = "std", source)] Reason);
 
-#[derive(Debug)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum Reason {
-    InvalidKeyShare(crate::InvalidCoreShare),
+    /// trusted dealer failed to generate shares due to internal error
+    InvalidKeyShare(#[cfg_attr(feature = "std", source)] crate::InvalidCoreShare),
+    /// deriving key share index failed
     DeriveKeyShareIndex,
+    /// randomly generated share is zero - probability of that is negligible
     ZeroShare,
 }
 
 impl From<Reason> for TrustedDealerError {
     fn from(err: Reason) -> Self {
         Self(err)
-    }
-}
-
-impl core::fmt::Display for TrustedDealerError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match &self.0 {
-            Reason::InvalidKeyShare(_) => {
-                f.write_str("trusted dealer failed to generate shares due to internal error")
-            }
-            Reason::DeriveKeyShareIndex => f.write_str("deriving key share index failed"),
-            Reason::ZeroShare => {
-                f.write_str("randomly generated share is zero - probability of that is negligible")
-            }
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for TrustedDealerError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match &self.0 {
-            Reason::InvalidKeyShare(err) => Some(err),
-            Reason::DeriveKeyShareIndex | Reason::ZeroShare => None,
-        }
     }
 }

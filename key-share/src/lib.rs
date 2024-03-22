@@ -23,7 +23,7 @@ extern crate std;
 extern crate alloc;
 
 use alloc::vec::Vec;
-use core::{fmt, ops};
+use core::ops;
 
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient;
@@ -512,24 +512,12 @@ impl From<InvalidShareReason> for InvalidCoreShare {
 
 /// Error related to HD key derivation
 #[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum HdError<E> {
     /// HD derivation is disabled for the key
     DisabledHd,
-    /// Derivation path is not valid
-    InvalidPath(E),
-}
-
-#[cfg(feature = "std")]
-impl<E> std::error::Error for HdError<E>
-where
-    E: std::error::Error + 'static,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::DisabledHd => None,
-            Self::InvalidPath(err) => Some(err),
-        }
-    }
+    /// derivation path is not valid
+    InvalidPath(#[cfg_attr(feature = "std", source)] E),
 }
 
 impl<T> From<ValidateError<T, InvalidCoreShare>> for InvalidCoreShare {
@@ -600,55 +588,31 @@ pub fn reconstruct_secret_key<E: Curve>(
 
 /// Error indicating that [key reconstruction](reconstruct_secret_key) failed
 #[cfg(feature = "spof")]
-#[derive(Debug)]
-pub struct ReconstructError(ReconstructErrorReason);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("key reconstruction failed")]
+pub struct ReconstructError(#[cfg_attr(feature = "std", source)] ReconstructErrorReason);
 
 #[cfg(feature = "spof")]
-#[derive(Debug)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum ReconstructErrorReason {
+    /// no key shares provided
     NoKeyShares,
+    /** provided key shares doesn't seem to share
+    the same key or belong to the same generation */
     DifferentKeyShares,
+    /// Too few key shares
+    #[displaydoc(
+        "expected at least `t={t}` key shares, but {len} \
+        key shares were provided"
+    )]
     TooFewKeyShares { len: usize, t: u16 },
+    /// subset function returned error (seems like a bug)
     Subset,
+    /// interpolation failed (seems like a bug)
     Interpolation,
 }
-
-#[cfg(feature = "spof")]
-impl fmt::Display for ReconstructError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("secret key reconstruction error")
-    }
-}
-#[cfg(feature = "spof")]
-#[cfg(feature = "std")]
-impl std::error::Error for ReconstructError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.0)
-    }
-}
-
-#[cfg(feature = "spof")]
-impl fmt::Display for ReconstructErrorReason {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NoKeyShares => f.write_str("no key shares provided"),
-            Self::DifferentKeyShares => f.write_str(
-                "provided key shares doesn't seem to share \
-                the same key or belong to the same generation",
-            ),
-            Self::TooFewKeyShares { len, t } => write!(
-                f,
-                "expected at least `t={t}` key shares, but {len} \
-                key shares were provided"
-            ),
-            Self::Subset => f.write_str("subset function returned error (seems like a bug)"),
-            Self::Interpolation => f.write_str("interpolation failed (seems like a bug)"),
-        }
-    }
-}
-#[cfg(feature = "spof")]
-#[cfg(feature = "std")]
-impl std::error::Error for ReconstructErrorReason {}
 
 #[cfg(feature = "spof")]
 impl From<ReconstructErrorReason> for ReconstructError {
