@@ -28,6 +28,8 @@ use core::{fmt, ops};
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient;
 
+#[cfg(feature = "serde")]
+mod serde_fix;
 #[cfg(feature = "spof")]
 pub mod trusted_dealer;
 mod utils;
@@ -114,17 +116,79 @@ use serde_with::As;
 /// If you need the smallest size of serialized key share, we advise implementing serialization manually (all fields of
 /// the key share are public!).
 #[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound = ""))]
 pub struct DirtyCoreKeyShare<E: Curve> {
     /// Index of local party in key generation protocol
     pub i: u16,
     /// Public key info
-    #[cfg_attr(feature = "serde", serde(flatten))]
     pub key_info: DirtyKeyInfo<E>,
     /// Secret share $x_i$
-    #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
     pub x: NonZero<SecretScalar<E>>,
+}
+
+#[cfg(feature = "serde")]
+impl<E: Curve> serde::Serialize for DirtyCoreKeyShare<E> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // See [`crate::serde_fix`] module docs
+        let Self {
+            i,
+            key_info:
+                DirtyKeyInfo {
+                    curve,
+                    shared_public_key,
+                    public_shares,
+                    vss_setup,
+                    #[cfg(feature = "hd-wallets")]
+                    chain_code,
+                },
+            x,
+        } = &self;
+        serde_fix::ser::CoreKeyShare {
+            i,
+            curve,
+            shared_public_key,
+            public_shares,
+            vss_setup,
+            x,
+            #[cfg(feature = "hd-wallets")]
+            chain_code,
+        }
+        .serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, E: Curve> serde::Deserialize<'de> for DirtyCoreKeyShare<E> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // See [`crate::serde_fix`] module docs
+        let serde_fix::de::CoreKeyShare {
+            curve,
+            i,
+            shared_public_key,
+            public_shares,
+            vss_setup,
+            x,
+            #[cfg(feature = "hd-wallets")]
+            chain_code,
+        } = serde::Deserialize::deserialize(deserializer)?;
+        Ok(Self {
+            i,
+            key_info: DirtyKeyInfo {
+                curve,
+                shared_public_key,
+                public_shares,
+                vss_setup,
+                #[cfg(feature = "hd-wallets")]
+                chain_code,
+            },
+            x,
+        })
+    }
 }
 
 /// Public Key Info

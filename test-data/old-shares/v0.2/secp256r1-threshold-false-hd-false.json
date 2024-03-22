@@ -1,0 +1,15 @@
+{
+  "curve": "secp256r1",
+  "i": 0,
+  "shared_public_key": "031023ef7954418c4bc7f521af6d5b90d571ff9dfa82e55a92dbfeb29fd7d457f7",
+  "public_shares": [
+    "024d7593f6fdd95c68012910df29ad4384fb48e9d464231d74121d15472305fc27",
+    "03d420dbda10ab219c62327da3bc894a5517093b31ca6c0e20a438767c7f8ccec4",
+    "02a03dc4b3e964e7a99061ef0405225b23d549b52e28c11f6d6aabfd9e9f9ae9f0",
+    "02aaccd9fc50477800c37c7125bf6f2d307f2f45138e1f5eb1a686b37a1e0a2f6b",
+    "03947ca76c15cdaa616f6738fed228e64496bfbba92bb4b1b7ac5d3dfa42b69706"
+  ],
+  "vss_setup": null,
+  "chain_code": null,
+  "x": "c0bb6ee7d79d2396cca4c11a986e472cba74d0cc48644ecbf7cebca769a86749"
+}

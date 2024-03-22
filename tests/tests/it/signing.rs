@@ -1,7 +1,7 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case, cfg_attr))]
 mod generic {
     use cggmp21_tests::external_verifier::ExternalVerifier;
-    use generic_ec::{coords::HasAffineX, Curve, NonZero, Point};
+    use generic_ec::{coords::HasAffineX, Curve, Point};
     use rand::seq::SliceRandom;
     use rand::{Rng, RngCore};
     use rand_dev::DevRng;
@@ -93,7 +93,7 @@ mod generic {
 
         #[cfg(feature = "hd-wallets")]
         let public_key = if let Some(path) = &derivation_path {
-            NonZero::from_point(
+            generic_ec::NonZero::from_point(
                 shares[0]
                     .derive_child_public_key(path.iter().cloned())
                     .unwrap()
@@ -197,7 +197,7 @@ mod generic {
 
         #[cfg(feature = "hd-wallets")]
         let public_key = if let Some(path) = &derivation_path {
-            NonZero::from_point(
+            generic_ec::NonZero::from_point(
                 shares[0]
                     .derive_child_public_key(path.iter().cloned())
                     .unwrap()

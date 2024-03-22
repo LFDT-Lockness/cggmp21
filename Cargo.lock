@@ -322,9 +322,12 @@ dependencies = [
  "anyhow",
  "bpaf",
  "cggmp21",
+ "ciborium",
  "futures",
  "generic-ec",
  "generic-tests",
+ "hex",
+ "include_dir",
  "lazy_static",
  "rand",
  "rand_chacha",
@@ -355,6 +358,33 @@ dependencies = [
  "num-traits",
  "serde",
  "winapi",
+]
+
+[[package]]
+name = "ciborium"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42e69ffd6f0917f5c029256a24d0161db17cea3997d185db0d35926308770f0e"
+dependencies = [
+ "ciborium-io",
+ "ciborium-ll",
+ "serde",
+]
+
+[[package]]
+name = "ciborium-io"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05afea1e0a06c9be33d539b876f1ce3692f4afea2cb41f740e7743225ed1c757"
+
+[[package]]
+name = "ciborium-ll"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
+dependencies = [
+ "ciborium-io",
+ "half",
 ]
 
 [[package]]
@@ -892,9 +922,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d12d7f94ce9093c96ba716c7f94c9c4f0858166cd8e74b617dfe1db6848ce7dd"
+checksum = "8f27328a31bb6dcce5ab6539cb13d5d206cd18c1f4a1b36e680129b037d6ea9a"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -1017,6 +1047,16 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "half"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5eceaaeec696539ddaf7b333340f1af35a5aa87ae3e4f3ead0532f72affab2e"
+dependencies = [
+ "cfg-if",
+ "crunchy",
 ]
 
 [[package]]
@@ -1203,6 +1243,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.101",
+]
+
+[[package]]
+name = "include_dir"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18762faeff7122e89e0857b02f7ce6fcc0d101d5e9ad2ad7846cc01d61b7f19e"
+dependencies = [
+ "include_dir_macros",
+]
+
+[[package]]
+name = "include_dir_macros"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b139284b5cf57ecfa712bcc66950bb635b31aff41c188e8a4cfc758eca374a3f"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
