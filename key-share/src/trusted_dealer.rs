@@ -186,7 +186,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
 /// Error explaining why trusted dealer failed to generate shares
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
-#[displaydoc("{0}")]
+#[displaydoc("trusted dealer failed to generate shares")]
 pub struct TrustedDealerError(#[cfg_attr(feature = "std", source)] Reason);
 
 #[derive(Debug, displaydoc::Display)]
