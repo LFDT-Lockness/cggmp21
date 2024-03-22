@@ -483,24 +483,26 @@ pub struct InvalidCoreShare(#[cfg_attr(feature = "std", source)] InvalidShareRea
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum InvalidShareReason {
-    /// "`n` overflows u16"
+    #[displaydoc("`n` overflows u16")]
     NOverflowsU16,
-    /// "amount of parties `n` is less than 2: n < 2"
+    #[displaydoc("amount of parties `n` is less than 2: n < 2")]
     TooFewParties,
-    /// "party secret share doesn't match its public share: public_shares[i] != G x"
+    #[displaydoc("party secret share doesn't match its public share: public_shares[i] != G x")]
     PartyIndexOutOfBounds,
-    /// "party secret share doesn't match its public share: public_shares[i] != G x"
+    #[displaydoc("party secret share doesn't match its public share: public_shares[i] != G x")]
     PartySecretShareDoesntMatchPublicShare,
-    /** list of public shares doesn't match shared public key:
-    `public_shares.sum() != shared_public_key` */
+    #[displaydoc(
+        "list of public shares doesn't match shared public key: \
+        `public_shares.sum() != shared_public_key`"
+    )]
     SharesDontMatchPublicKey,
-    /// "threshold value is too small (can't be less than 2)"
+    #[displaydoc("threshold value is too small (can't be less than 2)")]
     ThresholdTooSmall,
-    /// "threshold valud cannot exceed amount of signers"
+    #[displaydoc("threshold valud cannot exceed amount of signers")]
     ThresholdTooLarge,
-    /// "mismatched length of I: I.len() != n"
+    #[displaydoc("mismatched length of I: I.len() != n")]
     ILen,
-    /// "indexes of shares in I are not pairwise distinct"
+    #[displaydoc("indexes of shares in I are not pairwise distinct")]
     INotPairwiseDistinct,
 }
 
@@ -597,20 +599,21 @@ pub struct ReconstructError(#[cfg_attr(feature = "std", source)] ReconstructErro
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum ReconstructErrorReason {
-    /// no key shares provided
+    #[displaydoc("no key shares provided")]
     NoKeyShares,
-    /** provided key shares doesn't seem to share
-    the same key or belong to the same generation */
+    #[displaydoc(
+        "provided key shares doesn't seem to share \
+        the same key or belong to the same generation"
+    )]
     DifferentKeyShares,
-    /// Too few key shares
     #[displaydoc(
         "expected at least `t={t}` key shares, but {len} \
         key shares were provided"
     )]
     TooFewKeyShares { len: usize, t: u16 },
-    /// subset function returned error (seems like a bug)
+    #[displaydoc("subset function returned error (seems like a bug)")]
     Subset,
-    /// interpolation failed (seems like a bug)
+    #[displaydoc("interpolation failed (seems like a bug)")]
     Interpolation,
 }
 

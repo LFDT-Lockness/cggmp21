@@ -192,11 +192,11 @@ pub struct TrustedDealerError(#[cfg_attr(feature = "std", source)] Reason);
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum Reason {
-    /// trusted dealer failed to generate shares due to internal error
+    #[displaydoc("trusted dealer failed to generate shares due to internal error")]
     InvalidKeyShare(#[cfg_attr(feature = "std", source)] crate::InvalidCoreShare),
-    /// deriving key share index failed
+    #[displaydoc("deriving key share index failed")]
     DeriveKeyShareIndex,
-    /// randomly generated share is zero - probability of that is negligible
+    #[displaydoc("randomly generated share is zero - probability of that is negligible")]
     ZeroShare,
 }
 
