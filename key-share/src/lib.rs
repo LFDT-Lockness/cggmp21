@@ -15,7 +15,14 @@
 #![deny(missing_docs, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![forbid(unused_crate_dependencies)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![no_std]
 
+#[cfg(feature = "std")]
+extern crate std;
+
+extern crate alloc;
+
+use alloc::vec::Vec;
 use core::ops;
 
 use generic_ec::{serde::CurveName, Curve, NonZero, Point, Scalar, SecretScalar};
@@ -468,41 +475,51 @@ impl<E: Curve> AsRef<CoreKeyShare<E>> for CoreKeyShare<E> {
 }
 
 /// Error indicating that key share is not valid
-#[derive(Debug, thiserror::Error)]
-#[error(transparent)]
-pub struct InvalidCoreShare(#[from] InvalidShareReason);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("invalid core key share")]
+pub struct InvalidCoreShare(#[cfg_attr(feature = "std", source)] InvalidShareReason);
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum InvalidShareReason {
-    #[error("`n` overflows u16")]
+    #[displaydoc("`n` overflows u16")]
     NOverflowsU16,
-    #[error("amount of parties `n` is less than 2: n < 2")]
+    #[displaydoc("amount of parties `n` is less than 2: n < 2")]
     TooFewParties,
-    #[error("party index `i` out of bounds: i >= n")]
+    #[displaydoc("party secret share doesn't match its public share: public_shares[i] != G x")]
     PartyIndexOutOfBounds,
-    #[error("party secret share doesn't match its public share: public_shares[i] != G x")]
+    #[displaydoc("party secret share doesn't match its public share: public_shares[i] != G x")]
     PartySecretShareDoesntMatchPublicShare,
-    #[error("list of public shares doesn't match shared public key: public_shares.sum() != shared_public_key")]
+    #[displaydoc(
+        "list of public shares doesn't match shared public key: \
+        `public_shares.sum() != shared_public_key`"
+    )]
     SharesDontMatchPublicKey,
-    #[error("threshold value is too small (can't be less than 2)")]
+    #[displaydoc("threshold value is too small (can't be less than 2)")]
     ThresholdTooSmall,
-    #[error("threshold valud cannot exceed amount of signers")]
+    #[displaydoc("threshold valud cannot exceed amount of signers")]
     ThresholdTooLarge,
-    #[error("mismatched length of I: I.len() != n")]
+    #[displaydoc("mismatched length of I: I.len() != n")]
     ILen,
-    #[error("indexes of shares in I are not pairwise distinct")]
+    #[displaydoc("indexes of shares in I are not pairwise distinct")]
     INotPairwiseDistinct,
 }
 
+impl From<InvalidShareReason> for InvalidCoreShare {
+    fn from(err: InvalidShareReason) -> Self {
+        Self(err)
+    }
+}
+
 /// Error related to HD key derivation
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum HdError<E> {
     /// HD derivation is disabled for the key
-    #[error("HD derivation is disabled for the key")]
     DisabledHd,
-    /// Derivation path is not valid
-    #[error("derivation path is not valid")]
-    InvalidPath(#[source] E),
+    /// derivation path is not valid
+    InvalidPath(#[cfg_attr(feature = "std", source)] E),
 }
 
 impl<T> From<ValidateError<T, InvalidCoreShare>> for InvalidCoreShare {
@@ -573,27 +590,36 @@ pub fn reconstruct_secret_key<E: Curve>(
 
 /// Error indicating that [key reconstruction](reconstruct_secret_key) failed
 #[cfg(feature = "spof")]
-#[derive(Debug, thiserror::Error)]
-#[error("secret key reconstruction error")]
-pub struct ReconstructError(
-    #[source]
-    #[from]
-    ReconstructErrorReason,
-);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("key reconstruction failed")]
+pub struct ReconstructError(#[cfg_attr(feature = "std", source)] ReconstructErrorReason);
 
 #[cfg(feature = "spof")]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum ReconstructErrorReason {
-    #[error("no key shares provided")]
+    #[displaydoc("no key shares provided")]
     NoKeyShares,
-    #[error(
-        "provided key shares doesn't seem to share the same key or belong to the same generation"
+    #[displaydoc(
+        "provided key shares doesn't seem to share \
+        the same key or belong to the same generation"
     )]
     DifferentKeyShares,
-    #[error("expected at least `t={t}` key shares, but {len} key shares were provided")]
+    #[displaydoc(
+        "expected at least `t={t}` key shares, but {len} \
+        key shares were provided"
+    )]
     TooFewKeyShares { len: usize, t: u16 },
-    #[error("subset function returned error (seems like a bug)")]
+    #[displaydoc("subset function returned error (seems like a bug)")]
     Subset,
-    #[error("interpolation failed (seems like a bug)")]
+    #[displaydoc("interpolation failed (seems like a bug)")]
     Interpolation,
+}
+
+#[cfg(feature = "spof")]
+impl From<ReconstructErrorReason> for ReconstructError {
+    fn from(err: ReconstructErrorReason) -> Self {
+        Self(err)
+    }
 }

@@ -1,4 +1,5 @@
 /target
+/wasm/no_std/target
 
 .helix/
 .rstags

@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 /// Validated value
 ///
@@ -317,6 +317,7 @@ impl<T, E: fmt::Display> fmt::Display for ValidateError<T, E> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<T, E> std::error::Error for ValidateError<T, E>
 where
     E: std::error::Error + 'static,

@@ -6,3 +6,6 @@ members = [
     "key-share",
     "tests",
 ]
+exclude = [
+    "wasm/no_std",
+]

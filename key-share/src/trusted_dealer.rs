@@ -20,6 +20,8 @@
 //! # Ok::<_, key_share::trusted_dealer::TrustedDealerError>(())
 //! ```
 
+use alloc::vec::Vec;
+
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 
 use crate::{CoreKeyShare, VssSetup};
@@ -125,7 +127,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
                 .map(|x| NonZero::from_secret_scalar(x).ok_or(Reason::ZeroShare))
                 .collect::<Result<Vec<_>, _>>()?
         } else {
-            let mut shares = std::iter::repeat_with(|| NonZero::<SecretScalar<E>>::random(rng))
+            let mut shares = core::iter::repeat_with(|| NonZero::<SecretScalar<E>>::random(rng))
                 .take((self.n - 1).into())
                 .collect::<Vec<_>>();
             shares.push(
@@ -182,16 +184,24 @@ impl<E: Curve> TrustedDealerBuilder<E> {
 }
 
 /// Error explaining why trusted dealer failed to generate shares
-#[derive(Debug, thiserror::Error)]
-#[error(transparent)]
-pub struct TrustedDealerError(#[from] Reason);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("trusted dealer failed to generate shares")]
+pub struct TrustedDealerError(#[cfg_attr(feature = "std", source)] Reason);
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum Reason {
-    #[error("trusted dealer failed to generate shares due to internal error")]
-    InvalidKeyShare(#[source] crate::InvalidCoreShare),
-    #[error("deriving key share index failed")]
+    #[displaydoc("trusted dealer failed to generate shares due to internal error")]
+    InvalidKeyShare(#[cfg_attr(feature = "std", source)] crate::InvalidCoreShare),
+    #[displaydoc("deriving key share index failed")]
     DeriveKeyShareIndex,
-    #[error("randomly generated share is zero - probability of that is negligible")]
+    #[displaydoc("randomly generated share is zero - probability of that is negligible")]
     ZeroShare,
+}
+
+impl From<Reason> for TrustedDealerError {
+    fn from(err: Reason) -> Self {
+        Self(err)
+    }
 }

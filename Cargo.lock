@@ -615,6 +615,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "displaydoc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.32",
+]
+
+[[package]]
 name = "educe"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1347,6 +1358,7 @@ dependencies = [
 name = "key-share"
 version = "0.2.1"
 dependencies = [
+ "displaydoc",
  "generic-ec",
  "generic-ec-zkp",
  "hex",

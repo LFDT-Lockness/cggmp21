@@ -24,6 +24,34 @@ jobs:
       with:
         name: benchmark-tool
         path: target/release/measure_perf
+  # Checks each library without default features
+  bare_check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+        - key-share
+        - cggmp21-keygen
+        - cggmp21
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Build
+      run: cargo check --no-default-features -p ${{ matrix.package }}
+  build-wasm-nostd:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Install wasm32-unknown-unknown toolchain
+      run: rustup target add wasm32-unknown-unknown
+    - name: Build on wasm32-unknown-unknown (no_std)
+      run:
+        (cd wasm/no_std && cargo build --target wasm32-unknown-unknown)
 
   # Run tests without HD wallets support
   test:

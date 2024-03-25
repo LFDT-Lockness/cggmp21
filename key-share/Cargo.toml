@@ -11,27 +11,32 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = "0.2"
-generic-ec-zkp = "0.2"
+generic-ec = { version = "0.2", default-features = false, features = ["alloc"] }
+generic-ec-zkp = { version = "0.2", default-features = false, features = ["alloc"] }
 rand_core = { version = "0.6", optional = true }
 
-slip-10 = { version = "0.2", optional = true, features = ["std"] }
-udigest = { version = "0.1", default-features = false, features = ["derive"], optional = true }
+slip-10 = { version = "0.2", optional = true }
+udigest = { version = "0.1", default-features = false, features = ["alloc", "derive"], optional = true }
 
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
 hex = { version = "0.4", default-features = false, features = ["serde"], optional = true }
-serde_with = { version = "2", optional = true}
+serde_with = { version = "2", default-features = false, features = ["alloc"], optional = true }
 
-thiserror = "1"
+thiserror = { version = "1", optional = true }
+displaydoc = { version = "0.2", default-features = false }
 
 [dev-dependencies]
 rand_core = { version = "0.6", features = ["getrandom"] }
 
 [features]
-serde = ["dep:serde", "serde_with", "hex"]
+default = ["std"]
+
+serde = ["dep:serde", "serde_with", "hex", "generic-ec/serde"]
 hd-wallets = ["slip-10"]
 spof = ["dep:rand_core"]
-udigest = ["dep:udigest"]
+udigest = ["dep:udigest", "generic-ec/udigest"]
+
+std = ["dep:thiserror"]
 
 [package.metadata.docs.rs]
 all-features = true
