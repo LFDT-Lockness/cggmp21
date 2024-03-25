@@ -13,7 +13,7 @@ readme = "../README.md"
 
 [dependencies]
 cggmp21-keygen = { path = "../cggmp21-keygen", version = "0.1" }
-key-share = { path = "../key-share", version = "0.2" }
+key-share = { path = "../key-share", version = "0.2", features = ["serde"] }
 
 generic-ec = { version = "0.2", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.2", features = ["serde", "udigest"] }

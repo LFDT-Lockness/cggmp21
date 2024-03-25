@@ -200,6 +200,9 @@ impl<'de, E: Curve> serde::Deserialize<'de> for DirtyCoreKeyShare<E> {
 #[cfg_attr(feature = "serde", serde(bound = ""))]
 #[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
 pub struct DirtyKeyInfo<E: Curve> {
+    // NOTE: on changing any of `serde` attributes, remember to change
+    // `crate::serde_fix` as well!
+    //
     /// Guard that ensures curve consistency for deseraization
     #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::curve_name))]
     pub curve: CurveName<E>,
