@@ -1353,7 +1353,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "displaydoc",
  "generic-ec",
