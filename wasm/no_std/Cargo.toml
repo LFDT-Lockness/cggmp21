@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 # Only the crates below have wasm/no_std support
 key-share = { path = "../../key-share", default-features = false, features = ["serde", "hd-wallets", "spof", "udigest"] }
-
