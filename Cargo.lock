@@ -933,9 +933,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f27328a31bb6dcce5ab6539cb13d5d206cd18c1f4a1b36e680129b037d6ea9a"
+checksum = "af0c68aa918e65f208d4d375ce7aed0d0c92c78cfa919f6efc8863190099080f"
 dependencies = [
  "generic-ec-core",
  "generic-ec-curves",
@@ -1356,7 +1356,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "displaydoc",
  "generic-ec",
@@ -1954,18 +1954,18 @@ checksum = "e25dfac463d778e353db5be2449d1cce89bd6fd23c9f1ea21310ce6e5a1b29c4"
 
 [[package]]
 name = "serde"
-version = "1.0.188"
+version = "1.0.193"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf9e0fcba69a370eed61bcf2b728575f726b50b55cba78064753d708ddc7549e"
+checksum = "25dd9975e68d0cb5aa1120c288333fc98731bd1dd12f561e468ea4728c042b89"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.188"
+version = "1.0.193"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eca7ac642d82aa35b60049a6eccb4be6be75e599bd2e9adb5f875a737654af2"
+checksum = "43576ca501357b9b071ac53cdc7da8ef0cbd9493d8df094cd821777ea6e894d3"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -53,14 +53,14 @@ core_key_share! {
     pub shared_public_key: NonZero<Point<E>>,
     #[serde(with = "As::<Vec<generic_ec::serde::Compact>>")]
     pub public_shares: Vec<NonZero<Point<E>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vss_setup: Option<crate::VssSetup<E>>,
+
     #[cfg(feature = "hd-wallets")]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default),
-        serde(with = "As::<Option<crate::utils::HexOrBin>>")
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "As::<Option<crate::utils::HexOrBin>>")]
     pub chain_code: Option<slip_10::ChainCode>,
+
     #[serde(with = "As::<generic_ec::serde::Compact>")]
     pub x: NonZero<SecretScalar<E>>,
 }

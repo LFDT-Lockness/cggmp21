@@ -39,6 +39,6 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(
 ) -> Option<alloc::vec::Vec<T>> {
     indexes
         .iter()
-        .map(|&i| list.get(i.into()).map(T::clone))
+        .map(|&i| list.get(i.into()).cloned())
         .collect()
 }

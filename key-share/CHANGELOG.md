@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.3
+* Reduce size of serialized key share [#96]
+
+[#96]: https://github.com/dfns/cggmp21/pull/96
+
 ## v0.2.2
 * Add `no_std` support [#92]
 

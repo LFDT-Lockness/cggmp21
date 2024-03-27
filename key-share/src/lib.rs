@@ -200,6 +200,9 @@ impl<'de, E: Curve> serde::Deserialize<'de> for DirtyCoreKeyShare<E> {
 #[cfg_attr(feature = "serde", serde(bound = ""))]
 #[cfg_attr(feature = "udigest", derive(udigest::Digestable))]
 pub struct DirtyKeyInfo<E: Curve> {
+    // NOTE: on changing any of `serde` attributes, remember to change
+    // `crate::serde_fix` as well!
+    //
     /// Guard that ensures curve consistency for deseraization
     #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::curve_name))]
     pub curve: CurveName<E>,
@@ -215,12 +218,17 @@ pub struct DirtyKeyInfo<E: Curve> {
     )]
     pub public_shares: Vec<NonZero<Point<E>>>,
     /// Verifiable secret sharing setup, present if key was generated using VSS scheme
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub vss_setup: Option<VssSetup<E>>,
     /// Chain code associated with the key, if HD wallets support was enabled
     #[cfg(feature = "hd-wallets")]
     #[cfg_attr(
         feature = "serde",
         serde(default),
+        serde(skip_serializing_if = "Option::is_none"),
         serde(with = "As::<Option<utils::HexOrBin>>")
     )]
     #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::maybe_bytes))]
@@ -240,6 +248,10 @@ pub struct VssSetup<E: Curve> {
     /// Key shares indexes
     ///
     /// `I[i]` corresponds to key share index of a $\ith$ signer
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "As::<Vec<generic_ec::serde::PreferCompact>>")
+    )]
     pub I: Vec<NonZero<Scalar<E>>>,
 }
 
