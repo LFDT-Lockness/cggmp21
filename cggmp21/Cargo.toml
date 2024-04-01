@@ -1,6 +1,6 @@
 [package]
 name = "cggmp21"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "TSS ECDSA implementation based on CGGMP21 paper"
@@ -13,7 +13,7 @@ readme = "../README.md"
 
 [dependencies]
 cggmp21-keygen = { path = "../cggmp21-keygen", version = "0.1" }
-key-share = { path = "../key-share", version = "0.2", features = ["serde"] }
+key-share = { path = "../key-share", version = "0.2.2", features = ["serde"] }
 
 generic-ec = { version = "0.2", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.2", features = ["serde", "udigest"] }

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.1
+* Bump key-share to `^0.2.3` [#99]
+
+[#99]: https://github.com/dfns/cggmp21/pull/99
+
 ## v0.2.0
 * Add support of HD wallets compatible with BIP-32 and SLIP-10 [#68],
   [#74], [#75]
