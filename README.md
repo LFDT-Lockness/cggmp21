@@ -1,8 +1,28 @@
+<!-- cargo-rdme start -->
+
 ![License](https://img.shields.io/crates/l/cggmp21.svg)
 [![Docs](https://docs.rs/cggmp21/badge.svg)](https://docs.rs/cggmp21)
 [![Crates io](https://img.shields.io/crates/v/cggmp21.svg)](https://crates.io/crates/cggmp21)
 
 # Threshold ECDSA based on [CGGMP21] paper
+
+<!-- TOC STARTS -->
+
+- [Running the protocol](#running-the-protocol)
+  * [Networking](#networking)
+    + [Signer indices](#signer-indices)
+  * [Execution ID](#execution-id)
+  * [Auxiliary info generation](#auxiliary-info-generation)
+    + [On reusability of the auxiliary data](#on-reusability-of-the-auxiliary-data)
+  * [Distributed Key Generation (DKG)](#distributed-key-generation-dkg)
+  * [Signing](#signing)
+- [Sync API](#sync-api)
+- [HD wallets support](#hd-wallets-support)
+- [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
+- [Differences between the implementation and CGGMP21](#differences-between-the-implementation-and-cggmp21)
+- [Timing attacks](#timing-attacks)
+
+<!-- TOC ENDS -->
 
 [CGGMP21] is a state-of-art ECDSA TSS protocol that supports 1-round signing (requires preprocessing),
 identifiable abort, provides two signing protocols (3+1 and 5+1 rounds with different complexity
@@ -211,7 +231,7 @@ Such use-cases contradict to nature of MPC so we don't include those primitives 
 However, you may opt for them by enabling `spof` feature, then you can use `trusted_dealer`
 for key import and `key_share::reconstruct_secret_key` for key export.
 
-## Differences between the implementation and [CGGMP21]
+## Differences between the implementation and CGGMP21
 [CGGMP21] only defines a non-threshold protocol. To support general thresholds,
 we defined our own CGGMP21-like key generation and threshold signing
 protocols. However, we keep both
@@ -227,9 +247,12 @@ they are all documented in [the spec].
 [slip10]: https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 [bip32]: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 [report]: https://github.com/dfns/cggmp21/blob/m/docs/audit_report.pdf
+[serde]: https://serde.rs/
 
 ## Timing attacks
 Timing attacks are type of side-channel attacks that leak sensitive information through duration of
 execution. We consider timing attacks out of scope as they are nearly impossible to perform for such
 complicated protcol as CGGMP21 and impossible to do in our specific deployment. Thus, we intentionally
 don't do constant-time operations which gives us a significant performance boost.
+
+<!-- cargo-rdme end -->

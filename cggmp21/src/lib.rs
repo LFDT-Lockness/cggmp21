@@ -4,6 +4,9 @@
 //!
 //! # Threshold ECDSA based on [CGGMP21] paper
 //!
+//! <!-- TOC -->
+#![doc = include_str!("../docs/toc-cggmp21.md")]
+//!
 //! [CGGMP21] is a state-of-art ECDSA TSS protocol that supports 1-round signing (requires preprocessing),
 //! identifiable abort, provides two signing protocols (3+1 and 5+1 rounds with different complexity
 //! of abort identification) and key refresh protocol out of the box.
@@ -253,7 +256,7 @@
 //! However, you may opt for them by enabling `spof` feature, then you can use [`trusted_dealer`]
 //! for key import and [`key_share::reconstruct_secret_key`] for key export.
 //!
-//! ## Differences between the implementation and [CGGMP21]
+//! ## Differences between the implementation and CGGMP21
 //! [CGGMP21] only defines a non-threshold protocol. To support general thresholds,
 //! we defined our own CGGMP21-like key generation and threshold signing
 //! protocols. However, we keep both
@@ -269,6 +272,7 @@
 //! [slip10]: https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 //! [bip32]: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 //! [report]: https://github.com/dfns/cggmp21/blob/m/docs/audit_report.pdf
+//! [serde]: https://serde.rs/
 //!
 //! ## Timing attacks
 //! Timing attacks are type of side-channel attacks that leak sensitive information through duration of
