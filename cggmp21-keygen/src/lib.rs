@@ -1,4 +1,10 @@
 //! Threshold and non-threshold CGGMP21 DKG
+//!
+//! This crate provides an implementation of UC-secure DKG protocol taken from [CGGMP21] paper. Implementation is
+//! fully `#![no_std]` compatible and WASM-friendly.
+//!
+//! [CGGMP21]: https://ia.cr/2021/060
+
 #![allow(non_snake_case, clippy::too_many_arguments)]
 #![forbid(missing_docs)]
 #![no_std]
