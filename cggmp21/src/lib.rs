@@ -221,6 +221,15 @@
 //! **Never reuse presignatures!** If you use the same presignature to sign two different messages,
 //! the private key may be leaked.
 //!
+//! ## Sync API
+//! Every protocol is defined as async function. If you need to run a protocol in non-async environment,
+//! library provides a wrapper that allows you to execute protocol using sync API only.
+//!
+//! To use it, you need to enable `state-machine` feature. Then, for every protocol definition, you can
+//! find a companion function that returns [`StateMachine`](round_based::state_machine::StateMachine)
+//! which can be used to carry out the protocol. For instance, if you do presignature generation, use
+//! [`signing::SigningBuilder::generate_presignature_sync`].
+//!
 //! ## HD wallets support
 //! Library supports non-hardened deterministic key derivation based on [slip10] standard (compatible
 //! with [bip32]). It allows signers to generate a master key once, and then use it to instantaneously

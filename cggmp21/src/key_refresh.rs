@@ -171,6 +171,26 @@ where
         )
         .await
     }
+
+    /// Returns a state machine that can be used to carry out the key refresh protocol
+    ///
+    /// See [`round_based::state_machine`] for details on how that can be done.
+    #[cfg(feature = "state-machine")]
+    pub fn into_state_machine<R>(
+        self,
+        rng: &'a mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<KeyShare<E, L>, KeyRefreshError>,
+        Msg = NonThresholdMsg<E, D, L>,
+    > + 'a
+    where
+        R: RngCore + CryptoRng,
+        E: Curve,
+        L: SecurityLevel,
+        D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.start(rng, party))
+    }
 }
 
 impl<'a, L, D> AuxInfoGenerationBuilder<'a, L, D>
@@ -220,6 +240,25 @@ where
             self.precompute_crt,
         )
         .await
+    }
+
+    /// Returns a state machine that can be used to carry out the aux info generation protocol
+    ///
+    /// See [`round_based::state_machine`] for details on how that can be done.
+    #[cfg(feature = "state-machine")]
+    pub fn into_state_machine<R>(
+        self,
+        rng: &'a mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<AuxInfo<L>, KeyRefreshError>,
+        Msg = aux_only::Msg<D, L>,
+    > + 'a
+    where
+        R: RngCore + CryptoRng,
+        L: SecurityLevel,
+        D: Digest<OutputSize = digest::typenum::U32> + Clone + 'static,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.start(rng, party))
     }
 }
 

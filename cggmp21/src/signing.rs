@@ -358,6 +358,23 @@ where
         }
     }
 
+    /// Returns a state machine that can be used to carry out the presignature generation protocol
+    ///
+    /// See [`round_based::state_machine`] for details on how that can be done.
+    #[cfg(feature = "state-machine")]
+    pub fn generate_presignature_sync<R>(
+        self,
+        rng: &'r mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<Presignature<E>, SigningError>,
+        Msg = Msg<E, D>,
+    > + 'r
+    where
+        R: RngCore + CryptoRng,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.generate_presignature(rng, party))
+    }
+
     /// Starts signing protocol
     pub async fn sign<R, M>(
         self,
@@ -389,6 +406,26 @@ where
             ProtocolOutput::Signature(sig) => Ok(sig),
             ProtocolOutput::Presignature(_) => Err(Bug::UnexpectedProtocolOutput.into()),
         }
+    }
+
+    /// Returns a state machine that can be used to carry out the signing protocol
+    ///
+    /// See [`round_based::state_machine`] for details on how that can be done.
+    #[cfg(feature = "state-machine")]
+    pub fn sign_sync<R>(
+        self,
+        rng: &'r mut R,
+        message_to_sign: DataToSign<E>,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<Signature<E>, SigningError>,
+        Msg = Msg<E, D>,
+    > + 'r
+    where
+        R: RngCore + CryptoRng,
+    {
+        round_based::state_machine::wrap_protocol(move |party| {
+            self.sign(rng, party, message_to_sign)
+        })
     }
 }
 
