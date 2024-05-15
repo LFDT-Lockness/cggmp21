@@ -17,7 +17,7 @@ key-share = { path = "../key-share", version = "0.2.2", features = ["serde"] }
 
 generic-ec = { version = "0.2", features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.2", features = ["serde", "udigest"] }
-round-based = { version = "0.2", features = ["derive"] }
+round-based = { version = "0.3", features = ["derive"] }
 
 paillier-zk = { version = "0.2", features = ["serde"] }
 udigest = { version = "0.1", features = ["std", "derive"]}
@@ -38,7 +38,7 @@ hex = { version = "0.4", default-features = false, features = ["serde"] }
 slip-10 = { version = "0.2", optional = true, features = ["std"] }
 
 [dev-dependencies]
-round-based = { version = "0.2", features = ["derive", "dev"] }
+round-based = { version = "0.3", features = ["derive", "dev"] }
 
 rand = "0.8"
 rand_dev = "0.1"
@@ -53,6 +53,8 @@ curve-secp256r1 = ["generic-ec/curve-secp256r1"]
 curve-stark = ["generic-ec/curve-stark"]
 hd-wallets = ["dep:slip-10", "cggmp21-keygen/hd-wallets"]
 spof = ["key-share/spof"]
+
+state-machine = ["cggmp21-keygen/state-machine"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -1,31 +1,46 @@
-use std::convert::Infallible;
+use alloc::boxed::Box;
+use core::convert::Infallible;
 
 use round_based::rounds_router::{
     errors::{self as router_error, CompleteRoundError},
     simple_store::RoundInputError,
 };
-use thiserror::Error;
 
-pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+mod std_error {
+    #[cfg(feature = "std")]
+    pub use std::error::Error as StdError;
 
-#[derive(Debug, Error)]
+    #[cfg(not(feature = "std"))]
+    pub trait StdError: core::fmt::Display + core::fmt::Debug {}
+    #[cfg(not(feature = "std"))]
+    impl<E: core::fmt::Display + core::fmt::Debug> StdError for E {}
+}
+pub use std_error::StdError;
+
+pub type BoxedError = Box<dyn StdError + Send + Sync>;
+
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum IoError {
-    #[error("send message")]
-    SendMessage(#[source] BoxedError),
-    #[error("receive message")]
-    ReceiveMessage(#[source] BoxedError),
-    #[error("got eof while recieving messages")]
+    #[displaydoc("send message")]
+    SendMessage(#[cfg_attr(feature = "std", source)] BoxedError),
+    #[displaydoc("receive message")]
+    ReceiveMessage(#[cfg_attr(feature = "std", source)] BoxedError),
+    #[displaydoc("got eof while recieving messages")]
     ReceiveMessageEof,
-    #[error("route received message (possibly malicious behavior)")]
-    RouteReceivedError(router_error::CompleteRoundError<RoundInputError, Infallible>),
+    #[displaydoc("route received message (possibly malicious behavior)")]
+    RouteReceivedError(
+        #[cfg_attr(feature = "std", source)]
+        router_error::CompleteRoundError<RoundInputError, Infallible>,
+    ),
 }
 
 impl IoError {
-    pub fn send_message<E: std::error::Error + Send + Sync + 'static>(err: E) -> Self {
+    pub fn send_message<E: StdError + Send + Sync + 'static>(err: E) -> Self {
         Self::SendMessage(Box::new(err))
     }
 
-    pub fn receive_message<E: std::error::Error + Send + Sync + 'static>(
+    pub fn receive_message<E: StdError + Send + Sync + 'static>(
         err: CompleteRoundError<RoundInputError, E>,
     ) -> Self {
         match err {

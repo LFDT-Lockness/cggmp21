@@ -1,10 +1,12 @@
 #[generic_tests::define(attrs(tokio::test, test_case::case, cfg_attr))]
 mod generic {
+    use std::iter;
+
     use generic_ec::{Curve, Point};
     use rand::{seq::SliceRandom, Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
     use rand_dev::DevRng;
-    use round_based::simulation::Simulation;
+    use round_based::simulation::{Simulation, SimulationSync};
     use sha2::Sha256;
 
     use cggmp21::keygen::{NonThresholdMsg, ThresholdMsg};
@@ -36,7 +38,7 @@ mod generic {
         let mut outputs = vec![];
         for i in 0..n {
             let party = simulation.add_party();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
 
             outputs.push(async move {
                 let keygen =
@@ -53,31 +55,7 @@ mod generic {
             .await
             .expect("keygen failed");
 
-        for (i, key_share) in (0u16..).zip(&key_shares) {
-            assert_eq!(key_share.i, i);
-            assert_eq!(key_share.shared_public_key, key_shares[0].shared_public_key);
-            assert_eq!(key_share.public_shares, key_shares[0].public_shares);
-            assert_eq!(
-                Point::<E>::generator() * &key_share.x,
-                key_share.public_shares[usize::from(i)]
-            );
-        }
-        assert_eq!(
-            key_shares[0].shared_public_key,
-            key_shares[0].public_shares.iter().sum::<Point<E>>()
-        );
-
-        #[cfg(feature = "hd-wallets")]
-        if hd_wallet {
-            assert!(key_shares[0].chain_code.is_some());
-            for key_share in &key_shares[1..] {
-                assert_eq!(key_share.chain_code, key_shares[0].chain_code);
-            }
-        } else {
-            for key_share in &key_shares {
-                assert_eq!(key_share.chain_code, None);
-            }
-        }
+        validate_keygen_output(&mut rng, &key_shares, hd_wallet);
     }
 
     #[test_case::case(2, 3, false, false; "t2n3")]
@@ -123,7 +101,53 @@ mod generic {
             .await
             .expect("keygen failed");
 
-        for (i, key_share) in (0u16..).zip(&key_shares) {
+        validate_keygen_output(&mut rng, &key_shares, hd_wallet);
+    }
+
+    #[test_case::case(3, 5, false; "t3n5")]
+    #[cfg_attr(feature = "hd-wallets", test_case::case(3, 5, true; "t3n5-hd"))]
+    fn threshold_keygen_sync_works<E: Curve>(t: u16, n: u16, hd_wallet: bool) {
+        #[cfg(not(feature = "hd-wallets"))]
+        assert!(!hd_wallet);
+
+        let mut rng = DevRng::new();
+
+        let eid: [u8; 32] = rng.gen();
+        let eid = ExecutionId::new(&eid);
+
+        let mut party_rng = iter::repeat_with(|| rng.fork())
+            .take(n.into())
+            .collect::<Vec<_>>();
+
+        let mut simulation = SimulationSync::with_capacity(n);
+        for (i, party_rng) in (0..).zip(&mut party_rng) {
+            simulation.add_party({
+                let keygen = cggmp21::keygen::<E>(eid, i, n).set_threshold(t);
+
+                #[cfg(feature = "hd-wallets")]
+                let keygen = keygen.hd_wallet(hd_wallet);
+
+                keygen.into_state_machine(party_rng)
+            })
+        }
+        let key_shares = simulation
+            .run()
+            .unwrap()
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        validate_keygen_output(&mut rng, &key_shares, hd_wallet);
+    }
+
+    fn validate_keygen_output<E: generic_ec::Curve>(
+        rng: &mut impl rand::RngCore,
+        key_shares: &[cggmp21::IncompleteKeyShare<E>],
+        hd_wallet: bool,
+    ) {
+        #[cfg(not(feature = "hd-wallets"))]
+        assert!(!hd_wallet);
+
+        for (i, key_share) in (0u16..).zip(key_shares) {
             assert_eq!(key_share.i, i);
             assert_eq!(key_share.shared_public_key, key_shares[0].shared_public_key);
             assert_eq!(key_share.public_shares, key_shares[0].public_shares);
@@ -140,14 +164,15 @@ mod generic {
                 assert_eq!(key_share.chain_code, key_shares[0].chain_code);
             }
         } else {
-            for key_share in &key_shares {
+            for key_share in key_shares {
                 assert_eq!(key_share.chain_code, None);
             }
         }
 
         // Choose `t` random key shares and reconstruct a secret key
+        let t = key_shares[0].min_signers();
         let t_shares = key_shares
-            .choose_multiple(&mut rng, t.into())
+            .choose_multiple(rng, t.into())
             .cloned()
             .collect::<Vec<_>>();
 

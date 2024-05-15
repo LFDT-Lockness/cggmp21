@@ -7,7 +7,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cggmp21 = { path = "../cggmp21", features = ["all-curves", "spof"] }
+cggmp21 = { path = "../cggmp21", features = ["all-curves", "spof", "state-machine"] }
 
 anyhow = "1"
 bpaf = "0.7"
@@ -24,7 +24,7 @@ rand_chacha = "0.3"
 
 sha2 = "0.10"
 
-round-based = { version = "0.2", features = ["derive", "dev"] }
+round-based = { version = "0.3", features = ["derive", "dev", "state-machine"] }
 generic-ec = { version = "0.2", features = ["serde", "all-curves"] }
 
 tokio = { version = "1", features = ["macros"] }
