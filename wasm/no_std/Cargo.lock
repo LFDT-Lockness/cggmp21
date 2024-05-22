@@ -31,7 +31,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21-keygen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "digest",
  "displaydoc",
@@ -417,7 +417,7 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 [[package]]
 name = "round-based"
 version = "0.3.0"
-source = "git+https://github.com/dfns/round-based?branch=state-machine#023ec688907f06571643a14f677d2ac8bee29bf6"
+source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
 dependencies = [
  "displaydoc",
  "futures-util",
@@ -429,7 +429,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.1"
-source = "git+https://github.com/dfns/round-based?branch=state-machine#023ec688907f06571643a14f677d2ac8bee29bf6"
+source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
 dependencies = [
  "proc-macro2",
  "quote",

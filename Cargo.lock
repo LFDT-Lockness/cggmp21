@@ -1790,7 +1790,7 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.3.0"
-source = "git+https://github.com/dfns/round-based?branch=state-machine#023ec688907f06571643a14f677d2ac8bee29bf6"
+source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
 dependencies = [
  "displaydoc",
  "futures-util",
@@ -1805,7 +1805,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.1"
-source = "git+https://github.com/dfns/round-based?branch=state-machine#023ec688907f06571643a14f677d2ac8bee29bf6"
+source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
 dependencies = [
  "proc-macro2",
  "quote",
