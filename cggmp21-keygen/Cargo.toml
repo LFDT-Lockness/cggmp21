@@ -1,6 +1,6 @@
 [package]
 name = "cggmp21-keygen"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "UC-secure DKG implementation based on CGGMP21 paper"
@@ -11,25 +11,29 @@ keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-key-share = { path = "../key-share", version = "0.2", features = ["serde"] }
-slip-10 = { version = "0.2", optional = true }
+key-share = { path = "../key-share", version = "0.2", default-features = false, features = ["serde"] }
+slip-10 = { version = "0.2", default-features = false, optional = true }
 
-generic-ec = { version = "0.2", features = ["serde", "udigest"] }
-generic-ec-zkp = { version = "0.2", features = ["serde", "udigest"] }
-udigest = { version = "0.1", features = ["std", "derive"]}
+generic-ec = { version = "0.2", default-features = false, features = ["serde", "udigest"] }
+generic-ec-zkp = { version = "0.2", default-features = false, features = ["serde", "udigest"] }
+udigest = { version = "0.1", default-features = false, features = ["derive"]}
 
-round-based = { version = "0.2", features = ["derive"] }
-futures = "0.3"
+round-based = { version = "0.3", default-features = false, features = ["derive"] }
 
-sha2 = "0.10"
-digest = "0.10"
-rand_core = "0.6"
+sha2 = { version = "0.10", default-features = false }
+digest = { version = "0.10", default-features = false }
+rand_core = { version = "0.6", default-features = false }
 
-serde = { version = "1", features = ["derive"] }
-serde_with = { version = "2" }
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_with = { version = "2", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["serde"] }
 
-thiserror = "1"
+displaydoc = { version = "0.2", default-features = false }
+thiserror = { version = "1", optional = true }
 
 [features]
+default = ["std"]
+
+std = ["thiserror", "key-share/std", "udigest/std", "round-based/std"]
 hd-wallets = ["slip-10", "key-share/hd-wallets"]
+state-machine = ["round-based/state-machine"]

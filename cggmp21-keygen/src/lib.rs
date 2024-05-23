@@ -1,5 +1,17 @@
 //! Threshold and non-threshold CGGMP21 DKG
+//!
+//! This crate provides an implementation of UC-secure DKG protocol taken from [CGGMP21] paper. Implementation is
+//! fully `#![no_std]` compatible and WASM-friendly.
+//!
+//! [CGGMP21]: https://ia.cr/2021/060
+
 #![allow(non_snake_case, clippy::too_many_arguments)]
+#![forbid(missing_docs)]
+#![no_std]
+
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
 pub mod progress;
 pub mod security_level;
@@ -14,11 +26,12 @@ mod execution_id;
 mod rng;
 mod utils;
 
+use alloc::vec::Vec;
+
 use digest::Digest;
 use generic_ec::Curve;
 use rand_core::{CryptoRng, RngCore};
 use round_based::{Mpc, MsgId, PartyIndex};
-use thiserror::Error;
 
 #[doc(inline)]
 pub use key_share;
@@ -84,7 +97,7 @@ pub struct GenericKeygenBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
     tracer: Option<&'a mut dyn Tracer>,
     #[cfg(feature = "hd-wallets")]
     hd_enabled: bool,
-    _params: std::marker::PhantomData<(E, L, D)>,
+    _params: core::marker::PhantomData<(E, L, D)>,
 }
 
 /// Indicates non-threshold DKG
@@ -111,7 +124,7 @@ where
             tracer: None,
             #[cfg(feature = "hd-wallets")]
             hd_enabled: true,
-            _params: std::marker::PhantomData,
+            _params: core::marker::PhantomData,
         }
     }
 }
@@ -133,7 +146,7 @@ where
             tracer: self.tracer,
             #[cfg(feature = "hd-wallets")]
             hd_enabled: self.hd_enabled,
-            _params: std::marker::PhantomData,
+            _params: core::marker::PhantomData,
         }
     }
     /// Specifies another hash function to use
@@ -150,7 +163,7 @@ where
             tracer: self.tracer,
             #[cfg(feature = "hd-wallets")]
             hd_enabled: self.hd_enabled,
-            _params: std::marker::PhantomData,
+            _params: core::marker::PhantomData,
         }
     }
 
@@ -168,7 +181,7 @@ where
             tracer: self.tracer,
             #[cfg(feature = "hd-wallets")]
             hd_enabled: self.hd_enabled,
-            _params: std::marker::PhantomData,
+            _params: core::marker::PhantomData,
         }
     }
 
@@ -219,6 +232,23 @@ where
         )
         .await
     }
+
+    /// Returns a state machine that can be used to carry out the key generation protocol
+    ///
+    /// See [`round_based::state_machine`] for details on how that can be done.
+    #[cfg(feature = "state-machine")]
+    pub fn into_state_machine<R>(
+        self,
+        rng: &'a mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<CoreKeyShare<E>, KeygenError>,
+        Msg = non_threshold::Msg<E, L, D>,
+    > + 'a
+    where
+        R: RngCore + CryptoRng,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.start(rng, party))
+    }
 }
 
 impl<'a, E, L, D> GenericKeygenBuilder<'a, E, WithThreshold, L, D>
@@ -247,12 +277,30 @@ where
         )
         .await
     }
+
+    /// Returns a state machine that can be used to carry out the key generation protocol
+    ///
+    /// See [`round_based::state_machine`] for details on how that can be done.
+    #[cfg(feature = "state-machine")]
+    pub fn into_state_machine<R>(
+        self,
+        rng: &'a mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<CoreKeyShare<E>, KeygenError>,
+        Msg = threshold::Msg<E, L, D>,
+    > + 'a
+    where
+        R: RngCore + CryptoRng,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.start(rng, party))
+    }
 }
 
 /// Keygen protocol error
-#[derive(Debug, Error)]
-#[error("keygen protocol is failed to complete")]
-pub struct KeygenError(#[source] Reason);
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("keygen protocol is failed to complete")]
+pub struct KeygenError(#[cfg_attr(feature = "std", source)] Reason);
 
 crate::errors::impl_from! {
     impl From for KeygenError {
@@ -262,54 +310,59 @@ crate::errors::impl_from! {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum Reason {
     /// Protocol was maliciously aborted by another party
-    #[error("protocol was aborted by malicious party")]
-    Aborted(
-        #[source]
-        #[from]
-        KeygenAborted,
-    ),
-    #[error("i/o error")]
-    IoError(#[source] IoError),
+    #[displaydoc("protocol was aborted by malicious party")]
+    Aborted(#[cfg_attr(feature = "std", source)] KeygenAborted),
+    #[displaydoc("i/o error")]
+    IoError(#[cfg_attr(feature = "std", source)] IoError),
     /// Bug occurred
-    #[error("bug occurred")]
+    #[displaydoc("bug occurred")]
     Bug(Bug),
+}
+
+impl From<KeygenAborted> for Reason {
+    fn from(err: KeygenAborted) -> Self {
+        Reason::Aborted(err)
+    }
 }
 
 /// Error indicating that protocol was aborted by malicious party
 ///
 /// It _can be_ cryptographically proven, but we do not support it yet.
-#[derive(Debug, Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum KeygenAborted {
-    #[error("party decommitment doesn't match commitment: {0:?}")]
+    #[displaydoc("party decommitment doesn't match commitment: {0:?}")]
     InvalidDecommitment(Vec<utils::AbortBlame>),
-    #[error("party provided invalid schnorr proof: {0:?}")]
+    #[displaydoc("party provided invalid schnorr proof: {0:?}")]
     InvalidSchnorrProof(Vec<utils::AbortBlame>),
-    #[error("party secret share is not consistent: {parties:?}")]
+    #[displaydoc("party secret share is not consistent: {parties:?}")]
     FeldmanVerificationFailed { parties: Vec<u16> },
-    #[error("party data size is not suitable for threshold parameters: {parties:?}")]
+    #[displaydoc("party data size is not suitable for threshold parameters: {parties:?}")]
     InvalidDataSize { parties: Vec<u16> },
-    #[error("round1 wasn't reliable")]
+    #[displaydoc("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
     #[cfg(feature = "hd-wallets")]
-    #[error("party did not generate chain code: {0:?}")]
+    #[displaydoc("party did not generate chain code: {0:?}")]
     MissingChainCode(Vec<utils::AbortBlame>),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum Bug {
-    #[error("resulting key share is not valid")]
-    InvalidKeyShare(#[source] InvalidCoreShare),
-    #[error("unexpected zero value")]
+    #[displaydoc("resulting key share is not valid")]
+    InvalidKeyShare(#[cfg_attr(feature = "std", source)] InvalidCoreShare),
+    #[displaydoc("unexpected zero value")]
     NonZeroScalar,
     #[cfg(feature = "hd-wallets")]
-    #[error("chain code is missing although we checked that it should be present")]
+    #[displaydoc("chain code is missing although we checked that it should be present")]
     NoChainCode,
-    #[error("key share of one of the signers is zero - probability of that is negligible")]
+    #[displaydoc("key share of one of the signers is zero - probability of that is negligible")]
     ZeroShare,
-    #[error("shared public key is zero - probability of that is negligible")]
+    #[displaydoc("shared public key is zero - probability of that is negligible")]
     ZeroPk,
 }
 

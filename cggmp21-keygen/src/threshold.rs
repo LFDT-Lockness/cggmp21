@@ -1,11 +1,12 @@
+use alloc::vec::Vec;
+
 use digest::Digest;
-use futures::SinkExt;
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::{polynomial::Polynomial, schnorr_pok};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::simple_store::RoundInput, rounds_router::RoundsRouter, Delivery, Mpc, MpcParty,
-    Outgoing, ProtocolMessage,
+    Outgoing, ProtocolMessage, SinkExt,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;

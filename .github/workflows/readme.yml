@@ -12,9 +12,20 @@ jobs:
     - name: Install cargo-hakari
       uses: baptiste0928/cargo-install@v1
       with:
-        crate: cargo-readme
+        crate: cargo-rdme
     - name: Check that readme matches lib.rs
       run: |
         cp README.md README-copy.md
         make readme
         diff README.md README-copy.md
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+    - name: Install toc-markdown
+      run: npm install -g markdown-toc
+    - name: Check that table of contents matches docs/toc-cggmp21.md
+      run: |
+        cp docs/toc-cggmp21.md docs/toc-cggmp21-copy.md
+        make toc-cggmp21
+        diff docs/toc-cggmp21.md docs/toc-cggmp21-copy.md

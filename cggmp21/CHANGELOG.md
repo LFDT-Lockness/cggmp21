@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0
+* Provide sync API to carry out provided protocols [#100]
+* Update `round-based` dep to `v0.3`
+
+[#100]: https://github.com/dfns/cggmp21/pull/100
+
 ## v0.2.1
 * Bump key-share to `^0.2.3` [#99]
 

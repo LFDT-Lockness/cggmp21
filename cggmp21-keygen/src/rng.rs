@@ -42,7 +42,7 @@ where
     F: Fn(D) -> digest::Output<D>,
 {
     fn next_u32(&mut self) -> u32 {
-        const SIZE: usize = std::mem::size_of::<u32>();
+        const SIZE: usize = core::mem::size_of::<u32>();
         // NOTE: careful with SIZE usage, otherwise it panics
         if self.offset + SIZE > self.buffer.len() {
             self.buffer = (self.hasher)(D::new().chain_update(self.counter.to_le_bytes()));
@@ -72,6 +72,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use alloc::vec;
+
     use rand_core::RngCore;
     use sha2::Digest;
 

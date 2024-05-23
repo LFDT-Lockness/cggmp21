@@ -271,7 +271,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "cggmp21-keygen",
  "digest",
@@ -297,10 +297,10 @@ dependencies = [
 
 [[package]]
 name = "cggmp21-keygen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "digest",
- "futures",
+ "displaydoc",
  "generic-ec",
  "generic-ec-zkp",
  "hex",
@@ -1789,10 +1789,11 @@ dependencies = [
 
 [[package]]
 name = "round-based"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50a0cb1a40a115430c0d124ee305cf118208a37f921a744d41e84d3468a2c1d0"
+checksum = "55f473f56ecfa6457a75c0922c4e51ad036d4a1d27b0a697ac3a9b26f74acc3b"
 dependencies = [
+ "displaydoc",
  "futures-util",
  "phantom-type 0.3.1",
  "round-based-derive",
@@ -1804,9 +1805,9 @@ dependencies = [
 
 [[package]]
 name = "round-based-derive"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0397bf224fdbcb3b286926e43bba90a96f81a82cc630ebfc9290d18e8b6331bd"
+checksum = "1c3f220fb17bab108a448f516ce4ec470584675233ab3a799915ba71295da32e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2516,19 +2517,7 @@ checksum = "2fce9567bd60a67d08a16488756721ba392f24f29006402881e43b19aac64307"
 dependencies = [
  "cfg-if",
  "pin-project-lite",
- "tracing-attributes",
  "tracing-core",
-]
-
-[[package]]
-name = "tracing-attributes"
-version = "0.1.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c75893af559bc8e10716548bdef5cb2b983f8e637db9d0e15126b61b484ee2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.101",
 ]
 
 [[package]]
