@@ -9,7 +9,3 @@ members = [
 exclude = [
     "wasm/no_std",
 ]
-
-[patch.crates-io.round-based]
-git = "https://github.com/dfns/round-based"
-branch = "m"

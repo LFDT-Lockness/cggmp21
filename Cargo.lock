@@ -1790,7 +1790,8 @@ dependencies = [
 [[package]]
 name = "round-based"
 version = "0.3.0"
-source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55f473f56ecfa6457a75c0922c4e51ad036d4a1d27b0a697ac3a9b26f74acc3b"
 dependencies = [
  "displaydoc",
  "futures-util",
@@ -1805,7 +1806,8 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.1"
-source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c3f220fb17bab108a448f516ce4ec470584675233ab3a799915ba71295da32e"
 dependencies = [
  "proc-macro2",
  "quote",
