@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0
+* Update `generic-ec` and `slip-10` deps to latest version [#101]
+* Optimize key share verification using new features of `generic-ec` [#101]
+
+[#101]: https://github.com/dfns/cggmp21/pull/101
+
 ## v0.2.3
 * Reduce size of serialized key share [#96]
 
