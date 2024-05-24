@@ -12,7 +12,7 @@ keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 
 [dependencies]
 key-share = { path = "../key-share", version = "0.2", default-features = false, features = ["serde"] }
-slip-10 = { version = "0.2", default-features = false, optional = true }
+slip-10 = { version = "0.3", default-features = false, optional = true }
 
 generic-ec = { version = "0.3", default-features = false, features = ["serde", "udigest"] }
 generic-ec-zkp = { version = "0.3", default-features = false, features = ["serde", "udigest"] }

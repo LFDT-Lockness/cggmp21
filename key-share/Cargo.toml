@@ -15,7 +15,7 @@ generic-ec = { version = "0.3", default-features = false, features = ["alloc"] }
 generic-ec-zkp = { version = "0.3", default-features = false, features = ["alloc"] }
 rand_core = { version = "0.6", optional = true }
 
-slip-10 = { version = "0.2", optional = true }
+slip-10 = { version = "0.3", optional = true }
 udigest = { version = "0.1", default-features = false, features = ["alloc", "derive"], optional = true }
 
 serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
