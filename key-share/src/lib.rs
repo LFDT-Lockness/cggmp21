@@ -343,14 +343,13 @@ fn validate_vss_key_info<E: Curve>(
     let first_t_shares = &public_shares[0..usize::from(t)];
     let indexes = &vss_setup.I[0..usize::from(t)];
     let interpolation = |x: Scalar<E>| {
-        let lagrange_coefficients =
-            (0..usize::from(t)).map(|j| lagrange_coefficient(x, j, indexes));
-        lagrange_coefficients
-            .zip(first_t_shares)
-            .try_fold(Point::zero(), |acc, (lambda_j, X_j)| {
-                Some(acc + lambda_j? * X_j)
-            })
-            .ok_or(InvalidShareReason::INotPairwiseDistinct)
+        let lagrange_coefficients = (0..usize::from(t))
+            .map(|j| lagrange_coefficient(x, j, indexes))
+            .collect::<Option<Vec<_>>>()
+            .ok_or(InvalidShareReason::INotPairwiseDistinct)?;
+        Ok::<_, InvalidCoreShare>(Scalar::multiscalar_mul(
+            lagrange_coefficients.into_iter().zip(first_t_shares),
+        ))
     };
     let reconstructed_pk = interpolation(Scalar::zero())?;
     if reconstructed_pk != shared_public_key {
@@ -583,7 +582,7 @@ pub fn reconstruct_secret_key<E: Curve>(
         let S = key_shares.iter().map(|s| s.as_ref().i).collect::<Vec<_>>();
         let I = crate::utils::subset(&S, I).ok_or(ReconstructErrorReason::Subset)?;
         let lagrange_coefficients =
-            (0..).map(|j| generic_ec_zkp::polynomial::lagrange_coefficient(Scalar::zero(), j, &I));
+            (0..).map(|j| generic_ec_zkp::polynomial::lagrange_coefficient_at_zero(j, &I));
         let mut sk = lagrange_coefficients
             .zip(key_shares)
             .try_fold(Scalar::zero(), |acc, (lambda_j, key_share_j)| {

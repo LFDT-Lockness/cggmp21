@@ -3,7 +3,7 @@
 use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{coords::AlwaysHasAffineX, Curve, NonZero, Point, Scalar, SecretScalar};
-use generic_ec_zkp::polynomial::lagrange_coefficient;
+use generic_ec_zkp::polynomial::lagrange_coefficient_at_zero;
 use paillier_zk::rug::Complete;
 use paillier_zk::{fast_paillier, rug::Integer};
 use paillier_zk::{
@@ -494,11 +494,10 @@ where
         let I = utils::subset(S, I).ok_or(Bug::Subset)?;
         let X = utils::subset(S, &key_share.core.public_shares).ok_or(Bug::Subset)?;
 
-        let lambda_i =
-            lagrange_coefficient(Scalar::zero(), usize::from(i), &I).ok_or(Bug::LagrangeCoef)?;
+        let lambda_i = lagrange_coefficient_at_zero(usize::from(i), &I).ok_or(Bug::LagrangeCoef)?;
         let x_i = (lambda_i * &key_share.core.x).into_secret();
 
-        let lambda = (0..t).map(|j| lagrange_coefficient(Scalar::zero(), usize::from(j), &I));
+        let lambda = (0..t).map(|j| lagrange_coefficient_at_zero(usize::from(j), &I));
         let X = lambda
             .zip(&X)
             .map(|(lambda_j, X_j)| Some(lambda_j? * X_j))
