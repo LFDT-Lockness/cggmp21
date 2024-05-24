@@ -14,8 +14,8 @@ keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 key-share = { path = "../key-share", version = "0.2", default-features = false, features = ["serde"] }
 slip-10 = { version = "0.2", default-features = false, optional = true }
 
-generic-ec = { version = "0.2", default-features = false, features = ["serde", "udigest"] }
-generic-ec-zkp = { version = "0.2", default-features = false, features = ["serde", "udigest"] }
+generic-ec = { version = "0.3", default-features = false, features = ["serde", "udigest"] }
+generic-ec-zkp = { version = "0.3", default-features = false, features = ["serde", "udigest"] }
 udigest = { version = "0.1", default-features = false, features = ["derive"]}
 
 round-based = { version = "0.3", default-features = false, features = ["derive"] }

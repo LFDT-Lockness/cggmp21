@@ -15,11 +15,11 @@ readme = "../README.md"
 cggmp21-keygen = { path = "../cggmp21-keygen", version = "0.2" }
 key-share = { path = "../key-share", version = "0.2.2", features = ["serde"] }
 
-generic-ec = { version = "0.2", features = ["serde", "udigest"] }
-generic-ec-zkp = { version = "0.2", features = ["serde", "udigest"] }
+generic-ec = { version = "0.3", features = ["serde", "udigest"] }
+generic-ec-zkp = { version = "0.3", features = ["serde", "udigest"] }
 round-based = { version = "0.3", features = ["derive"] }
 
-paillier-zk = { version = "0.2", features = ["serde"] }
+paillier-zk = { version = "0.3", features = ["serde"] }
 udigest = { version = "0.1", features = ["std", "derive"]}
 
 digest = "0.10"

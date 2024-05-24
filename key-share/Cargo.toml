@@ -11,8 +11,8 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = { version = "0.2.3", default-features = false, features = ["alloc"] }
-generic-ec-zkp = { version = "0.2", default-features = false, features = ["alloc"] }
+generic-ec = { version = "0.3", default-features = false, features = ["alloc"] }
+generic-ec-zkp = { version = "0.3", default-features = false, features = ["alloc"] }
 rand_core = { version = "0.6", optional = true }
 
 slip-10 = { version = "0.2", optional = true }
