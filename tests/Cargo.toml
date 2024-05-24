@@ -25,7 +25,7 @@ rand_chacha = "0.3"
 sha2 = "0.10"
 
 round-based = { version = "0.3", features = ["derive", "dev", "state-machine"] }
-generic-ec = { version = "0.2", features = ["serde", "all-curves"] }
+generic-ec = { version = "0.3", features = ["serde", "all-curves"] }
 
 tokio = { version = "1", features = ["macros"] }
 futures = "0.3"

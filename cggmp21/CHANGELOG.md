@@ -2,9 +2,12 @@
 
 ## v0.3.0
 * Provide sync API to carry out provided protocols [#100]
-* Update `round-based` dep to `v0.3`
+* Update `round-based` dep to `v0.3` [#100]
+* Update `generic-ec`, `slip-10`, `paillier-zk` deps to latest version [#101]
+* Optimize key share verification and signing using new features of `generic-ec` [#101]
 
 [#100]: https://github.com/dfns/cggmp21/pull/100
+[#101]: https://github.com/dfns/cggmp21/pull/101
 
 ## v0.2.1
 * Bump key-share to `^0.2.3` [#99]

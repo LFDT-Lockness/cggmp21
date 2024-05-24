@@ -1,6 +1,6 @@
 [package]
 name = "key-share"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Key share of any Threshold Signature Scheme (TSS)"
@@ -11,11 +11,11 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = { version = "0.2.3", default-features = false, features = ["alloc"] }
-generic-ec-zkp = { version = "0.2", default-features = false, features = ["alloc"] }
+generic-ec = { version = "0.3", default-features = false, features = ["alloc"] }
+generic-ec-zkp = { version = "0.3", default-features = false, features = ["alloc"] }
 rand_core = { version = "0.6", optional = true }
 
-slip-10 = { version = "0.2", optional = true }
+slip-10 = { version = "0.3", optional = true }
 udigest = { version = "0.1", default-features = false, features = ["alloc", "derive"], optional = true }
 
 serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
