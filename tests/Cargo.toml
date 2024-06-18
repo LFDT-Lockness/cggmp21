@@ -7,25 +7,24 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cggmp21 = { path = "../cggmp21", features = ["all-curves", "spof", "state-machine"] }
+cggmp21 = { workspace = true, features = ["all-curves", "spof", "state-machine"] }
 
-anyhow = "1"
-bpaf = "0.7"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-ciborium = "0.2"
-hex = "0.4"
+anyhow = { workspace = true }
+bpaf = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+ciborium = { workspace = true }
+hex = { workspace = true }
 
-include_dir = "0.7"
+include_dir = { workspace = true }
 
-rand = "0.8"
-rand_dev = "0.1"
-rand_chacha = "0.3"
+rand = { workspace = true }
+rand_dev = { workspace = true }
 
-sha2 = "0.10"
+sha2 = { workspace = true }
 
-round-based = { version = "0.3", features = ["derive", "dev", "state-machine"] }
-generic-ec = { version = "0.3", features = ["serde", "all-curves"] }
+round-based = { workspace = true, features = ["derive", "dev", "state-machine"] }
+generic-ec = { workspace = true, features = ["serde", "all-curves"] }
 
 tokio = { version = "1", features = ["macros"] }
 futures = "0.3"

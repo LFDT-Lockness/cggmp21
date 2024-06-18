@@ -11,22 +11,22 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generic-ec = { version = "0.3", default-features = false, features = ["alloc"] }
-generic-ec-zkp = { version = "0.3", default-features = false, features = ["alloc"] }
-rand_core = { version = "0.6", optional = true }
+generic-ec = { workspace = true, features = ["alloc"] }
+generic-ec-zkp = { workspace = true, features = ["alloc"] }
+rand_core = { workspace = true, optional = true }
 
-slip-10 = { version = "0.3", optional = true }
-udigest = { version = "0.1", default-features = false, features = ["alloc", "derive"], optional = true }
+slip-10 = { workspace = true, optional = true }
+udigest = { workspace = true, features = ["alloc", "derive"], optional = true }
 
-serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
-hex = { version = "0.4", default-features = false, features = ["serde"], optional = true }
-serde_with = { version = "2", default-features = false, features = ["alloc"], optional = true }
+serde = { workspace = true, features = ["alloc", "derive"], optional = true }
+hex = { workspace = true, features = ["serde"], optional = true }
+serde_with = { workspace = true, features = ["alloc"], optional = true }
 
-thiserror = { version = "1", optional = true }
-displaydoc = { version = "0.2", default-features = false }
+thiserror = { workspace = true, optional = true }
+displaydoc = { workspace = true }
 
 [dev-dependencies]
-rand_core = { version = "0.6", features = ["getrandom"] }
+rand_core = { workspace = true, features = ["getrandom"] }
 
 [features]
 default = ["std"]

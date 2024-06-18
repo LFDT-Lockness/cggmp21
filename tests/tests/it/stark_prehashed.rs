@@ -77,7 +77,7 @@ async fn sign_transaction() {
     let mut outputs = vec![];
     for (i, share) in (0..).zip(participants_shares) {
         let party = simulation.add_party();
-        let mut party_rng = rand_chacha::ChaCha20Rng::from_seed(rng.gen());
+        let mut party_rng = rng.fork();
 
         outputs.push(async move {
             cggmp21::signing(eid, i, participants, share)

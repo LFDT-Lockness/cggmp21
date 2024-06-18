@@ -271,7 +271,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cggmp21-keygen",
  "digest",
@@ -283,9 +283,9 @@ dependencies = [
  "key-share",
  "paillier-zk",
  "rand",
- "rand_chacha",
  "rand_core",
  "rand_dev",
+ "rand_hash",
  "round-based",
  "serde",
  "serde_with 2.3.3",
@@ -330,7 +330,6 @@ dependencies = [
  "include_dir",
  "lazy_static",
  "rand",
- "rand_chacha",
  "rand_dev",
  "round-based",
  "secp256k1",
@@ -933,16 +932,17 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c35601473af37794b53e8c7dc4a540a659d8de54c957990e88715b4037597d1"
+version = "0.4.0-rc4"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
  "curve25519-dalek",
+ "digest",
  "generic-ec-core",
  "generic-ec-curves",
  "hex",
  "phantom-type 0.4.2",
  "rand_core",
+ "rand_hash",
  "serde",
  "serde_with 2.3.3",
  "subtle",
@@ -953,8 +953,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f156564cc8aa47456da807826b1a0aa9cf420474d9f41593ffbdde65133d4bea"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -966,8 +965,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5926949b758d01801c7edd75357495fe54c5fc25580a193de4c994c94d22307"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
  "curve25519-dalek",
  "elliptic-curve",
@@ -984,9 +982,8 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dae3a4e8ce33015cedc103b7c193c797baa318fa695a71e3ef3652197389d977"
+version = "0.4.0-rc4"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -1489,18 +1486,19 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49e75f79f16fa844d601be6a49467068b0e329dc69e4466eeec66d23a6162825"
+version = "0.4.0"
+source = "git+https://github.com/dfnsco/paillier-zk-private?branch=unambiguous-challenge#b7dea992947b87bab22868d9d08e90145b172304"
 dependencies = [
  "digest",
  "fast-paillier",
  "generic-ec",
  "rand_core",
+ "rand_hash",
  "rug",
  "serde",
  "serde_with 3.0.0",
  "thiserror",
+ "udigest",
 ]
 
 [[package]]
@@ -1711,6 +1709,16 @@ dependencies = [
  "hex",
  "rand_chacha",
  "rand_core",
+]
+
+[[package]]
+name = "rand_hash"
+version = "0.1.0-rc4"
+source = "git+https://github.com/dfns/rand_hash?branch=udigest-rc3#dc3e204b60c15b06387186c284fef18f407ffbc2"
+dependencies = [
+ "digest",
+ "rand_core",
+ "udigest",
 ]
 
 [[package]]
@@ -2089,9 +2097,8 @@ dependencies = [
 
 [[package]]
 name = "slip-10"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b92fadfb9de28645b655fb6508d8e5d433c024577d53d5c2501d808489bfb52"
+version = "0.4.0-rc4"
+source = "git+https://github.com/dfns/slip-10?branch=update-generic-ec#6d6f00ff44f228144c4494b7eb6404ed7341b563"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -2543,9 +2550,8 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "udigest"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8e4a5cb9599a5dc3d47f21ad605a5a14594e0b212c7627d68dd5ca9776ace2e"
+version = "0.2.0-rc4"
+source = "git+https://github.com/dfns/udigest?branch=inline-struct-clone#3dfaf6f6c238b2e5fe9228043718f4a9f4c39afd"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2553,9 +2559,8 @@ dependencies = [
 
 [[package]]
 name = "udigest-derive"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b29f121da05aa0857e7b96cf2f8782bd4140911506518486d4a125b97d7d609"
+version = "0.2.0-rc3"
+source = "git+https://github.com/dfns/udigest?branch=inline-struct-clone#3dfaf6f6c238b2e5fe9228043718f4a9f4c39afd"
 dependencies = [
  "proc-macro2",
  "quote",

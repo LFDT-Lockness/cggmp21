@@ -24,7 +24,7 @@ use crate::{
         DirtyAuxInfo, DirtyIncompleteKeyShare, DirtyKeyInfo, KeyShare, PartyAux, Validate,
     },
     progress::Tracer,
-    security_level::SecurityLevel,
+    security_level::{SecurityLevel, M},
     utils,
     utils::{
         but_nth, collect_blame, collect_simple_blame, iter_peers, scalar_to_bignumber, xor_array,
@@ -33,6 +33,12 @@ use crate::{
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId, IncompleteKeyShare,
 };
+
+macro_rules! prefixed {
+    ($name:tt) => {
+        concat!("dfns.cggmp21.key_refresh.non_threshold.", $name)
+    };
+}
 
 /// Message of key refresh protocol
 #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
@@ -52,7 +58,7 @@ pub enum Msg<E: Curve, D: Digest, L: SecurityLevel> {
 
 /// Message from round 1
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.full_key_refresh.non_threshold.round1")]
+#[udigest(tag = prefixed!("round1"))]
 #[udigest(bound = "")]
 #[serde(bound = "")]
 pub struct MsgRound1<D: Digest> {
@@ -62,7 +68,7 @@ pub struct MsgRound1<D: Digest> {
 }
 /// Message from round 2
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.full_key_refresh.non_threshold.round2")]
+#[udigest(tag = prefixed!("round2"))]
 #[udigest(bound = "")]
 #[serde(bound = "")]
 pub struct MsgRound2<E: Curve, L: SecurityLevel> {
@@ -119,26 +125,68 @@ pub struct MsgRound3<E: Curve> {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-#[derive(udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.full_key_refresh.non_threshold.tag")]
-enum Tag<'a> {
-    /// Tag that includes the prover index
-    Indexed {
-        party_index: u16,
+mod unambiguous {
+    use digest::Digest;
+    use generic_ec::Curve;
+
+    use crate::{ExecutionId, SecurityLevel};
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("proof_prm"))]
+    pub struct ProofPrm<'a> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("proof_mod"))]
+    pub struct ProofMod<'a> {
+        pub sid: ExecutionId<'a>,
         #[udigest(as_bytes)]
-        sid: &'a [u8],
-    },
-    /// Tag w/o party index
-    Unindexed {
+        pub rho: &'a [u8],
+        pub prover: u16,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("schnorr_challenge"))]
+    pub struct SchnorrChallenge<'a> {
+        pub sid: ExecutionId<'a>,
+        pub rho: &'a [u8],
+        pub prover: u16,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("proof_fac"))]
+    #[udigest(bound = "")]
+    pub struct ProofFac<'a> {
+        pub sid: ExecutionId<'a>,
         #[udigest(as_bytes)]
-        sid: &'a [u8],
-    },
+        pub rho: &'a [u8],
+        pub prover: u16,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("hash_commitment"))]
+    #[udigest(bound = "")]
+    pub struct HashCom<'a, E: Curve, L: SecurityLevel> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+        pub decommitment: &'a super::MsgRound2<E, L>,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("echo_round"))]
+    #[udigest(bound = "")]
+    pub struct Echo<'a, D: Digest> {
+        pub sid: ExecutionId<'a>,
+        pub commitment: &'a super::MsgRound1<D>,
+    }
 }
 
 pub async fn run_refresh<R, M, E, L, D>(
     mut rng: &mut R,
     party: M,
-    execution_id: ExecutionId<'_>,
+    sid: ExecutionId<'_>,
     pregenerated: PregeneratedPrimes<L>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
@@ -169,17 +217,6 @@ where
     let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L>>::broadcast(i, n));
     let round3 = rounds.add_round(RoundInput::<MsgRound3<E>>::p2p(i, n));
     let mut rounds = rounds.listen(incomings);
-
-    tracer.stage("Precompute execution id and shared state");
-    let sid = execution_id.as_bytes();
-    let tag = |j| {
-        udigest::Tag::<D>::new_structured(Tag::Indexed {
-            party_index: j,
-            sid,
-        })
-    };
-    let tag_i = tag(i);
-    let parties_shared_state = D::new_with_prefix(D::digest(sid));
 
     // Round 1
     tracer.round_begins();
@@ -218,8 +255,8 @@ where
     let s = t.pow_mod_ref(&lambda, &N).ok_or(Bug::PowMod)?.into();
 
     tracer.stage("Prove Πprm (ψˆ_i)");
-    let hat_psi = π_prm::prove(
-        parties_shared_state.clone().chain_update(i.to_be_bytes()),
+    let hat_psi = π_prm::prove::<{ M }, D>(
+        &unambiguous::ProofPrm { sid, prover: i },
         &mut rng,
         π_prm::Data {
             N: &N,
@@ -258,7 +295,11 @@ where
             nonce
         },
     };
-    let hash_commit = tag_i.clone().digest(&decommitment);
+    let hash_commit = udigest::hash::<D>(&unambiguous::HashCom {
+        sid,
+        prover: i,
+        decommitment: &decommitment,
+    });
 
     tracer.send_msg();
     let commitment = MsgRound1 {
@@ -283,8 +324,11 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::Tag::<D>::new_structured(Tag::Unindexed { sid })
-            .digest_iter(commitments.iter_including_me(&commitment));
+        let h_i = udigest::hash_iter::<D>(
+            commitments
+                .iter_including_me(&commitment)
+                .map(|commitment| unambiguous::Echo { sid, commitment }),
+        );
 
         tracer.send_msg();
         outgoings
@@ -335,7 +379,12 @@ where
     // validate decommitments
     tracer.stage("Validate round 1 decommitments");
     let blame = collect_blame(&decommitments, &commitments, |j, decomm, comm| {
-        tag(j).digest(decomm) != comm.commitment
+        let com_expected = udigest::hash::<D>(&unambiguous::HashCom {
+            sid,
+            prover: j,
+            decommitment: decomm,
+        });
+        com_expected != comm.commitment
     });
     if !blame.is_empty() {
         return Err(ProtocolAborted::invalid_decommitment(blame).into());
@@ -360,8 +409,8 @@ where
                 s: &d.s,
                 t: &d.t,
             };
-            π_prm::verify(
-                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+            π_prm::verify::<{ M }, D>(
+                &unambiguous::ProofPrm { sid, prover: j },
                 data,
                 &d.params_proof,
             )
@@ -395,13 +444,13 @@ where
         .fold(rho_bytes, xor_array);
 
     // common data for messages
-    let my_shared_state = parties_shared_state
-        .clone()
-        .chain_update(i.to_be_bytes())
-        .chain_update(&rho_bytes);
     tracer.stage("Compute П_mod (ψ_i)");
-    let psi = π_mod::non_interactive::prove(
-        my_shared_state.clone(),
+    let psi = π_mod::non_interactive::prove::<{ M }, D>(
+        &unambiguous::ProofMod {
+            sid,
+            rho: rho_bytes.as_ref(),
+            prover: i,
+        },
         &π_mod::Data { n: N.clone() },
         &π_mod::PrivateData {
             p: p.clone(),
@@ -418,16 +467,11 @@ where
     };
     let n_sqrt = utils::sqrt(&N);
     tracer.stage("Compute schnorr proof ψ_i^j");
-    let challenge = {
-        let hash = |d: D| {
-            d.chain_update(sid)
-                .chain_update(i.to_be_bytes())
-                .chain_update(rho_bytes.as_ref())
-                .finalize()
-        };
-        let mut rng = paillier_zk::rng::HashRng::new(hash);
-        Scalar::random(&mut rng)
-    };
+    let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrChallenge {
+        sid,
+        rho: rho_bytes.as_ref(),
+        prover: i,
+    });
     let challenge = schnorr_pok::Challenge { nonce: challenge };
     let psis = xs
         .iter()
@@ -448,8 +492,12 @@ where
             .encrypt_with_random(&mut rng, &scalar_to_bignumber(x))
             .map_err(|_| Bug::PaillierEnc)?;
         tracer.stage("Compute П_fac (ф_i^j)");
-        let phi = π_fac::prove(
-            my_shared_state.clone(),
+        let phi = π_fac::prove::<D>(
+            &unambiguous::ProofFac {
+                sid,
+                rho: rho_bytes.as_ref(),
+                prover: i,
+            },
             &π_fac::Aux {
                 s: d.s.clone(),
                 t: d.t.clone(),
@@ -535,16 +583,11 @@ where
         &decommitments,
         &shares_msg_b,
         |j, decommitment, proof_msg| {
-            let challenge = {
-                let hash = |d: D| {
-                    d.chain_update(sid)
-                        .chain_update(j.to_be_bytes())
-                        .chain_update(rho_bytes.as_ref())
-                        .finalize()
-                };
-                let mut rng = paillier_zk::rng::HashRng::new(hash);
-                Scalar::random(&mut rng)
-            };
+            let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrChallenge {
+                sid,
+                rho: rho_bytes.as_ref(),
+                prover: j,
+            });
             let challenge = schnorr_pok::Challenge { nonce: challenge };
 
             // x length is verified above
@@ -580,11 +623,12 @@ where
                 n: decommitment.N.clone(),
             };
             let (comm, proof) = &proof_msg.mod_proof;
-            π_mod::non_interactive::verify(
-                parties_shared_state
-                    .clone()
-                    .chain_update(j.to_be_bytes())
-                    .chain_update(&rho_bytes),
+            π_mod::non_interactive::verify::<{ M }, D>(
+                &unambiguous::ProofMod {
+                    sid,
+                    rho: rho_bytes.as_ref(),
+                    prover: j,
+                },
                 &data,
                 comm,
                 proof,
@@ -616,11 +660,12 @@ where
         &decommitments,
         &shares_msg_b,
         |j, decommitment, proof_msg| {
-            π_fac::verify(
-                parties_shared_state
-                    .clone()
-                    .chain_update(j.to_be_bytes())
-                    .chain_update(&rho_bytes),
+            π_fac::verify::<D>(
+                &unambiguous::ProofFac {
+                    sid,
+                    rho: rho_bytes.as_ref(),
+                    prover: j,
+                },
                 &phi_common_aux,
                 π_fac::Data {
                     n: &decommitment.N,

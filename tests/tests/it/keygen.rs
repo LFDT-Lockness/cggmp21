@@ -4,7 +4,6 @@ mod generic {
 
     use generic_ec::{Curve, Point};
     use rand::{seq::SliceRandom, Rng, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
     use rand_dev::DevRng;
     use round_based::simulation::{Simulation, SimulationSync};
     use sha2::Sha256;

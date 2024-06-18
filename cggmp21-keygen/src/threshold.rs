@@ -21,6 +21,12 @@ use crate::{
 
 use super::{Bug, KeygenAborted, KeygenError};
 
+macro_rules! prefixed {
+    ($name:tt) => {
+        concat!("dfns.cggmp21.keygen.threshold.", $name)
+    };
+}
+
 /// Message of key generation protocol
 #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
@@ -41,7 +47,7 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
-#[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
+#[udigest(tag = prefixed!("round1"))]
 pub struct MsgRound1<D: Digest> {
     /// $V_i$
     #[udigest(as_bytes)]
@@ -52,7 +58,7 @@ pub struct MsgRound1<D: Digest> {
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
-#[udigest(tag = "dfns.cggmp21.keygen.threshold.round1")]
+#[udigest(tag = prefixed!("round2_broad"))]
 pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// `rid_i`
     #[serde_as(as = "utils::HexOrBin")]
@@ -91,20 +97,28 @@ pub struct MsgRound3<E: Curve> {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-#[derive(udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.keygen.threshold.tag")]
-enum Tag<'a> {
-    /// Tag that includes the prover index
-    Indexed {
-        party_index: u16,
+mod unambiguous {
+    use crate::SecurityLevel;
+    use generic_ec::Curve;
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("hash_commitment"))]
+    #[udigest(bound = "")]
+    pub struct HashCom<'a, E: Curve, L: SecurityLevel> {
         #[udigest(as_bytes)]
-        sid: &'a [u8],
-    },
-    /// Tag w/o party index
-    Unindexed {
+        pub sid: &'a [u8],
+        pub party_index: u16,
+        pub decommitment: &'a super::MsgRound2Broad<E, L>,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("echo_round"))]
+    #[udigest(bound = "")]
+    pub struct Echo<'a, D: digest::Digest> {
         #[udigest(as_bytes)]
-        sid: &'a [u8],
-    },
+        pub sid: &'a [u8],
+        pub commitment: &'a super::MsgRound1<D>,
+    }
 }
 
 pub async fn run_threshold_keygen<E, R, M, L, D>(
@@ -144,13 +158,6 @@ where
 
     tracer.stage("Compute execution id");
     let sid = execution_id.as_bytes();
-    let tag = |j| {
-        udigest::Tag::<D>::new_structured(Tag::Indexed {
-            party_index: j,
-            sid,
-        })
-    };
-    let tag_i = tag(i);
 
     tracer.stage("Sample rid_i, schnorr commitment, polynomial, chain_code");
     let mut rid = L::Rid::default();
@@ -190,7 +197,11 @@ where
             nonce
         },
     };
-    let hash_commit = tag_i.clone().digest(&my_decommitment);
+    let hash_commit = udigest::hash::<D>(&unambiguous::HashCom {
+        sid,
+        party_index: i,
+        decommitment: &my_decommitment,
+    });
 
     tracer.send_msg();
     let my_commitment = MsgRound1 {
@@ -215,8 +226,11 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::Tag::<D>::new_structured(Tag::Unindexed { sid })
-            .digest_iter(commitments.iter_including_me(&my_commitment));
+        let h_i = udigest::hash_iter::<D>(
+            commitments
+                .iter_including_me(&my_commitment)
+                .map(|commitment| unambiguous::Echo { sid, commitment }),
+        );
 
         tracer.send_msg();
         outgoings
@@ -282,7 +296,11 @@ where
 
     tracer.stage("Validate decommitments");
     let blame = utils::collect_blame(&commitments, &decommitments, |j, com, decom| {
-        let com_expected = tag(j).digest(decom);
+        let com_expected = udigest::hash::<D>(&unambiguous::HashCom {
+            sid,
+            party_index: j,
+            decommitment: decom,
+        });
         com.commitment != com_expected
     });
     if !blame.is_empty() {
