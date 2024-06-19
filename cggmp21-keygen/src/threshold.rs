@@ -98,7 +98,7 @@ pub struct MsgRound3<E: Curve> {
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 mod unambiguous {
-    use generic_ec::Curve;
+    use generic_ec::{Curve, NonZero, Point};
 
     use crate::{ExecutionId, SecurityLevel};
 
@@ -109,6 +109,18 @@ mod unambiguous {
         pub sid: ExecutionId<'a>,
         pub party_index: u16,
         pub decommitment: &'a super::MsgRound2Broad<E, L>,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("schnorr_pok"))]
+    #[udigest(bound = "")]
+    pub struct SchnorrPok<'a, E: Curve> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+        #[udigest(as_bytes)]
+        pub rid: &'a [u8],
+        pub y: NonZero<Point<E>>,
+        pub h: Point<E>,
     }
 
     #[derive(udigest::Digestable)]
@@ -366,18 +378,13 @@ where
     debug_assert_eq!(Point::generator() * &sigma, ys[usize::from(i)]);
 
     tracer.stage("Calculate challenge");
-    let challenge = {
-        let hash = |d: D| {
-            d.chain_update(sid)
-                .chain_update(i.to_be_bytes())
-                .chain_update(rid.as_ref())
-                .chain_update(&ys[usize::from(i)].to_bytes(true)) // y_i
-                .chain_update(&my_decommitment.sch_commit.0.to_bytes(false)) // h
-                .finalize()
-        };
-        let mut rng = crate::rng::HashRng::new(hash);
-        Scalar::random(&mut rng)
-    };
+    let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
+        sid,
+        prover: i,
+        rid: rid.as_ref(),
+        y: ys[usize::from(i)],
+        h: my_decommitment.sch_commit.0,
+    });
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     tracer.stage("Prove knowledge of `sigma_i`");
@@ -403,18 +410,13 @@ where
 
     tracer.stage("Validate schnorr proofs");
     let blame = utils::collect_blame(&decommitments, &sch_proofs, |j, decom, sch_proof| {
-        let challenge = {
-            let hash = |d: D| {
-                d.chain_update(sid)
-                    .chain_update(j.to_be_bytes())
-                    .chain_update(rid.as_ref())
-                    .chain_update(&ys[usize::from(j)].to_bytes(true)) // y_i
-                    .chain_update(&decom.sch_commit.0.to_bytes(false)) // h
-                    .finalize()
-            };
-            let mut rng = crate::rng::HashRng::new(hash);
-            Scalar::random(&mut rng)
-        };
+        let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
+            sid,
+            prover: j,
+            rid: rid.as_ref(),
+            y: ys[usize::from(j)],
+            h: decom.sch_commit.0,
+        });
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         sch_proof
             .sch_proof

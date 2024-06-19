@@ -14,7 +14,7 @@ keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 key-share = { workspace = true, features = ["serde"] }
 slip-10 = { workspace = true, optional = true }
 
-generic-ec = { workspace = true, features = ["serde", "udigest"] }
+generic-ec = { workspace = true, features = ["serde", "udigest", "hash-to-scalar"] }
 generic-ec-zkp = { workspace = true, features = ["serde", "udigest"] }
 udigest = { workspace = true, features = ["derive"]}
 

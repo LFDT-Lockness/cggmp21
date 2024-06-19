@@ -101,6 +101,16 @@ mod unambiguous {
     }
 
     #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("schnorr_pok"))]
+    #[udigest(bound = "")]
+    pub struct SchnorrPok<'a> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+        #[udigest(as_bytes)]
+        pub rid: &'a [u8],
+    }
+
+    #[derive(udigest::Digestable)]
     #[udigest(tag = prefixed!("echo_round"))]
     #[udigest(bound = "")]
     pub struct Echo<'a, D: digest::Digest> {
@@ -293,16 +303,11 @@ where
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), utils::xor_array);
-    let challenge = {
-        let hash = |d: D| {
-            d.chain_update(sid)
-                .chain_update(i.to_be_bytes())
-                .chain_update(rid.as_ref())
-                .finalize()
-        };
-        let mut rng = crate::rng::HashRng::new(hash);
-        Scalar::random(&mut rng)
-    };
+    let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
+        sid,
+        prover: i,
+        rid: rid.as_ref(),
+    });
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     tracer.stage("Prove knowledge of `x_i`");
@@ -328,16 +333,11 @@ where
 
     tracer.stage("Validate schnorr proofs");
     let blame = utils::collect_blame(&decommitments, &sch_proofs, |j, decom, sch_proof| {
-        let challenge = {
-            let hash = |d: D| {
-                d.chain_update(sid)
-                    .chain_update(j.to_be_bytes())
-                    .chain_update(rid.as_ref())
-                    .finalize()
-            };
-            let mut rng = crate::rng::HashRng::new(hash);
-            Scalar::random(&mut rng)
-        };
+        let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
+            sid,
+            prover: j,
+            rid: rid.as_ref(),
+        });
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         sch_proof
             .sch_proof
