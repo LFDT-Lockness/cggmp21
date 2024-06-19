@@ -45,10 +45,6 @@ slip-10 = { version = "0.4.0-rc4", git = "https://github.com/dfns/slip-10", bran
 
 generic-tests = "0.1"
 
-bpaf = "0.7"
-include_dir = "0.7"
-ciborium = "0.2"
-
 [patch.crates-io.paillier-zk]
 git = "https://github.com/dfnsco/paillier-zk-private"
 branch = "unambiguous-challenge"

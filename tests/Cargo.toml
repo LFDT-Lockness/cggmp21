@@ -10,13 +10,9 @@ publish = false
 cggmp21 = { workspace = true, features = ["all-curves", "spof", "state-machine"] }
 
 anyhow = { workspace = true }
-bpaf = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-ciborium = { workspace = true }
 hex = { workspace = true }
-
-include_dir = { workspace = true }
 
 rand = { workspace = true }
 rand_dev = { workspace = true }
@@ -25,6 +21,10 @@ sha2 = { workspace = true }
 
 round-based = { workspace = true, features = ["derive", "dev", "state-machine"] }
 generic-ec = { workspace = true, features = ["serde", "all-curves"] }
+
+bpaf = "0.7"
+include_dir = "0.7"
+ciborium = "0.2"
 
 tokio = { version = "1", features = ["macros"] }
 futures = "0.3"
