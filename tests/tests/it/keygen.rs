@@ -3,7 +3,7 @@ mod generic {
     use std::iter;
 
     use generic_ec::{Curve, Point};
-    use rand::{seq::SliceRandom, Rng, SeedableRng};
+    use rand::{seq::SliceRandom, Rng};
     use rand_dev::DevRng;
     use round_based::simulation::{Simulation, SimulationSync};
     use sha2::Sha256;
@@ -82,7 +82,7 @@ mod generic {
         let mut outputs = vec![];
         for i in 0..n {
             let party = simulation.add_party();
-            let mut party_rng = ChaCha20Rng::from_seed(rng.gen());
+            let mut party_rng = rng.fork();
 
             outputs.push(async move {
                 let keygen = cggmp21::keygen(eid, i, n)
