@@ -98,15 +98,15 @@ pub struct MsgRound3<E: Curve> {
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
 mod unambiguous {
-    use crate::SecurityLevel;
     use generic_ec::Curve;
+
+    use crate::{ExecutionId, SecurityLevel};
 
     #[derive(udigest::Digestable)]
     #[udigest(tag = prefixed!("hash_commitment"))]
     #[udigest(bound = "")]
     pub struct HashCom<'a, E: Curve, L: SecurityLevel> {
-        #[udigest(as_bytes)]
-        pub sid: &'a [u8],
+        pub sid: ExecutionId<'a>,
         pub party_index: u16,
         pub decommitment: &'a super::MsgRound2Broad<E, L>,
     }
@@ -115,8 +115,7 @@ mod unambiguous {
     #[udigest(tag = prefixed!("echo_round"))]
     #[udigest(bound = "")]
     pub struct Echo<'a, D: digest::Digest> {
-        #[udigest(as_bytes)]
-        pub sid: &'a [u8],
+        pub sid: ExecutionId<'a>,
         pub commitment: &'a super::MsgRound1<D>,
     }
 }
@@ -127,7 +126,7 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
     t: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
-    execution_id: ExecutionId<'_>,
+    sid: ExecutionId<'_>,
     rng: &mut R,
     party: M,
     #[cfg(feature = "hd-wallets")] hd_enabled: bool,
@@ -155,9 +154,6 @@ where
 
     // Round 1
     tracer.round_begins();
-
-    tracer.stage("Compute execution id");
-    let sid = execution_id.as_bytes();
 
     tracer.stage("Sample rid_i, schnorr commitment, polynomial, chain_code");
     let mut rid = L::Rid::default();
