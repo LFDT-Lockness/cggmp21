@@ -2551,7 +2551,7 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "udigest"
 version = "0.2.0-rc4"
-source = "git+https://github.com/dfns/udigest?branch=inline-struct-clone#3dfaf6f6c238b2e5fe9228043718f4a9f4c39afd"
+source = "git+https://github.com/dfns/udigest?branch=proc-macro-clippy#16e6d99f6a5dc7639c4256359ff6350961364a33"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2560,7 +2560,7 @@ dependencies = [
 [[package]]
 name = "udigest-derive"
 version = "0.2.0-rc3"
-source = "git+https://github.com/dfns/udigest?branch=inline-struct-clone#3dfaf6f6c238b2e5fe9228043718f4a9f4c39afd"
+source = "git+https://github.com/dfns/udigest?branch=proc-macro-clippy#16e6d99f6a5dc7639c4256359ff6350961364a33"
 dependencies = [
  "proc-macro2",
  "quote",

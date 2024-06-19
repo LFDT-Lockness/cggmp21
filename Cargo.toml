@@ -55,7 +55,7 @@ branch = "unambiguous-challenge"
 
 [patch.crates-io.udigest]
 git = "https://github.com/dfns/udigest"
-branch = "inline-struct-clone"
+branch = "proc-macro-clippy"
 
 [patch.crates-io.generic-ec]
 git = "https://github.com/dfns/generic-ec"
