@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "cggmp21-keygen"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "digest",
  "displaydoc",
@@ -1357,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "displaydoc",
  "generic-ec",

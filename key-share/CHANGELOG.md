@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.0
+* Update `udigest` to v0.2
+* Update `generic-ec` to v0.4
+* Update `slip-10` to v0.4
+
 ## v0.3.0
 * Update `generic-ec` and `slip-10` deps to latest version [#101]
 * Optimize key share verification using new features of `generic-ec` [#101]
