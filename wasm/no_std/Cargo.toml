@@ -2,6 +2,7 @@
 name = "crates-compile-in-nostd-wasm"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 # Only the crates below have wasm/no_std support
 [dependencies.key-share]
@@ -13,19 +14,3 @@ features = ["serde", "hd-wallets", "spof", "udigest"]
 path = "../../cggmp21-keygen"
 default-features = false
 features = ["hd-wallets", "state-machine"]
-
-[patch.crates-io.udigest]
-git = "https://github.com/dfns/udigest"
-branch = "proc-macro-clippy"
-
-[patch.crates-io.generic-ec]
-git = "https://github.com/dfns/generic-ec"
-branch = "update-udigest"
-
-[patch.crates-io.rand_hash]
-git = "https://github.com/dfns/rand_hash"
-branch = "udigest-rc3"
-
-[patch.crates-io.slip-10]
-git = "https://github.com/dfns/slip-10"
-branch = "update-generic-ec"
