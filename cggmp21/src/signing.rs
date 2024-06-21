@@ -105,6 +105,12 @@ pub struct Signature<E: Curve> {
     pub s: NonZero<Scalar<E>>,
 }
 
+macro_rules! prefixed {
+    ($name:tt) => {
+        concat!("dfns.cggmp21.signing.", $name)
+    };
+}
+
 #[doc = include_str!("../docs/mpc_message.md")]
 pub mod msg {
     use digest::Digest;
@@ -144,7 +150,7 @@ pub mod msg {
 
     /// Message from round 1a
     #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
-    #[udigest(tag = "dfns.cggmp21.signing.round1")]
+    #[udigest(tag = prefixed!("round1"))]
     pub struct MsgRound1a {
         /// $K_i$
         #[udigest(with = utils::encoding::integer)]
@@ -207,6 +213,40 @@ pub mod msg {
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(bound = "")]
     pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
+}
+
+mod unambiguous {
+    use crate::ExecutionId;
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("proof_enc"))]
+    pub struct ProofEnc<'a> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("proof_psi"))]
+    pub struct ProofPsi<'a> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+        pub hat: bool,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("proof_log"))]
+    pub struct ProofLog<'a> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
+        pub prime_prime: bool,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("echo_round"))]
+    pub struct Echo<'a> {
+        pub sid: ExecutionId<'a>,
+        pub ciphertexts: &'a super::MsgRound1a,
+    }
 }
 
 /// Signing entry point
@@ -429,13 +469,6 @@ where
     }
 }
 
-/// Tag w/o party index
-#[derive(udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.signing.tag")]
-struct TagUnindexed<'a> {
-    sid: &'a [u8],
-}
-
 /// t-out-of-n signing
 ///
 /// CGGMP paper doesn't support threshold signing out of the box. However, threshold signing
@@ -592,7 +625,6 @@ where
             .map_err(|_| Bug::InvalidOwnPaillierKey)?;
 
     tracer.stage("Precompute execution id and security params");
-    let sid = sid.as_bytes();
     let security_params = crate::utils::SecurityParams::new::<L>();
 
     tracer.stage("Setup networking");
@@ -634,13 +666,12 @@ where
         .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
-    let parties_shared_state = D::new_with_prefix(D::digest(sid));
     for j in utils::iter_peers(i, n) {
         tracer.stage("Prove ψ0_j");
         let R_j = &R[usize::from(j)];
 
-        let psi0 = pi_enc::non_interactive::prove(
-            parties_shared_state.clone().chain_update(i.to_be_bytes()),
+        let psi0 = pi_enc::non_interactive::prove::<D>(
+            &unambiguous::ProofEnc { sid, prover: i },
             &R_j.into(),
             pi_enc::Data {
                 key: &dec_i,
@@ -681,11 +712,13 @@ where
     // Reliability check (if enabled)
     if enforce_reliable_broadcast {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::Tag::<D>::new_structured(TagUnindexed { sid }).digest_iter(
-            ciphertexts.iter_including_me(&MsgRound1a {
-                K: K_i.clone(),
-                G: G_i.clone(),
-            }),
+        let h_i = udigest::hash_iter::<D>(
+            ciphertexts
+                .iter_including_me(&MsgRound1a {
+                    K: K_i.clone(),
+                    G: G_i.clone(),
+                })
+                .map(|ciphertexts| unambiguous::Echo { sid, ciphertexts }),
         );
 
         tracer.send_msg();
@@ -724,8 +757,8 @@ where
             ciphertexts.iter_indexed().zip(psi0.iter_indexed())
         {
             let R_j = &R[usize::from(j)];
-            if pi_enc::non_interactive::verify(
-                parties_shared_state.clone().chain_update(j.to_be_bytes()),
+            if pi_enc::non_interactive::verify::<D>(
+                &unambiguous::ProofEnc { sid, prover: j },
                 &R_i.into(),
                 pi_enc::Data {
                     key: &fast_paillier::EncryptionKey::from_n(R_j.N.clone()),
@@ -810,9 +843,12 @@ where
             .map_err(|_| Bug::PaillierEnc(BugSource::hat_F))?;
 
         tracer.stage("Prove psi_ji");
-        let psi_cst = parties_shared_state.clone().chain_update(i.to_be_bytes());
-        let psi_ji = pi_aff::non_interactive::prove(
-            psi_cst.clone(),
+        let psi_ji = pi_aff::non_interactive::prove::<E, D>(
+            &unambiguous::ProofPsi {
+                sid,
+                prover: i,
+                hat: false,
+            },
             &R_j.into(),
             pi_aff::Data {
                 key0: &enc_j,
@@ -835,8 +871,12 @@ where
         runtime.yield_now().await;
 
         tracer.stage("Prove psiˆ_ji");
-        let hat_psi_ji = pi_aff::non_interactive::prove(
-            psi_cst.clone(),
+        let hat_psi_ji = pi_aff::non_interactive::prove::<E, D>(
+            &unambiguous::ProofPsi {
+                sid,
+                prover: i,
+                hat: true,
+            },
             &R_j.into(),
             pi_aff::Data {
                 key0: &enc_j,
@@ -858,8 +898,12 @@ where
         .map_err(|e| Bug::PiAffG(BugSource::hat_psi, e))?;
 
         tracer.stage("Prove psi_prime_ji ");
-        let psi_prime_ji = pi_log::non_interactive::prove(
-            psi_cst,
+        let psi_prime_ji = pi_log::non_interactive::prove::<E, D>(
+            &unambiguous::ProofLog {
+                sid,
+                prover: i,
+                prime_prime: false,
+            },
             &R_j.into(),
             pi_log::Data {
                 key0: &dec_i,
@@ -916,11 +960,14 @@ where
         let X_j = X[usize::from(j)];
         let R_j = &R[usize::from(j)];
         let enc_j = fast_paillier::EncryptionKey::from_n(R_j.N.clone());
-        let cst_j = parties_shared_state.clone().chain_update(j.to_be_bytes());
 
         tracer.stage("Validate psi");
-        let psi_invalid = pi_aff::non_interactive::verify(
-            cst_j.clone(),
+        let psi_invalid = pi_aff::non_interactive::verify::<E, D>(
+            &unambiguous::ProofPsi {
+                sid,
+                prover: j,
+                hat: false,
+            },
             &R_i.into(),
             pi_aff::Data {
                 key0: &dec_i,
@@ -937,8 +984,12 @@ where
         .err();
 
         tracer.stage("Validate hat_psi");
-        let hat_psi_invalid = pi_aff::non_interactive::verify(
-            cst_j.clone(),
+        let hat_psi_invalid = pi_aff::non_interactive::verify::<E, D>(
+            &unambiguous::ProofPsi {
+                sid,
+                prover: j,
+                hat: true,
+            },
             &R_i.into(),
             pi_aff::Data {
                 key0: &dec_i,
@@ -955,8 +1006,12 @@ where
         .err();
 
         tracer.stage("Validate psi_prime");
-        let psi_prime_invalid = pi_log::non_interactive::verify(
-            cst_j,
+        let psi_prime_invalid = pi_log::non_interactive::verify::<E, D>(
+            &unambiguous::ProofLog {
+                sid,
+                prover: j,
+                prime_prime: false,
+            },
             &R_i.into(),
             pi_log::Data {
                 key0: &enc_j,
@@ -1018,8 +1073,12 @@ where
     for j in utils::iter_peers(i, n) {
         tracer.stage("Prove psi_prime_prime");
         let R_j = &R[usize::from(j)];
-        let psi_prime_prime = pi_log::non_interactive::prove(
-            parties_shared_state.clone().chain_update(i.to_be_bytes()),
+        let psi_prime_prime = pi_log::non_interactive::prove::<E, D>(
+            &unambiguous::ProofLog {
+                sid,
+                prover: i,
+                prime_prime: true,
+            },
             &R_j.into(),
             pi_log::Data {
                 key0: &dec_i,
@@ -1077,8 +1136,12 @@ where
             b: &Gamma,
         };
 
-        if pi_log::non_interactive::verify(
-            parties_shared_state.clone().chain_update(j.to_be_bytes()),
+        if pi_log::non_interactive::verify::<E, D>(
+            &unambiguous::ProofLog {
+                sid,
+                prover: j,
+                prime_prime: true,
+            },
             &R_i.into(),
             data,
             &msg_j.psi_prime_prime.0,

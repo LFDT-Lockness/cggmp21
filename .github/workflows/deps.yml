@@ -16,6 +16,7 @@ jobs:
   track_deps:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
     - uses: actions/checkout@v3
@@ -25,6 +26,9 @@ jobs:
     - uses: actions/checkout@v3
       with:
         path: pr_branch
+    - uses: webfactory/ssh-agent@v0.9.0
+      with:
+          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - name: Retrieve base branch deps
       run: |
         cd base_branch

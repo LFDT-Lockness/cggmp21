@@ -228,11 +228,11 @@ pub mod encoding {
     }
 
     pub fn integers_list<B: udigest::Buffer>(
-        list: &[rug::Integer],
+        list: impl AsRef<[rug::Integer]>,
         encoder: udigest::encoding::EncodeValue<B>,
     ) {
         let mut encoder = encoder.encode_list();
-        for x in list {
+        for x in list.as_ref() {
             integer(x, encoder.add_item())
         }
     }

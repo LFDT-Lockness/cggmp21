@@ -271,7 +271,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cggmp21-keygen",
  "digest",
@@ -283,9 +283,9 @@ dependencies = [
  "key-share",
  "paillier-zk",
  "rand",
- "rand_chacha",
  "rand_core",
  "rand_dev",
+ "rand_hash",
  "round-based",
  "serde",
  "serde_with 2.3.3",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "cggmp21-keygen"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "digest",
  "displaydoc",
@@ -330,7 +330,6 @@ dependencies = [
  "include_dir",
  "lazy_static",
  "rand",
- "rand_chacha",
  "rand_dev",
  "round-based",
  "secp256k1",
@@ -933,16 +932,18 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c35601473af37794b53e8c7dc4a540a659d8de54c957990e88715b4037597d1"
+checksum = "10cc122ac7a2ebc45550f766cd23a9040f6d15db440230b0888e5645e8eb2cb4"
 dependencies = [
  "curve25519-dalek",
+ "digest",
  "generic-ec-core",
  "generic-ec-curves",
  "hex",
  "phantom-type 0.4.2",
  "rand_core",
+ "rand_hash",
  "serde",
  "serde_with 2.3.3",
  "subtle",
@@ -984,9 +985,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dae3a4e8ce33015cedc103b7c193c797baa318fa695a71e3ef3652197389d977"
+checksum = "f360d09b920f154726c654363cef62ba3497c8037b82f94aa17df215fc05d6f9"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -1356,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "displaydoc",
  "generic-ec",
@@ -1489,18 +1490,19 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49e75f79f16fa844d601be6a49467068b0e329dc69e4466eeec66d23a6162825"
+version = "0.4.0"
+source = "git+https://github.com/dfnsco/paillier-zk-private?rev=88cae377c9cbd75ca27bcd99ffbce2715486ce95#88cae377c9cbd75ca27bcd99ffbce2715486ce95"
 dependencies = [
  "digest",
  "fast-paillier",
  "generic-ec",
  "rand_core",
+ "rand_hash",
  "rug",
  "serde",
  "serde_with 3.0.0",
  "thiserror",
+ "udigest",
 ]
 
 [[package]]
@@ -1711,6 +1713,17 @@ dependencies = [
  "hex",
  "rand_chacha",
  "rand_core",
+]
+
+[[package]]
+name = "rand_hash"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "257d7a1ad5533c1faca40f34d4a1ead75b414f16611c0ec210b7fd23e440475f"
+dependencies = [
+ "digest",
+ "rand_core",
+ "udigest",
 ]
 
 [[package]]
@@ -2089,9 +2102,9 @@ dependencies = [
 
 [[package]]
 name = "slip-10"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b92fadfb9de28645b655fb6508d8e5d433c024577d53d5c2501d808489bfb52"
+checksum = "10c50b6de806a216bce1d98e9107e03f60b54abcfbe6be3935a528ab57c19f6a"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -2543,9 +2556,9 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "udigest"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8e4a5cb9599a5dc3d47f21ad605a5a14594e0b212c7627d68dd5ca9776ace2e"
+checksum = "3a435a16abb7029ba807a45242367b087dd767e87e2e5ebc5f0e4189ea114a23"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2553,9 +2566,9 @@ dependencies = [
 
 [[package]]
 name = "udigest-derive"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b29f121da05aa0857e7b96cf2f8782bd4140911506518486d4a125b97d7d609"
+checksum = "ee6296c12e792dbc59565a58920d8d1842997ad5a72ddf2a51f70d70bd7af2ba"
 dependencies = [
  "proc-macro2",
  "quote",

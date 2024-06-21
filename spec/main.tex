@@ -55,6 +55,7 @@
 \newcommand{\verify}[1]{\ensuremath{\mathtt{Verify}_{\mathtt{#1}}}}
 \newcommand{\verifyni}[1]{\ensuremath{\mathtt{VerifyNI}_{\mathtt{#1}}}}
 \newcommand{\ou}{\text{\;or\;}} % \or is prohibited in latex for some reason
+\newcommand{\Encode}[1]{\ensuremath{\mathtt{Encode}_{\mathtt{#1}}}}
 
 \newcommand{\changedt}[1]{\colorbox{Salmon}{#1}}
 \newcommand{\changed}[1]{\colorbox{Salmon}{$\displaystyle #1$}}
@@ -331,8 +332,57 @@ If we assume $t-1$ malicious parties and $n-t+1$ honest parties, the overall pri
 %If we assume any particular key is used at most $2^{20}>10^6$ times over its lifetime, then the aggregate privacy loss for any particular key is at most $2^{23-s} \cdot (t-1) (n-t+1)$.
 %Bounding the aggregate privacy by $2^{-64}$ is reasonable.
 
+\subsection{Unambiguous encoding}
+We require unambiguous encode function 
+
+$$\Encode{tag} : X_1 \times X_2 \times \dots \times X_n \to \{0, 1\}^*$$
+
+which takes arguments $x_1 \in X_1, \dots, x_n \in X_n$ and produces their unambiguous bytes encoding.
+$X_i$ can be any domain that has bytes representation. E.g. if we encode an integer, then $X_i$ is set
+of all integers, or if we encode a UTF-8 string, then $X_i$ is set of all valid UTF-8 strings.
+
+Encoding function should satisfy these properties:
+\begin{itemize}
+\item {\bf Unambiguousy.} For fixed $x_1 \in X_1, \dots, x_n \in X_n$, $\Encode{tag}(x_1, \dots, x_n)$
+    outputs a bytestring unique for input arguments, i.e.:
+
+    \begin{equation*}
+    \begin{split}
+    & \forall x_1 \in X_1, \dots, x_n \in X_n \\
+    & \forall x'_1 \in X_1, \dots, x'_n \in X_n: (x_1 \ne x'_1 \lor \dots \lor x_n \ne x'_n) \\
+    & \Encode{tag}(x_1, \dots, x_n) \ne \Encode{tag}(x'_1, \dots, x'_n)
+    \end{split}
+    \end{equation*}
+\item {\bf Tag-dependence.} Tag should be unambiguously encoded into the output, so
+    $\Encode{tag}(\dots) \ne \Encode{tag'}(\dots)$ for any $\text{tag} \ne \text{tag}'$. 
+\item {\bf Platform-independence.} Encoding should be the same regardless of platform or machine on which it's
+    executed.
+\end{itemize}
+
 \section{Zero-Knowledge Proofs}
 In this section we describe the various zero-knowledge proofs that are used as sub-routines in the protocol. In each case we first describe an interactive version of the proof; we then describe how we implement a non-interactive version of the proof using the Fiat-Shamir transform.
+
+\subsection{Non-Interactive Challenge Derivation}
+In order to implement Fiat-Shamir transform correctly, we need to deterministically and securely derive a challenge
+from the inputs. To do so, we define a function:
+
+$$\challengeni{tag} : X_1 \times \dots \times X_n \to Y_1 \times \dots \times Y_k$$
+
+which takes proof inputs and outputs uniformelly distributed challenges (number of challenges to be
+sampled depends on the proof).
+
+To sample the challenges, we first construct the cryptographic pseudo-random generator $G$:
+
+\begin{align*}
+G = & H(\Encode{tag}(0, x_1, \dots, x_n)) \\
+    & \| \; H(\Encode{tag}(1, x_1, \dots, x_n)) \\
+    & \| \; H(\Encode{tag}(2, x_1, \dots, x_n)) \\
+    & \| \; \dots
+\end{align*}
+
+And then we use pseudo-random stream $G$ to deterministically sample $y_1 \gets Y_1, \dots, y_k \gets Y_k$.
+
+{\bf Note:} sometimes we write $\challengeni{tag}^L(\dots)$ which is equivalent to $\challengeni{tag}(L, \dots)$.
 
 \subsection{$\proof{enc}$: Paillier Encryption in Range}
 
@@ -392,7 +442,7 @@ Note the second computation involves a fixed-based multiexponentiation.
 \subsubsection{Non-Interactive Version of the Proof}
 
 \begin{itemize}
-    \item We deterministically derive a challenge by applying a hash function to inputs that include $\state$, auxiliary data~$R_j$, the common input~$(N_i, K)$, and the initial protocol message $(S, A, C)$.    
+    \item We deterministically derive a challenge from inputs that include shared $\state$, auxiliary data~$R_j$, the common input~$(N_i, K)$, and the initial protocol message $(S, A, C)$.    
     We write the resulting function as 
     $e = \challengeni{enc}^{L}(\state, R_j, (N_i, K), (S, A, C))$.
 
@@ -517,7 +567,7 @@ Note that two of the above computations involve fixed-base multiexponentiations.
 
 \subsubsection{Non-Interactive Version of the Proof}
 \begin{itemize}
-    \item We deterministically derive a challenge by applying a hash function to inputs that include $\state$, the auxiliary data~$R_j$, the common input~$(N_j,N_i,C,D,Y,X)$, and the initial protocol message $(A,B_x,B_y,E,S,F,T)$.    
+    \item We deterministically derive a challenge from inputs that include shared $\state$, the auxiliary data~$R_j$, the common input~$(N_j,N_i,C,D,Y,X)$, and the initial protocol message $(A,B_x,B_y,E,S,F,T)$.    
 We write the resulting function as \[e = \challengeni{aff\mbox{-}g}^{L}(\state,R_j,(N_j,N_i,C,D,Y,X),(A,B_x,B_y,E,S,F,T)).\]
 
     \item The prover generates a proof as follows: it computes its initial message $(A,B_x,B_y,E,S,F,T)$ as described above; then it computes \[e = \challengeni{aff\mbox{-}g}^{L}(\state,R_j,(N_j,N_i,C,D,Y,X),(A,B_x,B_y,E,S,F,T));\] next, it computes $(z_1,z_2,z_3,z_4,w,w_y)$ as described above, using the challenge~$e$. Finally, it outputs the proof $((A,B_x,B_y,E,S,F,T), (z_1,z_2,z_3,z_4,w,w_y))$. We write the resulting function as $\proveni{aff\mbox{-}g}^{\E,L}(\state, R_j, (N_j, N_i, C, D, Y, C); (x,y,\rho,\rho_y))$. 
@@ -562,7 +612,7 @@ Send $\{(x_i, a_i, b_i, z_i)\}_{i=1}^m$ to the verifier.
 \subsubsection{Non-Interactive Version of the Proof}
 
 \begin{itemize}
-  \item We deterministically derive a challenge by applying a hash function to inputs that include $\state$, the common input~$N$, and the initial protocol message~$w$.   
+  \item We deterministically derive a challenge from inputs that include shared $\state$, the common input~$N$, and the initial protocol message~$w$.   
   We write the resulting function as $(y_1, \ldots, y_m)=\challengeni{mod}^L(\state, N, w)$.
 
   \item The prover generates a proof by first computing its initial message $w$ as described above; then it computes 
@@ -594,7 +644,7 @@ $t^{z_i} = A_i s^{e_i} \bmod N$ for $i=1, \ldots, m$.
 
 \subsubsection{Non-Interactive Version of the Proof}
 \begin{itemize}
-  \item We deterministically derive a challenge by hashing inputs that include $\state$, the common input~$(N,s,t)$, and the initial protocol message~$\{A_i\}_{i=1}^m$.   
+  \item We deterministically derive a challenge from inputs that include shared $\state$, the common input~$(N,s,t)$, and the initial protocol message~$\{A_i\}_{i=1}^m$.   
   We write the resulting function as
   $\{e_i\}_{i=1}^m = \challengeni{prm}^L(\state, N, s, t, \{A_i\}_{i=1}^m)$.
 
@@ -662,7 +712,7 @@ and sends $(z_1, z_2, z_3)$ to the verifier.
 \subsubsection{Non-Interactive Version of the Proof}
 
 \begin{itemize}
-    \item We deterministically derive a challenge by hashing inputs that include $\state$, the auxiliary data~$R_j$, the common input~$(N_i,C,X, B)$, and the initial protocol message~$(S,A,Y,D)$.   
+    \item We deterministically derive a challenge from inputs that include shared $\state$, the auxiliary data~$R_j$, the common input~$(N_i,C,X, B)$, and the initial protocol message~$(S,A,Y,D)$.   
     We write the resulting function as 
     $e=\challengeni{log*}^{\E,L}(\state, R_j, (N_i,C,X, B), (S,A,Y,D))$.
 
@@ -734,7 +784,7 @@ Note that the 1st and 2nd checks involve fixed-base multiexponentiations.
 \subsubsection{Non-Interactive Version of the Proof}
 
 \begin{itemize}
-  \item We deterministically derive a challenge by hashing inputs that include $\state$, the auxiliary data~$R_j$, the common input~$N_i$, and the initial protocol message~$(P, Q, A, B, T, \sigma)$.
+  \item We deterministically derive a challenge from inputs that include shared $\state$, the auxiliary data~$R_j$, the common input~$N_i$, and the initial protocol message~$(P, Q, A, B, T, \sigma)$.
   We write the resulting function as
   $e=\challengeni{fac}^{L} (\state, R_j, N_i, (P, Q, A, B, T, \sigma))$.
 
@@ -803,10 +853,10 @@ This protocol is run to generate auxiliary information for each signer in a clus
       \item Compute $N_i = p_iq_i$ and $\phi = (p_i - 1)(q_i - 1)$, and create a Paillier decryption key $\sk_i$ using those values.
      \item Sample  $r \gets \Z_{N_i}^{*}$ and $\lambda \gets \Z_\phi$,
         and compute $t_i = r_i^2 \bmod N_i$ and $s_i = t_i^\lambda \bmod N_i$.
-      \item Compute $\hat{\psi}_i = \proveni{prm}^L(\sid||i, (N_i, s_i, t_i), (\phi, \lambda))$.
+      \item Compute $\hat{\psi}_i = \proveni{prm}^L((\sid, i), (N_i, s_i, t_i), (\phi, \lambda))$.
       \item Sample $\rho_i, u_i \leftarrow \{0,1\}^\kappa$, 
         and compute $V_i =
-        H(\sid\| n\| i\| N_i\|s_i\| t_i\| \hat{\psi}_i|\rho_i\| u_i)$.
+        H(\Encode{hash\_com}(\sid, n, i, N_i, s_i, t_i, \hat{\psi}_i, \rho_i, u_i))$.
       \item Send $V_i$ to all parties.
     \end{itemize}
     
@@ -817,7 +867,7 @@ This protocol is run to generate auxiliary information for each signer in a clus
       \item ({\bf Reliability check.}) Optionally, if the reliability check is enabled:
     \begin{itemize}
         \item 
-        Compute $h_i = H(V_0 \| \dots \| V_{n-1})$ and 
+        Compute $h_i = H(\Encode{echo}(V_0, \dots, V_{n-1}))$ and 
             send $h_i$ to all parties.
         
         
@@ -837,16 +887,16 @@ This protocol is run to generate auxiliary information for each signer in a clus
       \item For $j \neq i$:
         \begin{itemize}
           \item Assert $V_j =
-            H(\sid\| n\| j\| N_j\| s_j\| t_j\| \hat{\psi}_j\| \rho_j\|u_j)$.
+            H(\Encode{hash\_com}(\sid, n, j, N_j, s_j, t_j, \hat{\psi}_j, \rho_j, u_j))$.
           \item Assert $N_j$ is at least $8 \cdot \kappa - 1$ bits in length
-          \item Assert $\verifyni{prm}^L(\sid||j, (N_j, s_j, t_j), \hat{\psi}_j)$.
+          \item Assert $\verifyni{prm}^L((\sid, j), (N_j, s_j, t_j), \hat{\psi}_j)$.
           \item Construct Paillier encryption key from~$N_j$.
         \end{itemize}
 \item Compute $\rho=\bigoplus_j \rho_j$.
-      \item Compute $\psi_i = \proveni{mod}^L(\sid||i\|\rho, N_i, (p_i, q_i))$.
+      \item Compute $\psi_i = \proveni{mod}^L((\sid, i, \rho), N_i, (p_i, q_i))$.
       \item For $j\neq i$ do:
         \begin{itemize}
-          \item Compute $\phi_i^j = \proveni{fac}^{L}(\sid||i\|\rho, R_j, N_i, (p_i, q_i))$.
+          \item Compute $\phi_i^j = \proveni{fac}^{L}((\sid, i, \rho), R_j, N_i, (p_i, q_i))$.
           \item Send $(\psi_i, \phi_i^j)$ to $P_j$.
         \end{itemize}
 
@@ -858,8 +908,8 @@ This protocol is run to generate auxiliary information for each signer in a clus
       \item Receive $(\psi_j, \phi_j^i)$ from all parties.
       \item For $j \neq i$ do: 
         \begin{itemize}
-          \item Assert $\verifyni{mod}^L(\sid||j\|\rho, N_j, \psi_j)$.
-          \item Assert $\verifyni{fac}^{L}(\sid||j\|\rho, R_i, N_j, \phi_j^i)$.
+          \item Assert $\verifyni{mod}^L((\sid, j, \rho), N_j, \psi_j)$.
+          \item Assert $\verifyni{fac}^{L}((\sid, j, \rho), R_i, N_j, \phi_j^i)$.
         \end{itemize}
 
       \item For $j \in [n]$ (including $j=i$), precompute a fixed-based multiexponentiation table $T_j$ as described in Section~\ref{sec:multiexp}. Let $\vec{T} = (T_j)_{j \in [n]}$.
@@ -897,7 +947,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
       \item Otherwise, set $c_i = \bot$
     \end{itemize}
     \item Sample $u_i \gets \{0,1\}^\kappa$
-          and set $V_i = H(\sid \| n \| i \| \rid_i \| X_i \| A_i \| u_i \| c_i)$.
+          and set $V_i = H(\Encode{hash\_com}(\sid, n, i, \rid_i, X_i, A_i, u_i, c_i))$.
     \item Send $V_i$ to all parties.
 \end{itemize}
 
@@ -905,7 +955,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
 \begin{itemize}
     \item {\bf (Reliability check.)} Optionally, if the reliability check is enabled:
 \begin{itemize}
-    \item Compute $h_i = H(V_0 \| \dots \| V_{n-1})$ and
+    \item Compute $h_i = H(\Encode{echo}(V_0, \dots, V_{n-1}))$ and
         send $h_i$ to all parties.
     
     \item Upon receiving $h_j$ from all other parties: abort if $h_i \neq h_j$ for some $j\in [n]$.
@@ -916,14 +966,14 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
 \item[\bf Round 3.] 
     Upon receiving $(\rid_j, X_j, A_j, u_j, c_j)$ from all other parties:
     \begin{itemize}
-    \item Abort if $V_j \neq H(\sid \| n \| j \| \rid_j \| X_j \| A_j \| u_j \| c_j)$
+    \item Abort if $V_j \neq H(\Encode{hash\_com}(\sid, n, j, \rid_j, X_j, A_j, u_j, c_j))$
           for some $j \in [n]$.
     \item Set $\rid = \bigoplus_j \rid_j$.
     \item {\bf (HD-wallets.)} If HD-wallets support enabled:
     \begin{itemize}
       \item Set chain code $c = \bigoplus_j c_j$
     \end{itemize}
-    \item Set $e_i = H(\sid \| i \| \rid \| X_i\|A_i)$
+    \item Set $e_i = \challengeni{sch}(\sid, i, \rid, X_i, A_i)$
           and compute $\psi_i = \prove{sch}(\tau_i, e_i, x_i)$.
     \item Send $\psi_i$ to all parties.
     \end{itemize}
@@ -934,7 +984,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
     \item 
         For all $j \ne i$:
         \begin{itemize}
-            \item Set $e_j = H(\sid \| j \| \rid\|X_j\|A_j)$.
+            \item Set $e_j = \challengeni{sch}(\sid, j, \rid, X_j, A_j)$.
             \item Assert $\verify{sch}(\psi_j, A_j, e_j, X_j)$.
         \end{itemize}
 
@@ -974,7 +1024,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
       \end{itemize}
 
       \item Sample $u_i \gets \{0,1\}^\kappa$
-        and compute $V_i = H(\sid\| n\| i\| t\|\rid_i\| \vec{S_i}\| A_i\| u_i \| c_i)$.
+        and compute $V_i = H(\Encode{hash\_com}(\sid, n, i, t, \rid_i, \vec{S_i}, A_i, u_i, c_i))$.
       \item Send $V_i$ to all parties.
     \end{itemize}
 
@@ -985,7 +1035,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
       \item {\bf (Reliability check.)} Optionally, if the reliability check is enabled:
     \begin{itemize}
         \item 
-        Compute $h_i = H(V_0 \| \cdots \| V_{n-1})$, and send $h_i$ to all parties.
+        Compute $h_i = H(\Encode{echo}(V_0, \cdots, V_{n-1}))$, and send $h_i$ to all parties.
         
         \item Upon receiving $h_j$ from all  parties: abort if 
         $h_i \neq h_j$ for some $j \in [n]$.
@@ -1000,7 +1050,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
       \item For each party $j \neq i$:
         \begin{itemize}
         \item Check that $\vec{S}_j$ has length $t$.
-        \item Assert $V_j = H(\sid\| n\| j\| t\| \rid_j\| \vec{S}_j\| A_j\| u_j \| c_j)$.
+        \item Assert $V_j = H(\Encode{hash\_com}(\sid, n, j, t, \rid_j, \vec{S}_j, A_j, u_j, c_j))$.
         \item Define 
           $F_j(x) = \sum_{k \in [t]} x^k \cdot S_{j,k}$.
         \item Assert $\sigma_{j,i} \cdot G  = F_j(i + 1)$.
@@ -1015,7 +1065,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
             $X_j = F(j + 1)$. 
             Let $\vec{X} = (X_j)_{j \in [n]}$.
       \item Compute $x_i = \sum_{j \in [n]} \sigma_{j,i}$.
-      \item Compute challenge $e_i = H(\sid\| i\| \rid\| X_i\| A_i)$.
+      \item Compute challenge $e_i = \challengeni{sch}(\sid, i, \rid, X_i, A_i)$.
       \item Compute Schnorr proof $\psi_i = \prove{sch}(\tau_i, e_i, \sigma_i)$.
       \item Send $\psi_i$ to all parties.
     \end{itemize}
@@ -1024,7 +1074,7 @@ This protocol is based on~\cite[Figure~5]{cggmp21}, but we have added the option
   Upon receiving $\psi_j$ from all parties:
     \begin{itemize}
       \item For $j \neq i$:
-      set $e_j = H(\sid| j\| \rid\| X_j\| A_j)$ and 
+      set $e_j = \challengeni{sch}(\sid, j, \rid, X_j, A_j)$ and 
       assert $\verify{sch}(\psi_j, A_j, e_j, X_j)$.
       \item Compute $Y = \sum_{j \in [n]} S_{j,0}$.
       \item Create identity mapping $I : [n] \to \Z_q \setminus 0$,
@@ -1058,7 +1108,7 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
     \begin{itemize}
         \item Sample $k_i, \gamma_i \gets \Z_q$, $\rho_i, v_i \gets \Z^*_{N_i}$, and set $G_i = \enc^\crt_{\sk_i}(\gamma_i; v_i)$,
             $K_i = \enc^\crt_{\sk_i}(k_i; \rho_i)$. 
-        \item For $j \ne i$ compute $\psi^0_{j,i} = \proveni{enc}^{L}(\sid \| i, R_j, (N_i, K_i), (k_i, \rho_i))$. 
+        \item For $j \ne i$ compute $\psi^0_{j,i} = \proveni{enc}^{L}((\sid, i), R_j, (N_i, K_i), (k_i, \rho_i))$. 
         \item Send $(K_i, G_i)$ to all parties, and for $j \neq i$ send $\psi^0_{j,i}$ to $P_j$.
     \end{itemize}
 
@@ -1067,14 +1117,14 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
     \begin{itemize}
      \item {\bf (Reliability check.)} Optionally, if the reliability check is enabled:
     \begin{itemize}
-        \item Compute $h_i = H(K_0 \| G_0 \| \cdots \| K_{n-1} \| G_{n-1})$
+        \item Compute $h_i = H(\Encode{echo}(K_0, G_0, \cdots, K_{n-1}, G_{n-1}))$
         and 
         send $h_i$ to all parties.
         
         \item Upon receiving $h_j$ from all parties, abort if 
         $h_i \neq h_j$ for some $j \in [n]$.
     \end{itemize}
-        \item For $j \neq i$, assert $\verifyni{enc}^{L}(\sid \| j, R_i, (N_j, K_j), \psi^0_{i,j})$. 
+        \item For $j \neq i$, assert $\verifyni{enc}^{L}((\sid, j), R_i, (N_j, K_j), \psi^0_{i,j})$. 
         
         \item Compute $\Gamma_i = \gamma_i \cdot G$.
         \item For $j \neq i$ do:
@@ -1087,11 +1137,11 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
             \item Compute $\hat{D}_{j,i} = (x_i \odot K_j) \oplus \enci{j}(-\hat{\beta}_{i,j}; \hat{s}_{i,j})$
                 and $\hat{F}_{j,i} = \enc^\crt_{\sk_i}(-\hat{\beta}_{i,j}; \hat{r}_{i,j})$.
 
-            \item Compute $\psi_{j,i} = \proveni{aff\mbox{-}g}^{\E,L}(\sid \| i, R_j, (N_j, N_i, K_j, D_{j,i}, F_{j,i}, \Gamma_i); (\gamma_i, -\beta_{i,j}, s_{i,j}, r_{i,j}))$ and
-            $\hat{\psi}_{j,i} = \proveni{aff\mbox{-}g}^{\E,L}(\sid \| i, R_j, (N_j, N_i, K_j, \hat{D}_{j,i}, \hat{F}_{j,i}, X_i); (x_i, -\hat{\beta}_{i,j}, \hat{s}_{i,j}, \hat{r}_{i,j}))$. 
+            \item Compute $\psi_{j,i} = \proveni{aff\mbox{-}g}^{\E,L}((\sid, i), R_j, (N_j, N_i, K_j, D_{j,i}, F_{j,i}, \Gamma_i); (\gamma_i, -\beta_{i,j}, s_{i,j}, r_{i,j}))$ and
+            $\hat{\psi}_{j,i} = \proveni{aff\mbox{-}g}^{\E,L}((\sid, i), R_j, (N_j, N_i, K_j, \hat{D}_{j,i}, \hat{F}_{j,i}, X_i); (x_i, -\hat{\beta}_{i,j}, \hat{s}_{i,j}, \hat{r}_{i,j}))$. 
             
             %\jnote{To consider later: this and the previous could possibly be combined for better efficiency}
-            \item Compute $\psi'_{j,i} = \proveni{log*}^{\E,L}(\sid \| i,R_j, (N_i, G_i, \Gamma_i, G); (\gamma_i, v_i))$.
+            \item Compute $\psi'_{j,i} = \proveni{log*}^{\E,L}((\sid, i),R_j, (N_i, G_i, \Gamma_i, G); (\gamma_i, v_i))$.
 \item         Send $(\Gamma_i, D_{j,i}, F_{j,i}, \hat{D}_{j,i}, \hat{F}_{j,i}, \psi_{j,i}, \hat{\psi}_{j,i}, \psi'_{j,i})$
         to $P_j$.
         \end{itemize}
@@ -1102,9 +1152,9 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
         \item Upon receiving $(\Gamma_j, D_{i,j}, F_{i,j}, \hat{D}_{i,j}, \hat{F}_{i,j}, \psi_{i,j}, \hat{\psi}_{i,j}, \psi'_{i,j})$ from $P_j$, do:
 
         \begin{itemize}
-            \item Assert $\verifyni{aff\mbox{-}g}^{\E,L}(\sid \| j, R_i, (N_i, N_j, K_i, D_{i,j}, F_{i,j}, \Gamma_j), \psi_{i,j})$.
-            \item Assert $\verifyni{aff\mbox{-}g}^{\E,L}(\sid \| j, R_i, (N_i, N_j, K_i, \hat{D}_{i,j}, \hat{F}_{i,j}, X_j), \hat{\psi}_{i,j})$.
-            \item Assert $\verifyni{log*}^{\E,L}(\sid \| j, R_i, (N_j, G_j, \Gamma_j, G), \psi'_{i,j})$.
+            \item Assert $\verifyni{aff\mbox{-}g}^{\E,L}((\sid, j), R_i, (N_i, N_j, K_i, D_{i,j}, F_{i,j}, \Gamma_j), \psi_{i,j})$.
+            \item Assert $\verifyni{aff\mbox{-}g}^{\E,L}((\sid, j), R_i, (N_i, N_j, K_i, \hat{D}_{i,j}, \hat{F}_{i,j}, X_j), \hat{\psi}_{i,j})$.
+            \item Assert $\verifyni{log*}^{\E,L}((\sid, j), R_i, (N_j, G_j, \Gamma_j, G), \psi'_{i,j})$.
         \end{itemize}
 
         \item Compute $\Gamma = \sum_{j\in [n]} \Gamma_j$ and $\Delta_i = k_i \cdot \Gamma$.
@@ -1112,7 +1162,7 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
         \item For $j \ne i$, do:
         \begin{itemize}
             \item Compute $\alpha_{i,j} = \dec_{(p_i,q_i)}(D_{i,j})$ and $\hat{\alpha}_{i,j} = \dec_{(p_i,q_i)}(\hat{D}_{i,j})$.
-            \item Compute $\psi''_{j,i} = \proveni{log*}^{\E,L}(\sid \| i, R_j,(N_i, K_i, \Delta_i, \Gamma); (k_i, \rho_i))$.
+            \item Compute $\psi''_{j,i} = \proveni{log*}^{\E,L}((\sid, i), R_j,(N_i, K_i, \Delta_i, \Gamma); (k_i, \rho_i))$.
         \end{itemize}
         \item  Compute $\delta_i = \gamma_i k_i + \sum_{j \ne i}(\alpha_{i,j} + \beta_{i,j}) \bmod q$ and
             $\chi_i = x_i k_i + \sum_{j \ne i}(\hat{\alpha}_{i,j} + \hat{\beta}_{i,j}) \bmod q$. 
@@ -1122,7 +1172,7 @@ The following protocol is based on \cite[Figure~7]{cggmp21}, although we have co
 
     \item[\textbf{Output}] \
     \begin{enumerate}
-        \item Upon receiving $(\delta_j, \Delta_j, \psi''_{i,j})$ from $P_j$, assert $\verifyni{log*}^{\E,L}(\sid \| j, R_i,(N_j, K_j, \Delta_j, \Gamma), \psi''_{i,j})$.
+        \item Upon receiving $(\delta_j, \Delta_j, \psi''_{i,j})$ from $P_j$, assert $\verifyni{log*}^{\E,L}((\sid, j), R_i,(N_j, K_j, \Delta_j, \Gamma), \psi''_{i,j})$.
 
         \item Compute $\delta = \sum_j \delta_j$, and do:
         \begin{itemize}
@@ -1234,7 +1284,7 @@ Original presigning protocol defined in CGGMP paper contains many typos and mist
     \begin{itemize}
         \item Sample $\gamma_i, k_i \gets \Fq$, $v_i, \rho_i \gets \Z^*_{N_i}$ and set $G_i = \enci{i}(\gamma_i, v_i)$,
             $K_i = \enci{i}(k_i, \rho_i)$
-        \item Compute $\psi^0_{j,i} = \proveni{enc}^{L,R_j}(\sid, (N_i, K_i); (k_i, \rho_i))$ for every $j \ne i$
+        \item Compute $\psi^0_{j,i} = \proveni{enc}^{L,R_j}((\sid, i), (N_i, K_i); (k_i, \rho_i))$ for every $j \ne i$
         \item Broadcast $(K_i, G_i)$ and send $\psi^0_{j,i}$ to each $P_j$
     \end{itemize}
 
@@ -1242,7 +1292,7 @@ Original presigning protocol defined in CGGMP paper contains many typos and mist
     \begin{enumerate}
         \item Upon receiving $(K_j, G_j, \psi^0_{i,j})$ from $P_j$, do:
             \begin{itemize}
-                \item Assert $\verifyni{enc}^{L,R_i}(\psi^0_{i,j}, \sid, (N_j, K_j))$ 
+                \item Assert $\verifyni{enc}^{L,R_i}((\sid, j), \psi^0_{i,j}, (N_j, K_j))$ 
             \end{itemize}
         \item When passing above verification for all $P_j$, set $\Gamma_i = G \cdot \gamma_i$ and for every $j \ne i$ do:
         \begin{itemize}
@@ -1252,9 +1302,9 @@ Original presigning protocol defined in CGGMP paper contains many typos and mist
                 and $F_{j,i} = \enci{i}(\changed{\beta_{i,j}}, \note{r_{i,j}})$
             \item $\hat{D}_{j,i} = (x_i \odot K_j) \oplus \enci{j}(-\hat{\beta}_{i,j}, \hat{s}_{i,j})$
                 and $\hat{F}_{j,i} = \enci{i}(\changed{\hat{\beta}_{i,j}}, \note{\hat{r}_{i,j}})$
-            \item $\psi_{j,i} = \proveni{aff\mbox{-}g}^{L,R_j}(\sid, (N_j, N_i, \changed{D_{j,i}, K_j}, F_{j,i}, \Gamma_i); (\gamma_i, \beta_{i,j}, s_{i,j}, r_{i,j}))$
-            \item $\hat{\psi}_{j,i} = \proveni{aff\mbox{-}g}^{L,R_j}(\sid, (N_j, N_i, \changed{\hat{D}_{j,i}, K_j}, \hat{F}_{j,i}, X_i); (x_i, \hat{\beta}_{i,j}, \hat{s}_{i,j}, \hat{r}_{i,j}))$
-            \item $\psi'_{j,i} = \proveni{log*}^{L,R_j}(\sid, (N_i, G_i, \Gamma_i, G); (\gamma_i, v_i))$
+            \item $\psi_{j,i} = \proveni{aff\mbox{-}g}^{L,R_j}((\sid, i), (N_j, N_i, \changed{D_{j,i}, K_j}, F_{j,i}, \Gamma_i); (\gamma_i, \beta_{i,j}, s_{i,j}, r_{i,j}))$
+            \item $\hat{\psi}_{j,i} = \proveni{aff\mbox{-}g}^{L,R_j}((\sid, i), (N_j, N_i, \changed{\hat{D}_{j,i}, K_j}, \hat{F}_{j,i}, X_i); (x_i, \hat{\beta}_{i,j}, \hat{s}_{i,j}, \hat{r}_{i,j}))$
+            \item $\psi'_{j,i} = \proveni{log*}^{L,R_j}((\sid, i), (N_i, G_i, \Gamma_i, G); (\gamma_i, v_i))$
         \end{itemize}
         Send $(\Gamma_i, D_{j,i}, F_{j,i}, \hat{D}_{j,i}, \hat{F}_{j,i}, \psi_{j,i}, \hat{\psi}_{j,i}, \psi'_{j,i})$
         to each $P_j$
@@ -1265,9 +1315,9 @@ Original presigning protocol defined in CGGMP paper contains many typos and mist
         \item Upon receiving $(\Gamma_j, D_{i,j}, F_{i,j}, \hat{D}_{i,j}, \hat{F}_{i,j}, \psi_{i,j}, \hat{\psi}_{i,j}, \psi'_{i,j})$ from $P_j$, do:
 
         \begin{itemize}
-            \item Assert $\verifyni{aff\mbox{-}g}^{L,R_i}(\psi_{i,j}, \sid, (N_i, N_j, \changed{D_{i,j}, K_i}, F_{j,i}, \Gamma_j))$
-            \item Assert $\verifyni{aff\mbox{-}g}^{L,R_i}(\hat{\psi}_{i,j}, \sid, (N_i, N_j, \changed{\hat{D}_{k,j}, K_i}, \hat{F}_{j,i}, X_j))$
-            \item Assert $\verifyni{log*}^{L,R_i}(\psi'_{i,j}, \sid, (N_j, G_j, \Gamma_j, G))$
+            \item Assert $\verifyni{aff\mbox{-}g}^{L,R_i}((\sid, j), \psi_{i,j}, (N_i, N_j, \changed{D_{i,j}, K_i}, F_{j,i}, \Gamma_j))$
+            \item Assert $\verifyni{aff\mbox{-}g}^{L,R_i}((\sid, j), \hat{\psi}_{i,j}, (N_i, N_j, \changed{\hat{D}_{k,j}, K_i}, \hat{F}_{j,i}, X_j))$
+            \item Assert $\verifyni{log*}^{L,R_i}((\sid, j), \psi'_{i,j}, (N_j, G_j, \Gamma_j, G))$
         \end{itemize}
 
         \item When passing above verification for all $P_j$, set $\Gamma = \sum_j \Gamma_j$ and $\Delta_i = k_i \cdot \Gamma$,
@@ -1277,7 +1327,7 @@ Original presigning protocol defined in CGGMP paper contains many typos and mist
         \begin{itemize}
             \item $\delta_i = \gamma_i k_i + \sum_{j \ne i}(\alpha_{i,j} - \beta_{i,j}) \bmod q$
             \item $\chi_i = x_i k_i + \sum_{j \ne i}(\hat{\alpha}_{i,j} - \hat{\beta}_{i,j}) \bmod q$
-            \item $\psi''_{j,i} = \proveni{log*}^{L,R_j}(sid, (N_i, K_i, \Delta_i, \Gamma); (k_i, \rho_i))$
+            \item $\psi''_{j,i} = \proveni{log*}^{L,R_j}((\sid, i), (N_i, K_i, \Delta_i, \Gamma); (k_i, \rho_i))$
         \end{itemize}
 
         Send $(\delta_i, \Delta_i, \psi''_{j,i})$ to each $P_j$
@@ -1287,7 +1337,7 @@ Original presigning protocol defined in CGGMP paper contains many typos and mist
     \begin{enumerate}
         \item Upon receiving $(\delta_j, \Delta_j, \psi''_{i,j})$ from $P_j$, do:
         \begin{itemize}
-            \item Assert $\verifyni{log*}^{L,R_i}(\psi''_{i,j}, (N_j, K_j, \Delta_j, \Gamma))$
+            \item Assert $\verifyni{log*}^{L,R_i}((\sid, j), \psi''_{i,j}, (N_j, K_j, \Delta_j, \Gamma))$
         \end{itemize}
 
         \item When passing above verification for all $P_j$, set $\delta = \sum_j \delta_j$, and do:
@@ -1351,7 +1401,7 @@ The following is based on \cite[Figure~6]{cggmp21}, with some unnecessary steps 
     \item[\bf Reliability check.] Optionally, if reliability check is enabled:
     \begin{itemize}
         \item Upon receiving $V_j$ from all parties:
-        set $h_i = H(V_0 \| \dots \| V_{n-1})$
+        set $h_i = H(\Encode{echo}(V_0, \dots, V_{n-1}))$
             and send $h_i$ to all parties.
         
         \item Upon receiving $h_j$ from all  parties:
@@ -1378,17 +1428,17 @@ The following is based on \cite[Figure~6]{cggmp21}, with some unnecessary steps 
             H(\sid\| n\| j\| \vec{X}_j\| \vec{A}_j\| N_j\| s_j\| t_j\| \hat{\psi}_j\| \rho_j\| u_j)$.
           \item Assert that $\vec X_j$ and $\vec A_j$ each contain exactly $n$ elements.
           \item Assert that $N_j$ is at least $8 \cdot \kappa - 1$ bits in length.
-          \item Assert $\verifyni{prm}^L(\sid||j, (N_j, s_j, t_j), \hat{\psi}_j)$.
+          \item Assert $\verifyni{prm}^L((\sid, j), (N_j, s_j, t_j), \hat{\psi}_j)$.
           \item Assert $\sum_k X_j^k = 0$ (the identity in~$\E$).
           \item Construct Paillier encryption key from $N_j$.
         \end{itemize}
 
       
       \item Compute $\rho = \oplus_j \rho_j$.
-      \item Compute $\psi_i = \proveni{mod}^L(\sid||i\|\rho, N_i, (p_i, q_i))$.
+      \item Compute $\psi_i = \proveni{mod}^L((\sid, i, \rho), N_i, (p_i, q_i))$.
       \item For $j \neq i$ do:
         \begin{itemize}
-        \item Compute $\phi_i^j = \proveni{fac}^{L}(\sid||i\|\rho, R_j, N_i, (p_i, q_i))$. 
+        \item Compute $\phi_i^j = \proveni{fac}^{L}((\sid, i, \rho), R_j, N_i, (p_i, q_i))$. 
         \item Compute $C_i^j = \enc_j(x_i^j)$ using a random nonce.
         \item Compute $e^j_i = H(\sid || i || \rho\|X_i^j\|A_i^j)$ and $\psi_i^j = \prove{sch}(\tau_i^j, e_i^j, x_i^j)$.
 
@@ -1407,8 +1457,8 @@ The following is based on \cite[Figure~6]{cggmp21}, with some unnecessary steps 
         \item  Decrypt $C_j^i$ to obtain $x_j^i$ and
           assert
             $X_j^i = x_j^i \cdot G$.
-                     \item Assert $\verifyni{mod}^L(\sid||j\|\rho, N_j, \psi_j)$.
-          \item Assert $\verifyni{fac}^{L}(\sid||j\|\rho, R_i, N_j, \phi_j^i)$.
+                     \item Assert $\verifyni{mod}^L((\sid, j, \rho), N_j, \psi_j)$.
+          \item Assert $\verifyni{fac}^{L}((\sid, j, \rho), R_i, N_j, \phi_j^i)$.
           \item For $k \in [n]$, set $e_j^k = H(\sid || j || \rho\|X_j^k\|A_j^k)$ and 
           assert $\verify{sch}(\psi_j^k, A_j^k, e^k_j, X_j^k)$.
         \end{itemize}

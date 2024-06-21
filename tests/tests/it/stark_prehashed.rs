@@ -1,7 +1,7 @@
 use cggmp21::{key_share::AnyKeyShare, security_level::SecurityLevel128, signing::msg::Msg};
 use cggmp21_tests::{convert_from_stark_scalar, convert_stark_scalar};
 use generic_ec::{coords::HasAffineX, curves::Stark};
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{seq::SliceRandom, Rng};
 use rand_dev::DevRng;
 use round_based::simulation::Simulation;
 use sha2::Sha256;
@@ -77,7 +77,7 @@ async fn sign_transaction() {
     let mut outputs = vec![];
     for (i, share) in (0..).zip(participants_shares) {
         let party = simulation.add_party();
-        let mut party_rng = rand_chacha::ChaCha20Rng::from_seed(rng.gen());
+        let mut party_rng = rng.fork();
 
         outputs.push(async move {
             cggmp21::signing(eid, i, participants, share)

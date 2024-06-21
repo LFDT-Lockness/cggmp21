@@ -2,6 +2,7 @@
 name = "crates-compile-in-nostd-wasm"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 # Only the crates below have wasm/no_std support
 [dependencies.key-share]
@@ -13,7 +14,3 @@ features = ["serde", "hd-wallets", "spof", "udigest"]
 path = "../../cggmp21-keygen"
 default-features = false
 features = ["hd-wallets", "state-machine"]
-
-[patch.crates-io.round-based]
-git = "https://github.com/dfns/round-based"
-branch = "m"

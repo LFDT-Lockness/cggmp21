@@ -14,7 +14,7 @@ let # Rust
   # Latex
   tex = (pkgs.texlive.combine {
     inherit (pkgs.texlive) scheme-small
-      collection-mathscience preprint;
+      collection-mathscience preprint amsmath;
   });
 
 in pkgs.stdenv.mkDerivation {

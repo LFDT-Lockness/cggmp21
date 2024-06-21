@@ -20,6 +20,12 @@ use crate::{
 
 use super::{Bug, KeygenAborted, KeygenError};
 
+macro_rules! prefixed {
+    ($name:tt) => {
+        concat!("dfns.cggmp21.keygen.non_threshold.", $name)
+    };
+}
+
 /// Message of key generation protocol
 #[derive(ProtocolMessage, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
@@ -38,7 +44,7 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
-#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round1")]
+#[udigest(tag = prefixed!("round1"))]
 pub struct MsgRound1<D: Digest> {
     /// $V_i$
     #[udigest(as_bytes)]
@@ -49,7 +55,7 @@ pub struct MsgRound1<D: Digest> {
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
 #[udigest(bound = "")]
-#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.round2")]
+#[udigest(tag = prefixed!("round2"))]
 pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     /// `rid_i`
     #[serde_as(as = "utils::HexOrBin")]
@@ -81,20 +87,36 @@ pub struct MsgRound3<E: Curve> {
 #[serde(bound = "")]
 pub struct MsgReliabilityCheck<D: Digest>(pub digest::Output<D>);
 
-#[derive(udigest::Digestable)]
-#[udigest(tag = "dfns.cggmp21.keygen.non_threshold.tag")]
-enum Tag<'a> {
-    /// Tag that includes the prover index
-    Indexed {
-        party_index: u16,
+mod unambiguous {
+    use crate::{ExecutionId, SecurityLevel};
+    use generic_ec::Curve;
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("hash_commitment"))]
+    #[udigest(bound = "")]
+    pub struct HashCom<'a, E: Curve, L: SecurityLevel> {
+        pub sid: ExecutionId<'a>,
+        pub party_index: u16,
+        pub decommitment: &'a super::MsgRound2<E, L>,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("schnorr_pok"))]
+    #[udigest(bound = "")]
+    pub struct SchnorrPok<'a> {
+        pub sid: ExecutionId<'a>,
+        pub prover: u16,
         #[udigest(as_bytes)]
-        sid: &'a [u8],
-    },
-    /// Tag w/o party index
-    Unindexed {
-        #[udigest(as_bytes)]
-        sid: &'a [u8],
-    },
+        pub rid: &'a [u8],
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("echo_round"))]
+    #[udigest(bound = "")]
+    pub struct Echo<'a, D: digest::Digest> {
+        pub sid: ExecutionId<'a>,
+        pub commitment: &'a super::MsgRound1<D>,
+    }
 }
 
 pub async fn run_keygen<E, R, M, L, D>(
@@ -102,7 +124,7 @@ pub async fn run_keygen<E, R, M, L, D>(
     i: u16,
     n: u16,
     reliable_broadcast_enforced: bool,
-    execution_id: ExecutionId<'_>,
+    sid: ExecutionId<'_>,
     rng: &mut R,
     party: M,
     #[cfg(feature = "hd-wallets")] hd_enabled: bool,
@@ -129,16 +151,6 @@ where
 
     // Round 1
     tracer.round_begins();
-
-    tracer.stage("Compute execution id");
-    let sid = execution_id.as_bytes();
-    let tag = |j| {
-        udigest::Tag::<D>::new_structured(Tag::Indexed {
-            party_index: j,
-            sid,
-        })
-    };
-    let tag_i = tag(i);
 
     tracer.stage("Sample x_i, rid_i, chain_code");
     let x_i = NonZero::<SecretScalar<E>>::random(rng);
@@ -172,7 +184,11 @@ where
             nonce
         },
     };
-    let hash_commit = tag_i.clone().digest(&my_decommitment);
+    let hash_commit = udigest::hash::<D>(&unambiguous::HashCom {
+        sid,
+        party_index: i,
+        decommitment: &my_decommitment,
+    });
     let my_commitment = MsgRound1 {
         commitment: hash_commit,
     };
@@ -197,8 +213,11 @@ where
     // Optional reliability check
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::Tag::<D>::new_structured(Tag::Unindexed { sid })
-            .digest_iter(commitments.iter_including_me(&my_commitment));
+        let h_i = udigest::hash_iter::<D>(
+            commitments
+                .iter_including_me(&my_commitment)
+                .map(|commitment| unambiguous::Echo { sid, commitment }),
+        );
 
         tracer.send_msg();
         outgoings
@@ -248,7 +267,11 @@ where
 
     tracer.stage("Validate decommitments");
     let blame = utils::collect_blame(&commitments, &decommitments, |j, com, decom| {
-        let com_expected = tag(j).digest(decom);
+        let com_expected = udigest::hash::<D>(&unambiguous::HashCom {
+            sid,
+            party_index: j,
+            decommitment: decom,
+        });
         com.commitment != com_expected
     });
     if !blame.is_empty() {
@@ -280,16 +303,11 @@ where
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), utils::xor_array);
-    let challenge = {
-        let hash = |d: D| {
-            d.chain_update(sid)
-                .chain_update(i.to_be_bytes())
-                .chain_update(rid.as_ref())
-                .finalize()
-        };
-        let mut rng = crate::rng::HashRng::new(hash);
-        Scalar::random(&mut rng)
-    };
+    let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
+        sid,
+        prover: i,
+        rid: rid.as_ref(),
+    });
     let challenge = schnorr_pok::Challenge { nonce: challenge };
 
     tracer.stage("Prove knowledge of `x_i`");
@@ -315,16 +333,11 @@ where
 
     tracer.stage("Validate schnorr proofs");
     let blame = utils::collect_blame(&decommitments, &sch_proofs, |j, decom, sch_proof| {
-        let challenge = {
-            let hash = |d: D| {
-                d.chain_update(sid)
-                    .chain_update(j.to_be_bytes())
-                    .chain_update(rid.as_ref())
-                    .finalize()
-            };
-            let mut rng = crate::rng::HashRng::new(hash);
-            Scalar::random(&mut rng)
-        };
+        let challenge = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
+            sid,
+            prover: j,
+            rid: rid.as_ref(),
+        });
         let challenge = schnorr_pok::Challenge { nonce: challenge };
         sch_proof
             .sch_proof

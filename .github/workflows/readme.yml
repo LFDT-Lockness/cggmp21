@@ -4,11 +4,18 @@ on:
   pull_request:
     branches: [ "*" ]
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
 jobs:
   check_readme:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - uses: webfactory/ssh-agent@v0.9.0
+      with:
+          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - name: Install cargo-hakari
       uses: baptiste0928/cargo-install@v1
       with:
