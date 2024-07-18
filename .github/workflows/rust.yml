@@ -15,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -38,9 +35,6 @@ jobs:
         - cggmp21
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -50,9 +44,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -67,9 +58,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -80,9 +68,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -99,9 +84,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -115,9 +97,6 @@ jobs:
     steps:
     - uses: dtolnay/rust-toolchain@nightly
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
@@ -157,9 +136,6 @@ jobs:
         - cggmp21
     steps:
     - uses: actions/checkout@v3
-    - uses: webfactory/ssh-agent@v0.9.0
-      with:
-          ssh-private-key: ${{ secrets.PAILLIER_ZK }}
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
