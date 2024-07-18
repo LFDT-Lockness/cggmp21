@@ -6,10 +6,15 @@ on:
   push:
     branches: [ "m" ]
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
 jobs:
   build_pdf:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
     - uses: actions/checkout@v3

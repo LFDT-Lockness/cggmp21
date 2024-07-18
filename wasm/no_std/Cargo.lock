@@ -86,6 +86,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek"
+version = "4.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "curve25519-dalek-derive",
+ "fiat-crypto",
+ "rustc_version",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.53",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -177,6 +203,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fiat-crypto"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -226,10 +258,10 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f5cb6bae30037a9462484c3f8c2290314b43e2ca09f7250a573165bcea9e914"
+version = "0.4.0-rc4"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
+ "curve25519-dalek",
  "generic-ec-core",
  "hex",
  "phantom-type 0.4.2",
@@ -243,9 +275,8 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-core"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85e8a3654fc9ea7366dd5725644b3537ec516dc47ea1944afd3c150ccb6e2137"
+version = "0.2.0"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -256,9 +287,8 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9b631ea71fa0294e80d479c5b952e276776c9abf1b1a542b48e66b83fe1828c"
+version = "0.4.0-rc4"
+source = "git+https://github.com/dfns/generic-ec?branch=update-udigest#8fbc75205c10dd9677fb67cf6eea67c6b44d836e"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -300,7 +330,7 @@ checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 
 [[package]]
 name = "key-share"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "displaydoc",
  "generic-ec",
@@ -417,7 +447,8 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 [[package]]
 name = "round-based"
 version = "0.3.0"
-source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55f473f56ecfa6457a75c0922c4e51ad036d4a1d27b0a697ac3a9b26f74acc3b"
 dependencies = [
  "displaydoc",
  "futures-util",
@@ -429,7 +460,8 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.1"
-source = "git+https://github.com/dfns/round-based?branch=m#53fca7f22295a2fbf741fb4c73b2713a899b96dc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c3f220fb17bab108a448f516ce4ec470584675233ab3a799915ba71295da32e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -437,10 +469,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustc_version"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
+dependencies = [
+ "semver",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
+
+[[package]]
+name = "semver"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "serde"
@@ -513,9 +560,8 @@ dependencies = [
 
 [[package]]
 name = "slip-10"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f20f0918d675ab26ca9fa3e2c42548356f54b7a09fb4633313756522ddd59f75"
+version = "0.4.0-rc4"
+source = "git+https://github.com/dfns/slip-10?branch=update-generic-ec#6d6f00ff44f228144c4494b7eb6404ed7341b563"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -601,9 +647,8 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "udigest"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8e4a5cb9599a5dc3d47f21ad605a5a14594e0b212c7627d68dd5ca9776ace2e"
+version = "0.2.0-rc4"
+source = "git+https://github.com/dfns/udigest?branch=proc-macro-clippy#16e6d99f6a5dc7639c4256359ff6350961364a33"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -611,9 +656,8 @@ dependencies = [
 
 [[package]]
 name = "udigest-derive"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b29f121da05aa0857e7b96cf2f8782bd4140911506518486d4a125b97d7d609"
+version = "0.2.0-rc3"
+source = "git+https://github.com/dfns/udigest?branch=proc-macro-clippy#16e6d99f6a5dc7639c4256359ff6350961364a33"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -651,3 +695,13 @@ dependencies = [
  "quote",
  "syn 2.0.53",
 ]
+
+[[patch.unused]]
+name = "paillier-zk"
+version = "0.4.0"
+source = "git+https://github.com/dfnsco/paillier-zk-private?branch=unambiguous-challenge#aea2eba48cae13af949d6ac8134d49ddbc3974c2"
+
+[[patch.unused]]
+name = "rand_hash"
+version = "0.1.0-rc4"
+source = "git+https://github.com/dfns/rand_hash?branch=udigest-rc3#dc3e204b60c15b06387186c284fef18f407ffbc2"

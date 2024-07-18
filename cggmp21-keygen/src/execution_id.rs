@@ -3,8 +3,9 @@
 /// Each protocol execution must have unique execution ID. All signers taking part in the protocol
 /// (keygen/signing/etc.) must share the same execution ID, otherwise protocol will abort with
 /// unverbose error.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, udigest::Digestable)]
 pub struct ExecutionId<'id> {
+    #[udigest(as_bytes)]
     id: &'id [u8],
 }
 

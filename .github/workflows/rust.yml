@@ -106,6 +106,7 @@ jobs:
   bench:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     needs: build
     steps:
@@ -140,3 +141,9 @@ jobs:
         cache-on-failure: "true"
     - name: Dry-run publish
       run: cargo publish --dry-run -p ${{ matrix.package }}
+  check-changelog:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Check changelogs
+      run: ./.github/changelog.sh

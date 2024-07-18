@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0
+* security fix: derive challenges for zero-knowledge proof unambiguously
+* Update `udigest` to v0.2
+* Update `generic-ec` to v0.4
+* Update `slip-10` to v0.4
+
 ## v0.3.0
 * Provide sync API to carry out provided protocols [#100]
 * Update `round-based` dep to `v0.3` [#100]

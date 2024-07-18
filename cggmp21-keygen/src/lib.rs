@@ -23,7 +23,6 @@ mod threshold;
 
 mod errors;
 mod execution_id;
-mod rng;
 mod utils;
 
 use alloc::vec::Vec;

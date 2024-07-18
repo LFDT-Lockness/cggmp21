@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0
+* security fix: derive challenges for zero-knowledge proof unambiguously
+* Update `udigest` to v0.2
+* Update `generic-ec` to v0.4
+* Update `slip-10` to v0.4
+
 ## v0.2.0
 * Make library `#![no_std]`-compatible and WASM-friendly [#100]
 * Provide sync API to carry out DKG protocol [#100]

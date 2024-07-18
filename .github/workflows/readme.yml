@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [ "*" ]
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
 jobs:
   check_readme:
     runs-on: ubuntu-latest

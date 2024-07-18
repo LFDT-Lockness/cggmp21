@@ -1,11 +1,11 @@
 //! Пprm or Rprm in the paper. Proof that s ⋮ t modulo N. Non-interactive
 //! version only.
-use digest::{typenum::U32, Digest};
+use digest::Digest;
 use paillier_zk::{
     fast_paillier::utils,
-    rug::{self, Complete, Integer},
+    rug::{Complete, Integer},
 };
-use rand_core::{RngCore, SeedableRng};
+use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use thiserror::Error;
@@ -15,10 +15,13 @@ struct Challenge<const M: usize> {
 }
 
 /// Data to construct proof about
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, udigest::Digestable)]
 pub struct Data<'a> {
+    #[udigest(with = crate::utils::encoding::integer)]
     pub N: &'a Integer,
+    #[udigest(with = crate::utils::encoding::integer)]
     pub s: &'a Integer,
+    #[udigest(with = crate::utils::encoding::integer)]
     pub t: &'a Integer,
 }
 
@@ -38,24 +41,25 @@ pub struct Proof<const M: usize> {
     pub zs: [Integer; M],
 }
 
-fn derive_challenge<const M: usize, D>(
-    shared_state: D,
+fn derive_challenge<const M: usize, D: Digest>(
+    shared_state: &impl udigest::Digestable,
     data: Data,
     commitment: &[Integer; M],
-) -> Challenge<M>
-where
-    D: Digest<OutputSize = U32>,
-{
-    let order = rug::integer::Order::Msf;
-    let mut digest = shared_state
-        .chain_update(data.N.to_digits(order))
-        .chain_update(data.s.to_digits(order))
-        .chain_update(data.t.to_digits(order));
-    for a in commitment.iter() {
-        digest.update(a.to_digits(order));
+) -> Challenge<M> {
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = "dfns.ring_pedersen_parameters.seed")]
+    struct Seed<'a, S: udigest::Digestable, const M: usize> {
+        shared_state: &'a S,
+        data: Data<'a>,
+        #[udigest(with = crate::utils::encoding::integers_list)]
+        commitment: &'a [Integer; M],
     }
-    let seed = digest.finalize();
-    let mut rng = rand_chacha::ChaCha20Rng::from_seed(seed.into());
+
+    let mut rng = rand_hash::HashRng::<D, _>::from_seed(Seed::<_, M> {
+        shared_state,
+        data,
+        commitment,
+    });
 
     // generate bools by hand since we don't have rand
     let mut es = [false; M];
@@ -77,17 +81,13 @@ where
 ///
 /// - `phi` - $φ(N) = (p-1)(q-1)$
 /// - `lambda` - λ such that $s = t^λ$
-pub fn prove<const M: usize, R, D>(
-    shared_state: D,
-    rng: &mut R,
+pub fn prove<const M: usize, D: Digest>(
+    shared_state: &impl udigest::Digestable,
+    rng: &mut impl rand_core::RngCore,
     data: Data,
     phi: &Integer,
     lambda: &Integer,
-) -> Result<Proof<M>, ZkError>
-where
-    D: Digest<OutputSize = U32>,
-    R: RngCore,
-{
+) -> Result<Proof<M>, ZkError> {
     let private_commitment =
         [(); M].map(|()| phi.random_below_ref(&mut utils::external_rand(rng)).into());
     let commitment = private_commitment
@@ -102,7 +102,7 @@ where
         commitment.map(Option::unwrap)
     };
 
-    let challenge: Challenge<M> = derive_challenge(shared_state, data, &commitment);
+    let challenge: Challenge<M> = derive_challenge::<M, D>(shared_state, data, &commitment);
 
     let mut zs = private_commitment;
     for (z_ref, e) in zs.iter_mut().zip(&challenge.es) {
@@ -116,15 +116,12 @@ where
 
 /// Verify the proof. Derives determenistic challenge based on `shared_state`
 /// and `data`.
-pub fn verify<const M: usize, D>(
-    shared_state: D,
+pub fn verify<const M: usize, D: Digest>(
+    shared_state: &impl udigest::Digestable,
     data: Data,
     proof: &Proof<M>,
-) -> Result<(), InvalidProof>
-where
-    D: Digest<OutputSize = U32>,
-{
-    let challenge: Challenge<M> = derive_challenge(shared_state, data, &proof.commitment);
+) -> Result<(), InvalidProof> {
+    let challenge: Challenge<M> = derive_challenge::<M, D>(shared_state, data, &proof.commitment);
     for ((z, a), e) in proof.zs.iter().zip(&proof.commitment).zip(&challenge.es) {
         let lhs: Integer = data.t.pow_mod_ref(z, data.N).ok_or(InvalidProof)?.into();
         if *e {
@@ -163,10 +160,12 @@ mod test {
 
     use crate::utils;
 
+    type D = sha2::Sha256;
+
     #[test]
     fn passing() {
-        let mut rng = rand_core::OsRng;
-        let shared_state = sha2::Sha256::default();
+        let mut rng = rand_dev::DevRng::new();
+        let shared_state = "shared state";
 
         let p = utils::generate_blum_prime(&mut rng, 256);
         let q = utils::generate_blum_prime(&mut rng, 256);
@@ -187,14 +186,14 @@ mod test {
         };
 
         let proof: super::Proof<16> =
-            super::prove(shared_state.clone(), &mut rng, data, &phi, &lambda).unwrap();
-        super::verify(shared_state, data, &proof).expect("proof should pass");
+            super::prove::<16, D>(&shared_state, &mut rng, data, &phi, &lambda).unwrap();
+        super::verify::<16, D>(&shared_state, data, &proof).expect("proof should pass");
     }
 
     #[test]
     fn failing() {
-        let mut rng = rand_core::OsRng;
-        let shared_state = sha2::Sha256::default();
+        let mut rng = rand_dev::DevRng::new();
+        let shared_state = "shared state";
 
         let p = utils::generate_blum_prime(&mut rng, 256);
         let q = utils::generate_blum_prime(&mut rng, 256);
@@ -216,8 +215,8 @@ mod test {
         };
 
         let proof: super::Proof<16> =
-            super::prove(shared_state.clone(), &mut rng, data, &phi, &lambda).unwrap();
-        if super::verify(shared_state, data, &proof).is_ok() {
+            super::prove::<16, D>(&shared_state, &mut rng, data, &phi, &lambda).unwrap();
+        if super::verify::<16, D>(&shared_state, data, &proof).is_ok() {
             panic!("proof should fail");
         }
     }
