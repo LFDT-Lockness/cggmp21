@@ -44,7 +44,3 @@ hex = { version = "0.4", default-features = false }
 slip-10 = { version = "0.4", default-features = false }
 
 generic-tests = "0.1"
-
-[patch.crates-io.paillier-zk]
-git = "https://github.com/dfnsco/paillier-zk-private"
-rev = "88cae377c9cbd75ca27bcd99ffbce2715486ce95"

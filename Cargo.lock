@@ -1491,7 +1491,8 @@ dependencies = [
 [[package]]
 name = "paillier-zk"
 version = "0.4.0"
-source = "git+https://github.com/dfnsco/paillier-zk-private?rev=88cae377c9cbd75ca27bcd99ffbce2715486ce95#88cae377c9cbd75ca27bcd99ffbce2715486ce95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd33253a2a0403d52c54716f409bd181b423b02fe8b4fffb28b891820c1ee2f3"
 dependencies = [
  "digest",
  "fast-paillier",
