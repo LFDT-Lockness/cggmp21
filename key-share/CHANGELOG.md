@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.1
+* Add HD-related methods to `DirtyKeyInfo` [#104]
+
+[#104]: https://github.com/dfns/cggmp21/pull/104
+
 ## v0.4.0
 * Update `udigest` to v0.2
 * Update `generic-ec` to v0.4
