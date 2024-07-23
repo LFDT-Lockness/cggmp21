@@ -407,7 +407,7 @@ impl<E: Curve> DirtyKeyInfo<E> {
 }
 
 #[cfg(feature = "hd-wallets")]
-impl<E: Curve> DirtyCoreKeyShare<E> {
+impl<E: Curve> DirtyKeyInfo<E> {
     /// Checks whether the key is HD-capable
     pub fn is_hd_wallet(&self) -> bool {
         self.chain_code.is_some()
@@ -438,6 +438,33 @@ impl<E: Curve> DirtyCoreKeyShare<E> {
             derivation_path.into_iter().map(|index| index.try_into()),
         )
         .map_err(HdError::InvalidPath)
+    }
+}
+
+#[cfg(feature = "hd-wallets")]
+impl<E: Curve> DirtyCoreKeyShare<E> {
+    /// Checks whether the key is HD-capable
+    pub fn is_hd_wallet(&self) -> bool {
+        (**self).is_hd_wallet()
+    }
+
+    /// Returns extended public key, if HD support was enabled
+    pub fn extended_public_key(&self) -> Option<slip_10::ExtendedPublicKey<E>> {
+        (**self).extended_public_key()
+    }
+
+    /// Derives child public key, if it's HD key
+    pub fn derive_child_public_key<ChildIndex>(
+        &self,
+        derivation_path: impl IntoIterator<Item = ChildIndex>,
+    ) -> Result<
+        slip_10::ExtendedPublicKey<E>,
+        HdError<<ChildIndex as TryInto<slip_10::NonHardenedIndex>>::Error>,
+    >
+    where
+        slip_10::NonHardenedIndex: TryFrom<ChildIndex>,
+    {
+        (**self).derive_child_public_key(derivation_path)
     }
 }
 
