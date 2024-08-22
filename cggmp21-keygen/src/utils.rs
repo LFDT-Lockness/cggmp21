@@ -25,6 +25,7 @@ where
 /// In the future we might want to replace the data_message and proof_message
 /// with a generic vec of messages.
 #[derive(Debug)]
+#[allow(dead_code)] // removes false-positive warnings
 pub struct AbortBlame {
     /// Party which can be blamed for breaking the protocol
     pub faulty_party: PartyIndex,
