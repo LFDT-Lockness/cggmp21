@@ -1357,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "displaydoc",
  "generic-ec",
@@ -1490,9 +1490,8 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd33253a2a0403d52c54716f409bd181b423b02fe8b4fffb28b891820c1ee2f3"
+version = "0.4.1"
+source = "git+https://github.com/dfns/paillier-zk?branch=udigest_as#b10890719b498c3e6bd7f573829ea2a4e1867340"
 dependencies = [
  "digest",
  "fast-paillier",
@@ -2557,9 +2556,8 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "udigest"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a435a16abb7029ba807a45242367b087dd767e87e2e5ebc5f0e4189ea114a23"
+version = "0.2.1"
+source = "git+https://github.com/dfns/udigest?branch=udigest_as#dc6242fb6964deba9a792307da548dd1e68b19c5"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2567,9 +2565,8 @@ dependencies = [
 
 [[package]]
 name = "udigest-derive"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee6296c12e792dbc59565a58920d8d1842997ad5a72ddf2a51f70d70bd7af2ba"
+version = "0.3.0"
+source = "git+https://github.com/dfns/udigest?branch=udigest_as#dc6242fb6964deba9a792307da548dd1e68b19c5"
 dependencies = [
  "proc-macro2",
  "quote",
