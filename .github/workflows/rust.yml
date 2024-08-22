@@ -126,22 +126,6 @@ jobs:
       with:
         header: bench
         path: pr-comment
-
-  check-publish:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-        - key-share
-        - cggmp21-keygen
-        - cggmp21
-    steps:
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-      with:
-        cache-on-failure: "true"
-    - name: Dry-run publish
-      run: cargo publish --dry-run -p ${{ matrix.package }}
   check-changelog:
     runs-on: ubuntu-latest
     steps:
