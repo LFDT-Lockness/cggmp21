@@ -219,22 +219,13 @@ pub fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) ->
 pub mod encoding {
     use paillier_zk::rug;
 
-    pub fn integer<B: udigest::Buffer>(
-        x: &rug::Integer,
-        encoder: udigest::encoding::EncodeValue<B>,
-    ) {
-        encoder
-            .encode_leaf()
-            .chain(x.to_digits(rug::integer::Order::Msf));
-    }
-
-    pub fn integers_list<B: udigest::Buffer>(
-        list: impl AsRef<[rug::Integer]>,
-        encoder: udigest::encoding::EncodeValue<B>,
-    ) {
-        let mut encoder = encoder.encode_list();
-        for x in list.as_ref() {
-            integer(x, encoder.add_item())
+    pub struct Integer;
+    impl udigest::DigestAs<rug::Integer> for Integer {
+        fn digest_as<B: udigest::Buffer>(
+            x: &rug::Integer,
+            encoder: udigest::encoding::EncodeValue<B>,
+        ) {
+            encoder.encode_leaf_value(x.to_digits(rug::integer::Order::Msf))
         }
     }
 }

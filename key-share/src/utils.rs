@@ -12,20 +12,14 @@ use hex as _;
 
 #[cfg(feature = "udigest")]
 pub mod encoding {
-    pub fn curve_name<B: udigest::Buffer, E: generic_ec::Curve>(
-        _value: &generic_ec::serde::CurveName<E>,
-        encoder: udigest::encoding::EncodeValue<B>,
-    ) {
-        encoder.encode_leaf_value(E::CURVE_NAME)
-    }
-
-    #[cfg(feature = "hd-wallets")]
-    pub fn maybe_bytes<B: udigest::Buffer>(
-        m: &Option<impl AsRef<[u8]>>,
-        encoder: udigest::encoding::EncodeValue<B>,
-    ) {
-        use udigest::Digestable;
-        m.as_ref().map(udigest::Bytes).unambiguously_encode(encoder)
+    pub struct CurveName;
+    impl<E: generic_ec::Curve> udigest::DigestAs<generic_ec::serde::CurveName<E>> for CurveName {
+        fn digest_as<B: udigest::Buffer>(
+            _value: &generic_ec::serde::CurveName<E>,
+            encoder: udigest::encoding::EncodeValue<B>,
+        ) {
+            encoder.encode_leaf_value(E::CURVE_NAME)
+        }
     }
 }
 

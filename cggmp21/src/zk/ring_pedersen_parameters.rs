@@ -17,11 +17,11 @@ struct Challenge<const M: usize> {
 /// Data to construct proof about
 #[derive(Clone, Copy, udigest::Digestable)]
 pub struct Data<'a> {
-    #[udigest(with = crate::utils::encoding::integer)]
+    #[udigest(as = &crate::utils::encoding::Integer)]
     pub N: &'a Integer,
-    #[udigest(with = crate::utils::encoding::integer)]
+    #[udigest(as = &crate::utils::encoding::Integer)]
     pub s: &'a Integer,
-    #[udigest(with = crate::utils::encoding::integer)]
+    #[udigest(as = &crate::utils::encoding::Integer)]
     pub t: &'a Integer,
 }
 
@@ -34,10 +34,10 @@ pub struct Data<'a> {
 #[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 pub struct Proof<const M: usize> {
     #[serde_as(as = "[_; M]")]
-    #[udigest(with = crate::utils::encoding::integers_list)]
+    #[udigest(as = [crate::utils::encoding::Integer; M])]
     pub commitment: [Integer; M],
     #[serde_as(as = "[_; M]")]
-    #[udigest(with = crate::utils::encoding::integers_list)]
+    #[udigest(as = [crate::utils::encoding::Integer; M])]
     pub zs: [Integer; M],
 }
 
@@ -51,7 +51,7 @@ fn derive_challenge<const M: usize, D: Digest>(
     struct Seed<'a, S: udigest::Digestable, const M: usize> {
         shared_state: &'a S,
         data: Data<'a>,
-        #[udigest(with = crate::utils::encoding::integers_list)]
+        #[udigest(as = &[crate::utils::encoding::Integer; M])]
         commitment: &'a [Integer; M],
     }
 

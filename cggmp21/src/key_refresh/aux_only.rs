@@ -65,13 +65,13 @@ pub struct MsgRound1<D: Digest> {
 #[serde(bound = "")]
 pub struct MsgRound2<L: SecurityLevel> {
     /// $N_i$
-    #[udigest(with = utils::encoding::integer)]
+    #[udigest(as = utils::encoding::Integer)]
     pub N: Integer,
     /// $s_i$
-    #[udigest(with = utils::encoding::integer)]
+    #[udigest(as = utils::encoding::Integer)]
     pub s: Integer,
     /// $t_i$
-    #[udigest(with = utils::encoding::integer)]
+    #[udigest(as = utils::encoding::Integer)]
     pub t: Integer,
     /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet
