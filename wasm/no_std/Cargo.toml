@@ -14,3 +14,15 @@ features = ["serde", "hd-wallets", "spof", "udigest"]
 path = "../../cggmp21-keygen"
 default-features = false
 features = ["hd-wallets", "state-machine"]
+
+[patch.crates-io.udigest]
+git = "https://github.com/dfns/udigest"
+branch = "udigest_as"
+
+[patch.crates-io.udigest-derive]
+git = "https://github.com/dfns/udigest"
+branch = "udigest_as"
+
+[patch.crates-io.paillier-zk]
+git = "https://github.com/dfns/paillier-zk"
+branch = "udigest_as"
