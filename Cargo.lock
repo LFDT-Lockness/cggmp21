@@ -932,9 +932,8 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10cc122ac7a2ebc45550f766cd23a9040f6d15db440230b0888e5645e8eb2cb4"
+version = "0.4.1"
+source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
 dependencies = [
  "curve25519-dalek",
  "digest",
@@ -954,8 +953,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f156564cc8aa47456da807826b1a0aa9cf420474d9f41593ffbdde65133d4bea"
+source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -967,8 +965,7 @@ dependencies = [
 [[package]]
 name = "generic-ec-curves"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5926949b758d01801c7edd75357495fe54c5fc25580a193de4c994c94d22307"
+source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
 dependencies = [
  "curve25519-dalek",
  "elliptic-curve",
@@ -985,9 +982,8 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f360d09b920f154726c654363cef62ba3497c8037b82f94aa17df215fc05d6f9"
+version = "0.4.1"
+source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
 dependencies = [
  "generic-array",
  "generic-ec",

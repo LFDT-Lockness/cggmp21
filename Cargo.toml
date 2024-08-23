@@ -15,8 +15,8 @@ cggmp21 = { version = "0.4", path = "cggmp21" }
 cggmp21-keygen = { version = "0.3", path = "cggmp21-keygen" }
 key-share = { version = "0.4", path = "key-share", default-features = false }
 
-generic-ec = { version = "0.4", default-features = false } 
-generic-ec-zkp = { version = "0.4", default-features = false } 
+generic-ec = { version = "0.4.1", default-features = false } 
+generic-ec-zkp = { version = "0.4.1", default-features = false } 
 round-based = { version = "0.3", default-features = false }
 
 paillier-zk = "0.4.1" 
@@ -56,3 +56,11 @@ branch = "udigest_as"
 [patch.crates-io.paillier-zk]
 git = "https://github.com/dfns/paillier-zk"
 branch = "udigest_as"
+
+[patch.crates-io.generic-ec]
+git = "https://github.com/dfns/generic-ec"
+branch = "udigest_nostd"
+
+[patch.crates-io.generic-ec-zkp]
+git = "https://github.com/dfns/generic-ec"
+branch = "udigest_nostd"
