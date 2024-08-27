@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.2
+* Take advantage of `#[udigest(as = ...)]` attribute [#106]
+
+[#106]: https://github.com/dfns/cggmp21/pull/106
+
 ## v0.4.1
 * Add HD-related methods to `DirtyKeyInfo` [#104]
 
