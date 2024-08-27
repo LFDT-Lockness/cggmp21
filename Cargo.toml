@@ -44,23 +44,3 @@ hex = { version = "0.4", default-features = false }
 slip-10 = { version = "0.4", default-features = false }
 
 generic-tests = "0.1"
-
-[patch.crates-io.udigest]
-git = "https://github.com/dfns/udigest"
-branch = "udigest_as"
-
-[patch.crates-io.udigest-derive]
-git = "https://github.com/dfns/udigest"
-branch = "udigest_as"
-
-[patch.crates-io.paillier-zk]
-git = "https://github.com/dfns/paillier-zk"
-branch = "udigest_as"
-
-[patch.crates-io.generic-ec]
-git = "https://github.com/dfns/generic-ec"
-branch = "udigest_nostd"
-
-[patch.crates-io.generic-ec-zkp]
-git = "https://github.com/dfns/generic-ec"
-branch = "udigest_nostd"
