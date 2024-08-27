@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.1
+* Take advantage of `#[udigest(as = ...)]` attribute [#106]
+
+[#106]: https://github.com/dfns/cggmp21/pull/106
+
 ## v0.4.0
 * security fix: derive challenges for zero-knowledge proof unambiguously
 * Update `udigest` to v0.2
