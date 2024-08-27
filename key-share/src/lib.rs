@@ -204,7 +204,7 @@ pub struct DirtyKeyInfo<E: Curve> {
     // `crate::serde_fix` as well!
     //
     /// Guard that ensures curve consistency for deseraization
-    #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::curve_name))]
+    #[cfg_attr(feature = "udigest", udigest(as = utils::encoding::CurveName))]
     pub curve: CurveName<E>,
     /// Public key corresponding to shared secret key. Corresponds to _X_ in paper.
     #[cfg_attr(feature = "serde", serde(with = "As::<generic_ec::serde::Compact>"))]
@@ -231,7 +231,7 @@ pub struct DirtyKeyInfo<E: Curve> {
         serde(skip_serializing_if = "Option::is_none"),
         serde(with = "As::<Option<utils::HexOrBin>>")
     )]
-    #[cfg_attr(feature = "udigest", udigest(with = utils::encoding::maybe_bytes))]
+    #[cfg_attr(feature = "udigest", udigest(as = Option<udigest::Bytes>))]
     pub chain_code: Option<slip_10::ChainCode>,
 }
 

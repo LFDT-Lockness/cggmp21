@@ -932,9 +932,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10cc122ac7a2ebc45550f766cd23a9040f6d15db440230b0888e5645e8eb2cb4"
+checksum = "0a88871287d5618d728c21ef0bea4dc5dc3097cbfa2efd3e1b6e85a33df74083"
 dependencies = [
  "curve25519-dalek",
  "digest",
@@ -985,9 +985,9 @@ dependencies = [
 
 [[package]]
 name = "generic-ec-zkp"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f360d09b920f154726c654363cef62ba3497c8037b82f94aa17df215fc05d6f9"
+checksum = "1743ab486bf2fd0a82fa36c3df29b7a32f3870dbab57cd2d49c420b8342031dd"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -1357,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "displaydoc",
  "generic-ec",
@@ -1490,9 +1490,9 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd33253a2a0403d52c54716f409bd181b423b02fe8b4fffb28b891820c1ee2f3"
+checksum = "41f7666e5a36fe77ef28a4f8306367a759c7caacbdf8eeea89f524ccc2ade933"
 dependencies = [
  "digest",
  "fast-paillier",
@@ -2557,9 +2557,9 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "udigest"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a435a16abb7029ba807a45242367b087dd767e87e2e5ebc5f0e4189ea114a23"
+checksum = "0f8c862324ffd970533e7fde91b00bf06cd973e2023bfa6c7df5f96a1c959a9d"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -2567,9 +2567,9 @@ dependencies = [
 
 [[package]]
 name = "udigest-derive"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee6296c12e792dbc59565a58920d8d1842997ad5a72ddf2a51f70d70bd7af2ba"
+checksum = "d6132fb8382b1bdec1cd01062dbe1e88074610e8fe37c2d504043a45f6400108"
 dependencies = [
  "proc-macro2",
  "quote",

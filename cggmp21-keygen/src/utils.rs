@@ -25,6 +25,7 @@ where
 /// In the future we might want to replace the data_message and proof_message
 /// with a generic vec of messages.
 #[derive(Debug)]
+#[allow(dead_code)] // removes false-positive warnings
 pub struct AbortBlame {
     /// Party which can be blamed for breaking the protocol
     pub faulty_party: PartyIndex,
@@ -88,16 +89,4 @@ where
 /// Iterate peers of i-th party
 pub fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
     (0..n).filter(move |x| *x != i)
-}
-
-/// Unambiguous encoding for different types for which it was not defined
-pub mod encoding {
-    #[cfg(feature = "hd-wallets")]
-    pub fn maybe_bytes<B: udigest::Buffer>(
-        m: &Option<impl AsRef<[u8]>>,
-        encoder: udigest::encoding::EncodeValue<B>,
-    ) {
-        use udigest::Digestable;
-        m.as_ref().map(udigest::Bytes).unambiguously_encode(encoder)
-    }
 }

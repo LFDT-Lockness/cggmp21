@@ -77,13 +77,13 @@ pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     /// $\vec A_i$
     pub sch_commits_a: Vec<schnorr_pok::Commit<E>>,
     /// $N_i$
-    #[udigest(with = utils::encoding::integer)]
+    #[udigest(as = utils::encoding::Integer)]
     pub N: Integer,
     /// $s_i$
-    #[udigest(with = utils::encoding::integer)]
+    #[udigest(as = utils::encoding::Integer)]
     pub s: Integer,
     /// $t_i$
-    #[udigest(with = utils::encoding::integer)]
+    #[udigest(as = utils::encoding::Integer)]
     pub t: Integer,
     /// $\hat \psi_i$
     // this should be L::M instead, but no rustc support yet

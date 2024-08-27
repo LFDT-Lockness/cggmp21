@@ -71,7 +71,7 @@ pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// Party contribution to chain code
     #[cfg(feature = "hd-wallets")]
     #[serde_as(as = "Option<utils::HexOrBin>")]
-    #[udigest(with = utils::encoding::maybe_bytes)]
+    #[udigest(as = Option<udigest::Bytes>)]
     pub chain_code: Option<slip_10::ChainCode>,
     /// $u_i$
     #[serde(with = "hex::serde")]

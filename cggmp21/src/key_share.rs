@@ -3,7 +3,7 @@
 use std::ops;
 use std::sync::Arc;
 
-use generic_ec::{Curve, NonZero, Point, SecretScalar};
+use generic_ec::{Curve, NonZero, Point};
 use paillier_zk::paillier_encryption_in_range as π_enc;
 use paillier_zk::rug::{Complete, Integer};
 use serde::{Deserialize, Serialize};
@@ -346,7 +346,7 @@ impl<E: Curve, T: AsRef<IncompleteKeyShare<E>>> AnyKeyShare<E> for T {}
 #[cfg(feature = "spof")]
 pub fn reconstruct_secret_key<E: Curve>(
     key_shares: &[impl AnyKeyShare<E>],
-) -> Result<SecretScalar<E>, ReconstructError> {
+) -> Result<generic_ec::SecretScalar<E>, ReconstructError> {
     key_share::reconstruct_secret_key(key_shares)
 }
 

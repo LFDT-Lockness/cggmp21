@@ -153,10 +153,10 @@ pub mod msg {
     #[udigest(tag = prefixed!("round1"))]
     pub struct MsgRound1a {
         /// $K_i$
-        #[udigest(with = utils::encoding::integer)]
+        #[udigest(as = utils::encoding::Integer)]
         pub K: fast_paillier::Ciphertext,
         /// $G_i$
-        #[udigest(with = utils::encoding::integer)]
+        #[udigest(as = utils::encoding::Integer)]
         pub G: fast_paillier::Ciphertext,
     }
 
