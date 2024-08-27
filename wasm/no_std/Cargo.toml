@@ -15,22 +15,3 @@ path = "../../cggmp21-keygen"
 default-features = false
 features = ["hd-wallets", "state-machine"]
 
-[patch.crates-io.udigest]
-git = "https://github.com/dfns/udigest"
-branch = "udigest_as"
-
-[patch.crates-io.udigest-derive]
-git = "https://github.com/dfns/udigest"
-branch = "udigest_as"
-
-[patch.crates-io.paillier-zk]
-git = "https://github.com/dfns/paillier-zk"
-branch = "udigest_as"
-
-[patch.crates-io.generic-ec]
-git = "https://github.com/dfns/generic-ec"
-branch = "udigest_nostd"
-
-[patch.crates-io.generic-ec-zkp]
-git = "https://github.com/dfns/generic-ec"
-branch = "udigest_nostd"

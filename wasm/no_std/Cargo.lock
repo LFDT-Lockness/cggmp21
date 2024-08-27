@@ -259,7 +259,8 @@ dependencies = [
 [[package]]
 name = "generic-ec"
 version = "0.4.1"
-source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a88871287d5618d728c21ef0bea4dc5dc3097cbfa2efd3e1b6e85a33df74083"
 dependencies = [
  "curve25519-dalek",
  "digest",
@@ -278,7 +279,8 @@ dependencies = [
 [[package]]
 name = "generic-ec-core"
 version = "0.2.0"
-source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f156564cc8aa47456da807826b1a0aa9cf420474d9f41593ffbdde65133d4bea"
 dependencies = [
  "generic-array",
  "rand_core",
@@ -290,7 +292,8 @@ dependencies = [
 [[package]]
 name = "generic-ec-zkp"
 version = "0.4.1"
-source = "git+https://github.com/dfns/generic-ec?branch=udigest_nostd#15c7c9063507d8e32fd1f5c60ffb352249961117"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1743ab486bf2fd0a82fa36c3df29b7a32f3870dbab57cd2d49c420b8342031dd"
 dependencies = [
  "generic-array",
  "generic-ec",
@@ -668,7 +671,8 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "udigest"
 version = "0.2.1"
-source = "git+https://github.com/dfns/udigest?branch=udigest_as#dc6242fb6964deba9a792307da548dd1e68b19c5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f8c862324ffd970533e7fde91b00bf06cd973e2023bfa6c7df5f96a1c959a9d"
 dependencies = [
  "digest",
  "udigest-derive",
@@ -677,7 +681,8 @@ dependencies = [
 [[package]]
 name = "udigest-derive"
 version = "0.3.0"
-source = "git+https://github.com/dfns/udigest?branch=udigest_as#dc6242fb6964deba9a792307da548dd1e68b19c5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6132fb8382b1bdec1cd01062dbe1e88074610e8fe37c2d504043a45f6400108"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -715,8 +720,3 @@ dependencies = [
  "quote",
  "syn 2.0.75",
 ]
-
-[[patch.unused]]
-name = "paillier-zk"
-version = "0.4.1"
-source = "git+https://github.com/dfns/paillier-zk?branch=udigest_as#b10890719b498c3e6bd7f573829ea2a4e1867340"
