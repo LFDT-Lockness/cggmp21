@@ -54,7 +54,10 @@
 //! * [`round_based::Incoming`] and [`round_based::Outgoing`] wrap `Msg` and provide additional data (e.g., sender/recepient)
 //! * [`futures::Stream`] and [`futures::Sink`] are well-known async primitives.
 //!
-//! Once you have that, you can construct an [MpcParty][round_based::MpcParty]:
+//! Once you have that, you can construct an [`MpcParty`](round_based::MpcParty):
+//!
+//! [`MpcParty`]: round_based::MpcParty
+//!
 //! ```rust
 //! # type Msg = cggmp21::signing::msg::Msg<cggmp21::supported_curves::Secp256k1, sha2::Sha256>;
 //! # let incoming = futures::stream::pending::<Result<round_based::Incoming<Msg>, std::convert::Infallible>>();

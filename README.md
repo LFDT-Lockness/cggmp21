@@ -71,7 +71,9 @@ where:
 * `round_based::Incoming` and `round_based::Outgoing` wrap `Msg` and provide additional data (e.g., sender/recepient)
 * `futures::Stream` and `futures::Sink` are well-known async primitives.
 
-Once you have that, you can construct an [MpcParty][round_based::MpcParty]:
+Once you have that, you can construct an `MpcParty`:
+
+
 ```rust
 let delivery = (incoming, outgoing);
 let party = round_based::MpcParty::connected(delivery);
