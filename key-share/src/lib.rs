@@ -110,7 +110,7 @@ use serde_with::As;
 /// are being serialized, that helps us adding new fields as the library grows. We strongly advise using either
 /// [`serde_json`](https://docs.rs/serde_json/), if verbose/human-readable format is needed, or
 /// [`ciborium`](https://docs.rs/ciborium/latest/ciborium/), if you'd like to opt for binary format. Other serialization
-/// backends are not tested and may not work or stop working at some point (like [bincode](https://github.com/dfns/cggmp21/issues/89) did)
+/// backends are not tested and may not work or stop working at some point (like [bincode](https://github.com/LFDT-Lockness/cggmp21/issues/89) did)
 /// or be not backwards compatible between certain versions.
 ///
 /// If you need the smallest size of serialized key share, we advise implementing serialization manually (all fields of

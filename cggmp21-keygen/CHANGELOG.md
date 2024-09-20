@@ -3,7 +3,7 @@
 ## v0.3.1
 * Take advantage of `#[udigest(as = ...)]` attribute [#106]
 
-[#106]: https://github.com/dfns/cggmp21/pull/106
+[#106]: https://github.com/LFDT-Lockness/cggmp21/pull/106
 
 ## v0.3.0
 * security fix: derive challenges for zero-knowledge proof unambiguously
@@ -17,8 +17,8 @@
 * Update `round-based` dep to `v0.3`
 * Update `generic-ec` and `slip-10` deps to latest version [#101]
 
-[#100]: https://github.com/dfns/cggmp21/pull/100
-[#101]: https://github.com/dfns/cggmp21/pull/101
+[#100]: https://github.com/LFDT-Lockness/cggmp21/pull/100
+[#101]: https://github.com/LFDT-Lockness/cggmp21/pull/101
 
 ## v0.1.0
 

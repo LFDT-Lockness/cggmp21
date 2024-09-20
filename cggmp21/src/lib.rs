@@ -267,11 +267,11 @@
 //! they are all documented in [the spec].
 //!
 //! [CGGMP21]: https://ia.cr/2021/060
-//! [the spec]: https://dfns.github.io/cggmp21/cggmp21-spec.pdf
+//! [the spec]: https://lfdt-lockness.github.io/cggmp21/cggmp21-spec.pdf
 //! [security guidelines]: #security-guidelines
 //! [slip10]: https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 //! [bip32]: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
-//! [report]: https://github.com/dfns/cggmp21/blob/m/docs/audit_report.pdf
+//! [report]: https://github.com/LFDT-Lockness/cggmp21/blob/m/docs/audit_report.pdf
 //! [serde]: https://serde.rs/
 //!
 //! ## Timing attacks

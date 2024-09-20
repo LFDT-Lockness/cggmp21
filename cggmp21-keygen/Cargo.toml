@@ -4,7 +4,7 @@ version = "0.3.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "UC-secure DKG implementation based on CGGMP21 paper"
-repository = "https://github.com/dfns/cggmp21"
+repository = "https://github.com/LFDT-Lockness/cggmp21"
 categories = ["algorithms", "cryptography"]
 keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 
