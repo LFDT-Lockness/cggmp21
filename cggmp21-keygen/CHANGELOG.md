@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.2
+* Update links in the documentation and crate settings after moving the repo [#113]
+
+[#113]: https://github.com/LFDT-Lockness/cggmp21/pull/113
+
 ## v0.3.1
 * Take advantage of `#[udigest(as = ...)]` attribute [#106]
 

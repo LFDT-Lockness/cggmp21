@@ -271,7 +271,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "cggmp21-keygen",
  "digest",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "cggmp21-keygen"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "digest",
  "displaydoc",
@@ -1357,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "displaydoc",
  "generic-ec",
