@@ -1,10 +1,10 @@
 [package]
 name = "cggmp21"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "TSS ECDSA implementation based on CGGMP21 paper"
-repository = "https://github.com/dfns/cggmp21"
+repository = "https://github.com/LFDT-Lockness/cggmp21"
 categories = ["algorithms", "cryptography"]
 keywords = ["mpc", "threshold-signatures", "tss"]
 readme = "../README.md"
