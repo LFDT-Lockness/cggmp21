@@ -1,6 +1,7 @@
 //! ![License](https://img.shields.io/crates/l/cggmp21.svg)
 //! [![Docs](https://docs.rs/cggmp21/badge.svg)](https://docs.rs/cggmp21)
 //! [![Crates io](https://img.shields.io/crates/v/cggmp21.svg)](https://crates.io/crates/cggmp21)
+//! [![Discord](https://img.shields.io/discord/905194001349627914?logo=discord&logoColor=ffffff&label=Discord)](https://discordapp.com/channels/905194001349627914/1285268686147424388)
 //!
 //! # Threshold ECDSA based on [CGGMP21] paper
 //!

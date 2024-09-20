@@ -16,5 +16,5 @@ We will evaluate the reported vulnerability, determine whether it needs to
 be addressed, and (if so) and provide an estimated timeline for addressing it.
 
 After vulnerability was fixed and the new version of CGGMP21 protocol was
-properly tested, we publishe the fix, and publicly disclose the vulnerability
+properly tested, we publish the fix, and publicly disclose the vulnerability
 (credits for finding the issue go to the reporter).
