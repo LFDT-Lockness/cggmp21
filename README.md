@@ -260,7 +260,7 @@ complicated protcol as CGGMP21 and impossible to do in our specific deployment. 
 don't do constant-time operations which gives us a significant performance boost.
 
 ## Join us in Discord!
-If you wish to communicate with us about this repo, feel free to reach out to us [in Discord]!
+Feel free to reach out to us [in Discord]!
 
 [in Discord]: https://discordapp.com/channels/905194001349627914/1285268686147424388
 
