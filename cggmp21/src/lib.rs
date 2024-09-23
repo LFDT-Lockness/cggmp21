@@ -1,6 +1,7 @@
 //! ![License](https://img.shields.io/crates/l/cggmp21.svg)
 //! [![Docs](https://docs.rs/cggmp21/badge.svg)](https://docs.rs/cggmp21)
 //! [![Crates io](https://img.shields.io/crates/v/cggmp21.svg)](https://crates.io/crates/cggmp21)
+//! [![Discord](https://img.shields.io/discord/905194001349627914?logo=discord&logoColor=ffffff&label=Discord)][in Discord]
 //!
 //! # Threshold ECDSA based on [CGGMP21] paper
 //!
@@ -282,6 +283,11 @@
 //! execution. We consider timing attacks out of scope as they are nearly impossible to perform for such
 //! complicated protcol as CGGMP21 and impossible to do in our specific deployment. Thus, we intentionally
 //! don't do constant-time operations which gives us a significant performance boost.
+//!
+//! ## Join us in Discord!
+//! Feel free to reach out to us [in Discord]!
+//!
+//! [in Discord]: https://discordapp.com/channels/905194001349627914/1285268686147424388
 
 #![allow(
     non_snake_case,

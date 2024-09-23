@@ -13,5 +13,6 @@
 - [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
 - [Differences between the implementation and CGGMP21](#differences-between-the-implementation-and-cggmp21)
 - [Timing attacks](#timing-attacks)
+- [Join us in Discord!](#join-us-in-discord)
 
 <!-- TOC ENDS -->
