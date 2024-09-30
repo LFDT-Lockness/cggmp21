@@ -12,7 +12,7 @@ keywords = ["mpc", "dkg", "threshold-signatures", "tss"]
 
 [dependencies]
 key-share = { workspace = true, features = ["serde"] }
-slip-10 = { workspace = true, optional = true }
+hd-wallet = { workspace = true, optional = true }
 
 generic-ec = { workspace = true, features = ["serde", "udigest", "hash-to-scalar"] }
 generic-ec-zkp = { workspace = true, features = ["serde", "udigest"] }
@@ -35,5 +35,5 @@ thiserror = { workspace = true, optional = true }
 default = ["std"]
 
 std = ["thiserror", "key-share/std", "udigest/std", "round-based/std"]
-hd-wallets = ["slip-10", "key-share/hd-wallets"]
+hd-wallet = ["dep:hd-wallet", "key-share/hd-wallet"]
 state-machine = ["round-based/state-machine"]

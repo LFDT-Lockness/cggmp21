@@ -35,7 +35,7 @@ serde = { workspace = true, features = ["derive", "rc"] }
 serde_with = { workspace = true }
 hex = { workspace = true, default-features = false, features = ["serde"] }
 
-slip-10 = { workspace = true, optional = true, features = ["std"] }
+hd-wallet = { workspace = true, optional = true, features = ["std"] }
 
 [dev-dependencies]
 round-based = { workspace = true, features = ["derive", "dev"] }
@@ -50,7 +50,7 @@ all-curves = ["curve-secp256k1", "curve-secp256r1", "curve-stark"]
 curve-secp256k1 = ["generic-ec/curve-secp256k1"]
 curve-secp256r1 = ["generic-ec/curve-secp256r1"]
 curve-stark = ["generic-ec/curve-stark"]
-hd-wallets = ["dep:slip-10", "cggmp21-keygen/hd-wallets"]
+hd-wallet = ["dep:hd-wallet", "cggmp21-keygen/hd-wallet"]
 spof = ["key-share/spof"]
 
 state-machine = ["cggmp21-keygen/state-machine"]
