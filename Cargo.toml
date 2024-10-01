@@ -11,9 +11,9 @@ exclude = [
 ]
 
 [workspace.dependencies]
-cggmp21 = { version = "0.4", path = "cggmp21" }
-cggmp21-keygen = { version = "0.3", path = "cggmp21-keygen" }
-key-share = { version = "0.4", path = "key-share", default-features = false }
+cggmp21 = { version = "0.5", path = "cggmp21" }
+cggmp21-keygen = { version = "0.4", path = "cggmp21-keygen" }
+key-share = { version = "0.5", path = "key-share", default-features = false }
 
 generic-ec = { version = "0.4.1", default-features = false } 
 generic-ec-zkp = { version = "0.4.1", default-features = false } 
