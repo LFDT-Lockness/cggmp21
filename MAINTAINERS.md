@@ -2,9 +2,9 @@
 
 | Name               | Github        |
 |--------------------|---------------|
-| Denis Varlakov     | [@errorchain] |
+| Denis Varlakov     | [@survived]   |
 | Nikita Sorokovikov | [@maurges]    |
 
-[@errorchain]: https://github.com/errorchain
+[@survived]: https://github.com/survived
 [@maurges]: https://github.com/maurges
 
