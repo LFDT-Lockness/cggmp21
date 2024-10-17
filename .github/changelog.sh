@@ -7,7 +7,7 @@ changelog_file=CHANGELOG.md;
 git fetch origin "$m_branch:$m_branch" --depth=1
 
 changed=0;
-for log in */"$changelog_file"; do
+for log in "$changelog_file" */"$changelog_file"; do
     dir=$(dirname "$log");
     # check if version changed
     if git diff "$m_branch" -- "$dir/Cargo.toml" | grep -q "^-version = "; then
