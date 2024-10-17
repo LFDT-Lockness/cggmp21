@@ -268,7 +268,7 @@ pub struct SigningBuilder<
     enforce_reliable_broadcast: bool,
     _digest: std::marker::PhantomData<D>,
 
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     additive_shift: Option<Scalar<E>>,
 }
 
@@ -294,7 +294,7 @@ where
             tracer: None,
             enforce_reliable_broadcast: true,
             _digest: std::marker::PhantomData,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             additive_shift: None,
         }
     }
@@ -312,7 +312,7 @@ where
             enforce_reliable_broadcast: self.enforce_reliable_broadcast,
             execution_id: self.execution_id,
             _digest: std::marker::PhantomData,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             additive_shift: self.additive_shift,
         }
     }
@@ -348,21 +348,48 @@ where
     ///     .set_derivation_path([1, 999])?
     /// # ; Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "hd-wallets")]
+    ///
+    /// ## Derivation algorithm
+    /// This method uses [`hd_wallet::Slip10Like`] derivation algorithm. If you need to use another one, see
+    /// [`set_derivation_path_with_algo`](Self::set_derivation_path_with_algo)
+    #[cfg(feature = "hd-wallet")]
     pub fn set_derivation_path<Index>(
+        self,
+        path: impl IntoIterator<Item = Index>,
+    ) -> Result<
+        Self,
+        crate::key_share::HdError<<Index as TryInto<hd_wallet::NonHardenedIndex>>::Error>,
+    >
+    where
+        hd_wallet::NonHardenedIndex: TryFrom<Index>,
+    {
+        self.set_derivation_path_with_algo::<hd_wallet::Slip10Like, _>(path)
+    }
+
+    /// Specifies HD derivation path, using HD derivation algorithm [`hd_wallet::HdWallet`]
+    ///
+    /// Note: when generating a presignature, derivation path doesn't need to be known in advance. Instead
+    /// of using this method, [`Presignature::set_derivation_path`] could be used to set derivation path
+    /// after presignature was generated.
+    #[cfg(feature = "hd-wallet")]
+    pub fn set_derivation_path_with_algo<Hd: hd_wallet::HdWallet<E>, Index>(
         mut self,
         path: impl IntoIterator<Item = Index>,
-    ) -> Result<Self, crate::key_share::HdError<<Index as TryInto<slip_10::NonHardenedIndex>>::Error>>
+    ) -> Result<
+        Self,
+        crate::key_share::HdError<<Index as TryInto<hd_wallet::NonHardenedIndex>>::Error>,
+    >
     where
-        slip_10::NonHardenedIndex: TryFrom<Index>,
+        hd_wallet::NonHardenedIndex: TryFrom<Index>,
     {
         use crate::key_share::HdError;
         let public_key = self
             .key_share
             .extended_public_key()
             .ok_or(HdError::DisabledHd)?;
-        self.additive_shift =
-            Some(derive_additive_shift(public_key, path).map_err(HdError::InvalidPath)?);
+        self.additive_shift = Some(
+            derive_additive_shift::<E, Hd, _>(public_key, path).map_err(HdError::InvalidPath)?,
+        );
         Ok(self)
     }
 
@@ -386,9 +413,9 @@ where
             self.parties_indexes_at_keygen,
             None,
             self.enforce_reliable_broadcast,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             self.additive_shift,
-            #[cfg(not(feature = "hd-wallets"))]
+            #[cfg(not(feature = "hd-wallet"))]
             None,
         )
         .await?
@@ -436,9 +463,9 @@ where
             self.parties_indexes_at_keygen,
             Some(message_to_sign),
             self.enforce_reliable_broadcast,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             self.additive_shift,
-            #[cfg(not(feature = "hd-wallets"))]
+            #[cfg(not(feature = "hd-wallet"))]
             None,
         )
         .await?
@@ -1262,16 +1289,42 @@ impl<E: Curve> Presignature<E> {
     /// key](crate::key_share::DirtyIncompleteKeyShare::extended_public_key)
     /// assoicated with the key share that was used to generate presignature.
     /// Using wrong `epub` will simply lead to invalid signature.
-    #[cfg(feature = "hd-wallets")]
+    ///
+    /// For HD derivation, uses [`hd_wallet::Slip10Like`] algorithm. If you need to
+    /// use another derivation algorithm, see [`set_derivation_path_with_algo`](Self::set_derivation_path_with_algo)
+    #[cfg(feature = "hd-wallet")]
     pub fn set_derivation_path<Index>(
-        mut self,
-        epub: slip_10::ExtendedPublicKey<E>,
+        self,
+        epub: hd_wallet::ExtendedPublicKey<E>,
         derivation_path: impl IntoIterator<Item = Index>,
-    ) -> Result<Self, <Index as TryInto<slip_10::NonHardenedIndex>>::Error>
+    ) -> Result<Self, <Index as TryInto<hd_wallet::NonHardenedIndex>>::Error>
     where
-        slip_10::NonHardenedIndex: TryFrom<Index>,
+        hd_wallet::NonHardenedIndex: TryFrom<Index>,
     {
-        let additive_shift = derive_additive_shift(epub, derivation_path)?;
+        self.set_derivation_path_with_algo::<hd_wallet::Slip10Like, _>(epub, derivation_path)
+    }
+
+    /// Specifies HD derivation path
+    ///
+    /// Outputs a presignature that can be used to sign a message with a child
+    /// key derived from master `epub` using `derivation_path`. Note that all
+    /// signers need to set the same derivation path, otherwise output signature
+    /// will be invalid.
+    ///
+    /// `epub` must be an [extended public
+    /// key](crate::key_share::DirtyIncompleteKeyShare::extended_public_key)
+    /// assoicated with the key share that was used to generate presignature.
+    /// Using wrong `epub` will simply lead to invalid signature.
+    #[cfg(feature = "hd-wallet")]
+    pub fn set_derivation_path_with_algo<Hd: hd_wallet::HdWallet<E>, Index>(
+        mut self,
+        epub: hd_wallet::ExtendedPublicKey<E>,
+        derivation_path: impl IntoIterator<Item = Index>,
+    ) -> Result<Self, <Index as TryInto<hd_wallet::NonHardenedIndex>>::Error>
+    where
+        hd_wallet::NonHardenedIndex: TryFrom<Index>,
+    {
+        let additive_shift = derive_additive_shift::<E, Hd, _>(epub, derivation_path)?;
 
         let mut chi = self.chi + additive_shift * &self.k;
         self.chi = SecretScalar::new(&mut chi);
@@ -1280,19 +1333,19 @@ impl<E: Curve> Presignature<E> {
     }
 }
 
-#[cfg(feature = "hd-wallets")]
-fn derive_additive_shift<E: Curve, Index>(
-    mut epub: slip_10::ExtendedPublicKey<E>,
+#[cfg(feature = "hd-wallet")]
+fn derive_additive_shift<E: Curve, Hd: hd_wallet::HdWallet<E>, Index>(
+    mut epub: hd_wallet::ExtendedPublicKey<E>,
     path: impl IntoIterator<Item = Index>,
-) -> Result<Scalar<E>, <Index as TryInto<slip_10::NonHardenedIndex>>::Error>
+) -> Result<Scalar<E>, <Index as TryInto<hd_wallet::NonHardenedIndex>>::Error>
 where
-    slip_10::NonHardenedIndex: TryFrom<Index>,
+    hd_wallet::NonHardenedIndex: TryFrom<Index>,
 {
     let mut additive_shift = Scalar::<E>::zero();
 
     for child_index in path {
-        let child_index: slip_10::NonHardenedIndex = child_index.try_into()?;
-        let shift = slip_10::derive_public_shift(&epub, child_index);
+        let child_index: hd_wallet::NonHardenedIndex = child_index.try_into()?;
+        let shift = Hd::derive_public_shift(&epub, child_index);
 
         additive_shift += shift.shift;
         epub = shift.child_public_key;

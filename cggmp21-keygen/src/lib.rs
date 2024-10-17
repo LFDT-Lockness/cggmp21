@@ -94,7 +94,7 @@ pub struct GenericKeygenBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
     optional_t: M,
     execution_id: ExecutionId<'a>,
     tracer: Option<&'a mut dyn Tracer>,
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     hd_enabled: bool,
     _params: core::marker::PhantomData<(E, L, D)>,
 }
@@ -121,7 +121,7 @@ where
             reliable_broadcast_enforced: true,
             execution_id: eid,
             tracer: None,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             hd_enabled: true,
             _params: core::marker::PhantomData,
         }
@@ -143,7 +143,7 @@ where
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
             tracer: self.tracer,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             hd_enabled: self.hd_enabled,
             _params: core::marker::PhantomData,
         }
@@ -160,7 +160,7 @@ where
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
             tracer: self.tracer,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             hd_enabled: self.hd_enabled,
             _params: core::marker::PhantomData,
         }
@@ -178,7 +178,7 @@ where
             reliable_broadcast_enforced: self.reliable_broadcast_enforced,
             execution_id: self.execution_id,
             tracer: self.tracer,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             hd_enabled: self.hd_enabled,
             _params: core::marker::PhantomData,
         }
@@ -198,7 +198,7 @@ where
         }
     }
 
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     /// Specifies whether HD derivation is enabled for a key
     pub fn hd_wallet(mut self, v: bool) -> Self {
         self.hd_enabled = v;
@@ -226,7 +226,7 @@ where
             self.execution_id,
             rng,
             party,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             self.hd_enabled,
         )
         .await
@@ -271,7 +271,7 @@ where
             self.execution_id,
             rng,
             party,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             self.hd_enabled,
         )
         .await
@@ -344,7 +344,7 @@ enum KeygenAborted {
     InvalidDataSize { parties: Vec<u16> },
     #[displaydoc("round1 wasn't reliable")]
     Round1NotReliable(Vec<(PartyIndex, MsgId)>),
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     #[displaydoc("party did not generate chain code: {0:?}")]
     MissingChainCode(Vec<utils::AbortBlame>),
 }
@@ -356,7 +356,7 @@ enum Bug {
     InvalidKeyShare(#[cfg_attr(feature = "std", source)] InvalidCoreShare),
     #[displaydoc("unexpected zero value")]
     NonZeroScalar,
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     #[displaydoc("chain code is missing although we checked that it should be present")]
     NoChainCode,
     #[displaydoc("key share of one of the signers is zero - probability of that is negligible")]

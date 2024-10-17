@@ -140,7 +140,7 @@ impl<E: Curve> serde::Serialize for DirtyCoreKeyShare<E> {
                     shared_public_key,
                     public_shares,
                     vss_setup,
-                    #[cfg(feature = "hd-wallets")]
+                    #[cfg(feature = "hd-wallet")]
                     chain_code,
                 },
             x,
@@ -152,7 +152,7 @@ impl<E: Curve> serde::Serialize for DirtyCoreKeyShare<E> {
             public_shares,
             vss_setup,
             x,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             chain_code,
         }
         .serialize(serializer)
@@ -173,7 +173,7 @@ impl<'de, E: Curve> serde::Deserialize<'de> for DirtyCoreKeyShare<E> {
             public_shares,
             vss_setup,
             x,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             chain_code,
         } = serde::Deserialize::deserialize(deserializer)?;
         Ok(Self {
@@ -183,7 +183,7 @@ impl<'de, E: Curve> serde::Deserialize<'de> for DirtyCoreKeyShare<E> {
                 shared_public_key,
                 public_shares,
                 vss_setup,
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 chain_code,
             },
             x,
@@ -224,7 +224,7 @@ pub struct DirtyKeyInfo<E: Curve> {
     )]
     pub vss_setup: Option<VssSetup<E>>,
     /// Chain code associated with the key, if HD wallets support was enabled
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     #[cfg_attr(
         feature = "serde",
         serde(default),
@@ -232,7 +232,7 @@ pub struct DirtyKeyInfo<E: Curve> {
         serde(with = "As::<Option<utils::HexOrBin>>")
     )]
     #[cfg_attr(feature = "udigest", udigest(as = Option<udigest::Bytes>))]
-    pub chain_code: Option<slip_10::ChainCode>,
+    pub chain_code: Option<hd_wallet::ChainCode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -406,7 +406,7 @@ impl<E: Curve> DirtyKeyInfo<E> {
     }
 }
 
-#[cfg(feature = "hd-wallets")]
+#[cfg(feature = "hd-wallet")]
 impl<E: Curve> DirtyKeyInfo<E> {
     /// Checks whether the key is HD-capable
     pub fn is_hd_wallet(&self) -> bool {
@@ -414,26 +414,26 @@ impl<E: Curve> DirtyKeyInfo<E> {
     }
 
     /// Returns extended public key, if HD support was enabled
-    pub fn extended_public_key(&self) -> Option<slip_10::ExtendedPublicKey<E>> {
-        Some(slip_10::ExtendedPublicKey {
+    pub fn extended_public_key(&self) -> Option<hd_wallet::ExtendedPublicKey<E>> {
+        Some(hd_wallet::ExtendedPublicKey {
             public_key: self.shared_public_key.into_inner(),
             chain_code: self.chain_code?,
         })
     }
 
-    /// Derives child public key, if it's HD key
-    pub fn derive_child_public_key<ChildIndex>(
+    /// Derives child public key, if it's HD key, using [`HdWallet`](hd_wallet::HdWallet) algorithm
+    pub fn derive_child_public_key<Hd: hd_wallet::HdWallet<E>, ChildIndex>(
         &self,
         derivation_path: impl IntoIterator<Item = ChildIndex>,
     ) -> Result<
-        slip_10::ExtendedPublicKey<E>,
-        HdError<<ChildIndex as TryInto<slip_10::NonHardenedIndex>>::Error>,
+        hd_wallet::ExtendedPublicKey<E>,
+        HdError<<ChildIndex as TryInto<hd_wallet::NonHardenedIndex>>::Error>,
     >
     where
-        slip_10::NonHardenedIndex: TryFrom<ChildIndex>,
+        hd_wallet::NonHardenedIndex: TryFrom<ChildIndex>,
     {
         let epub = self.extended_public_key().ok_or(HdError::DisabledHd)?;
-        slip_10::try_derive_child_public_key_with_path(
+        Hd::try_derive_child_public_key_with_path(
             &epub,
             derivation_path.into_iter().map(|index| index.try_into()),
         )
@@ -441,7 +441,7 @@ impl<E: Curve> DirtyKeyInfo<E> {
     }
 }
 
-#[cfg(feature = "hd-wallets")]
+#[cfg(feature = "hd-wallet")]
 impl<E: Curve> DirtyCoreKeyShare<E> {
     /// Checks whether the key is HD-capable
     pub fn is_hd_wallet(&self) -> bool {
@@ -449,22 +449,22 @@ impl<E: Curve> DirtyCoreKeyShare<E> {
     }
 
     /// Returns extended public key, if HD support was enabled
-    pub fn extended_public_key(&self) -> Option<slip_10::ExtendedPublicKey<E>> {
+    pub fn extended_public_key(&self) -> Option<hd_wallet::ExtendedPublicKey<E>> {
         (**self).extended_public_key()
     }
 
     /// Derives child public key, if it's HD key
-    pub fn derive_child_public_key<ChildIndex>(
+    pub fn derive_child_public_key<Hd: hd_wallet::HdWallet<E>, ChildIndex>(
         &self,
         derivation_path: impl IntoIterator<Item = ChildIndex>,
     ) -> Result<
-        slip_10::ExtendedPublicKey<E>,
-        HdError<<ChildIndex as TryInto<slip_10::NonHardenedIndex>>::Error>,
+        hd_wallet::ExtendedPublicKey<E>,
+        HdError<<ChildIndex as TryInto<hd_wallet::NonHardenedIndex>>::Error>,
     >
     where
-        slip_10::NonHardenedIndex: TryFrom<ChildIndex>,
+        hd_wallet::NonHardenedIndex: TryFrom<ChildIndex>,
     {
-        (**self).derive_child_public_key(derivation_path)
+        (**self).derive_child_public_key::<Hd, _>(derivation_path)
     }
 }
 

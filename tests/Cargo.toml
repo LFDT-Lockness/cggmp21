@@ -45,11 +45,11 @@ generic-tests = "0.1"
 test-case = "3"
 
 [features]
-hd-wallets = ["cggmp21/hd-wallets"]
+hd-wallet = ["cggmp21/hd-wallet"]
 
 [[bin]]
 name = "precompute_shares"
-required-features = ["hd-wallets"]
+required-features = ["hd-wallet"]
 
 [[bin]]
 name = "measure_perf"

@@ -20,9 +20,9 @@ mod generic {
     #[test_case::case(None, 3, false, false; "n3")]
     #[test_case::case(Some(2), 3, false, false; "t2n3")]
     #[test_case::case(Some(3), 3, false, false; "t3n3")]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(None, 3, false, true; "n3-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(Some(2), 3, false, true; "t2n3-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(Some(3), 3, false, true; "t3n3-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(None, 3, false, true; "n3-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(Some(2), 3, false, true; "t2n3-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(Some(3), 3, false, true; "t3n3-hd"))]
     #[tokio::test]
     async fn signing_works<E: Curve, V>(
         t: Option<u16>,
@@ -33,7 +33,7 @@ mod generic {
         Point<E>: HasAffineX<E>,
         V: ExternalVerifier<E>,
     {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         let mut rng = DevRng::new();
@@ -51,7 +51,7 @@ mod generic {
         rng.fill_bytes(&mut original_message_to_sign);
         let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let derivation_path = if hd_wallet {
             Some(cggmp21_tests::random_derivation_path(&mut rng))
         } else {
@@ -71,14 +71,14 @@ mod generic {
             let party = simulation.add_party();
             let mut party_rng = rng.fork();
 
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             let derivation_path = derivation_path.clone();
 
             outputs.push(async move {
                 let signing = cggmp21::signing(eid, i, participants, share)
                     .enforce_reliable_broadcast(reliable_broadcast);
 
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 let signing = if let Some(derivation_path) = derivation_path {
                     signing.set_derivation_path(derivation_path).unwrap()
                 } else {
@@ -93,11 +93,13 @@ mod generic {
             .await
             .expect("signing failed");
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let public_key = if let Some(path) = &derivation_path {
             generic_ec::NonZero::from_point(
                 shares[0]
-                    .derive_child_public_key(path.iter().cloned())
+                    .derive_child_public_key::<cggmp21::hd_wallet::Slip10Like, _>(
+                        path.iter().cloned(),
+                    )
                     .unwrap()
                     .public_key,
             )
@@ -105,7 +107,7 @@ mod generic {
         } else {
             shares[0].shared_public_key
         };
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         let public_key = shares[0].shared_public_key;
 
         signatures[0]
@@ -119,14 +121,14 @@ mod generic {
     }
 
     #[test_case::case(Some(3), 5, false; "t3n5")]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(Some(3), 5, true; "t3n5-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(Some(3), 5, true; "t3n5-hd"))]
     #[tokio::test]
     async fn signing_with_presigs<E: Curve, V>(t: Option<u16>, n: u16, hd_wallet: bool)
     where
         Point<E>: HasAffineX<E>,
         V: ExternalVerifier<E>,
     {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         let mut rng = DevRng::new();
@@ -171,7 +173,7 @@ mod generic {
         rng.fill_bytes(&mut original_message_to_sign);
         let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let derivation_path = if hd_wallet {
             Some(cggmp21_tests::random_derivation_path(&mut rng))
         } else {
@@ -181,7 +183,7 @@ mod generic {
         let partial_signatures = presignatures
             .into_iter()
             .map(|presig| {
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 let presig = if let Some(derivation_path) = &derivation_path {
                     let epub = shares[0].extended_public_key().expect("not hd wallet");
                     presig
@@ -197,11 +199,13 @@ mod generic {
         let signature = cggmp21::PartialSignature::combine(&partial_signatures)
             .expect("invalid partial sigantures");
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let public_key = if let Some(path) = &derivation_path {
             generic_ec::NonZero::from_point(
                 shares[0]
-                    .derive_child_public_key(path.iter().cloned())
+                    .derive_child_public_key::<cggmp21::hd_wallet::Slip10Like, _>(
+                        path.iter().cloned(),
+                    )
                     .unwrap()
                     .public_key,
             )
@@ -209,7 +213,7 @@ mod generic {
         } else {
             shares[0].shared_public_key
         };
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         let public_key = shares[0].shared_public_key;
 
         signature
@@ -222,14 +226,14 @@ mod generic {
 
     #[test_case::case(None, 3, false; "n3")]
     #[test_case::case(Some(3), 5, false; "t3n5")]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(None, 3, true; "n3-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(Some(3), 5, true; "t3n5-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(None, 3, true; "n3-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(Some(3), 5, true; "t3n5-hd"))]
     fn signing_sync<E: Curve, V>(t: Option<u16>, n: u16, hd_wallet: bool)
     where
         Point<E>: HasAffineX<E>,
         V: ExternalVerifier<E>,
     {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         let mut rng = DevRng::new();
@@ -245,7 +249,7 @@ mod generic {
         rng.fill_bytes(&mut original_message_to_sign);
         let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let derivation_path = if hd_wallet {
             Some(cggmp21_tests::random_derivation_path(&mut rng))
         } else {
@@ -270,7 +274,7 @@ mod generic {
             simulation.add_party({
                 let signing = cggmp21::signing(eid, i, participants, share);
 
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 let signing = if let Some(derivation_path) = derivation_path.clone() {
                     signing.set_derivation_path(derivation_path).unwrap()
                 } else {
@@ -288,11 +292,13 @@ mod generic {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let public_key = if let Some(path) = &derivation_path {
             generic_ec::NonZero::from_point(
                 shares[0]
-                    .derive_child_public_key(path.iter().cloned())
+                    .derive_child_public_key::<cggmp21::hd_wallet::Slip10Like, _>(
+                        path.iter().cloned(),
+                    )
                     .unwrap()
                     .public_key,
             )
@@ -300,7 +306,7 @@ mod generic {
         } else {
             shares[0].shared_public_key
         };
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         let public_key = shares[0].shared_public_key;
 
         signatures[0]

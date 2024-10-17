@@ -18,13 +18,13 @@ mod generic {
     #[test_case::case(7, false, false; "n7")]
     #[test_case::case(10, false, false; "n10")]
     #[test_case::case(10, true, false; "n10-reliable")]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(3, false, true; "n3-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(5, false, true; "n5-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(7, false, true; "n7-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(10, false, true; "n10-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(3, false, true; "n3-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(5, false, true; "n5-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(7, false, true; "n7-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(10, false, true; "n10-hd"))]
     #[tokio::test]
     async fn keygen_works<E: Curve>(n: u16, reliable_broadcast: bool, hd_wallet: bool) {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         let mut rng = DevRng::new();
@@ -43,7 +43,7 @@ mod generic {
                 let keygen =
                     cggmp21::keygen(eid, i, n).enforce_reliable_broadcast(reliable_broadcast);
 
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 let keygen = keygen.hd_wallet(hd_wallet);
 
                 keygen.start(&mut party_rng, party).await
@@ -60,8 +60,8 @@ mod generic {
     #[test_case::case(2, 3, false, false; "t2n3")]
     #[test_case::case(3, 5, false, false; "t3n5")]
     #[test_case::case(3, 5, true, false; "t3n5-reliable")]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(2, 3, false, true; "t2n3-hd"))]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(3, 5, false, true; "t3n5-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(2, 3, false, true; "t2n3-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(3, 5, false, true; "t3n5-hd"))]
     #[tokio::test]
     async fn threshold_keygen_works<E: Curve>(
         t: u16,
@@ -69,7 +69,7 @@ mod generic {
         reliable_broadcast: bool,
         hd_wallet: bool,
     ) {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         let mut rng = DevRng::new();
@@ -89,7 +89,7 @@ mod generic {
                     .enforce_reliable_broadcast(reliable_broadcast)
                     .set_threshold(t);
 
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 let keygen = keygen.hd_wallet(hd_wallet);
 
                 keygen.start(&mut party_rng, party).await
@@ -104,9 +104,9 @@ mod generic {
     }
 
     #[test_case::case(3, 5, false; "t3n5")]
-    #[cfg_attr(feature = "hd-wallets", test_case::case(3, 5, true; "t3n5-hd"))]
+    #[cfg_attr(feature = "hd-wallet", test_case::case(3, 5, true; "t3n5-hd"))]
     fn threshold_keygen_sync_works<E: Curve>(t: u16, n: u16, hd_wallet: bool) {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         let mut rng = DevRng::new();
@@ -123,7 +123,7 @@ mod generic {
             simulation.add_party({
                 let keygen = cggmp21::keygen::<E>(eid, i, n).set_threshold(t);
 
-                #[cfg(feature = "hd-wallets")]
+                #[cfg(feature = "hd-wallet")]
                 let keygen = keygen.hd_wallet(hd_wallet);
 
                 keygen.into_state_machine(party_rng)
@@ -143,7 +143,7 @@ mod generic {
         key_shares: &[cggmp21::IncompleteKeyShare<E>],
         hd_wallet: bool,
     ) {
-        #[cfg(not(feature = "hd-wallets"))]
+        #[cfg(not(feature = "hd-wallet"))]
         assert!(!hd_wallet);
 
         for (i, key_share) in (0u16..).zip(key_shares) {
@@ -156,7 +156,7 @@ mod generic {
             );
         }
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         if hd_wallet {
             assert!(key_shares[0].chain_code.is_some());
             for key_share in &key_shares[1..] {

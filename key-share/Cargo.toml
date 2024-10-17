@@ -1,6 +1,6 @@
 [package]
 name = "key-share"
-version = "0.4.3"
+version = "0.5.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Key share of any Threshold Signature Scheme (TSS)"
@@ -15,7 +15,7 @@ generic-ec = { workspace = true, features = ["alloc"] }
 generic-ec-zkp = { workspace = true, features = ["alloc"] }
 rand_core = { workspace = true, optional = true }
 
-slip-10 = { workspace = true, optional = true }
+hd-wallet = { workspace = true, optional = true }
 udigest = { workspace = true, features = ["alloc", "derive"], optional = true }
 
 serde = { workspace = true, features = ["alloc", "derive"], optional = true }
@@ -32,7 +32,7 @@ rand_core = { workspace = true, features = ["getrandom"] }
 default = ["std"]
 
 serde = ["dep:serde", "serde_with", "hex", "generic-ec/serde"]
-hd-wallets = ["slip-10"]
+hd-wallet = ["dep:hd-wallet"]
 spof = ["dep:rand_core"]
 udigest = ["dep:udigest", "generic-ec/udigest"]
 

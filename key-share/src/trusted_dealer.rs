@@ -40,7 +40,7 @@ pub struct TrustedDealerBuilder<E: Curve> {
     t: Option<u16>,
     n: u16,
     shared_secret_key: Option<NonZero<SecretScalar<E>>>,
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     enable_hd: bool,
 }
 
@@ -53,7 +53,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
             t: None,
             n,
             shared_secret_key: None,
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             enable_hd: true,
         }
     }
@@ -85,7 +85,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
     }
 
     /// Specifies that the key being generated shall support HD derivation
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     pub fn hd_wallet(self, v: bool) -> Self {
         Self {
             enable_hd: v,
@@ -153,9 +153,9 @@ impl<E: Curve> TrustedDealerBuilder<E> {
             I: key_shares_indexes,
         });
 
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         let chain_code = if self.enable_hd {
-            let mut code = slip_10::ChainCode::default();
+            let mut code = hd_wallet::ChainCode::default();
             rng.fill_bytes(&mut code);
             Some(code)
         } else {
@@ -172,7 +172,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
                         shared_public_key,
                         public_shares: public_shares.clone(),
                         vss_setup: vss_setup.clone(),
-                        #[cfg(feature = "hd-wallets")]
+                        #[cfg(feature = "hd-wallet")]
                         chain_code,
                     },
                     x: x_i,

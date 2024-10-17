@@ -165,11 +165,11 @@ pub fn convert_from_stark_scalar(
     generic_ec::Scalar::from_be_bytes(bytes).context("Can't read bytes")
 }
 
-#[cfg(feature = "hd-wallets")]
+#[cfg(feature = "hd-wallet")]
 pub fn random_derivation_path(rng: &mut impl rand::RngCore) -> Vec<u32> {
     use rand::Rng;
     let len = rng.gen_range(1..=3);
-    std::iter::repeat_with(|| rng.gen_range(0..cggmp21::slip_10::H))
+    std::iter::repeat_with(|| rng.gen_range(0..cggmp21::hd_wallet::H))
         .take(len)
         .collect::<Vec<_>>()
 }
