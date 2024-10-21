@@ -8,10 +8,10 @@ publish = false
 [dependencies.key-share]
 path = "../../key-share"
 default-features = false
-features = ["serde", "hd-wallets", "spof", "udigest"]
+features = ["serde", "hd-wallet", "spof", "udigest"]
 
 [dependencies.cggmp21-keygen]
 path = "../../cggmp21-keygen"
 default-features = false
-features = ["hd-wallets", "state-machine"]
+features = ["hd-wallet", "state-machine"]
 
