@@ -137,7 +137,7 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     }
 
     /// Specifies that the key being generated shall support HD derivation
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     pub fn hd_wallet(self, v: bool) -> Self {
         Self {
             inner: self.inner.hd_wallet(v),

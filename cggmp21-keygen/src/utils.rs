@@ -69,7 +69,7 @@ where
 
 /// Filter returns `true` for every __faulty__ message. Data and proof are set
 /// to the same message.
-#[cfg(feature = "hd-wallets")]
+#[cfg(feature = "hd-wallet")]
 pub fn collect_simple_blame<D, F>(messages: &RoundMsgs<D>, mut filter: F) -> Vec<AbortBlame>
 where
     F: FnMut(&D) -> bool,

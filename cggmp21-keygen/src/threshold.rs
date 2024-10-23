@@ -69,10 +69,10 @@ pub struct MsgRound2Broad<E: Curve, L: SecurityLevel> {
     /// $A_i$
     pub sch_commit: schnorr_pok::Commit<E>,
     /// Party contribution to chain code
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     #[serde_as(as = "Option<utils::HexOrBin>")]
     #[udigest(as = Option<udigest::Bytes>)]
-    pub chain_code: Option<slip_10::ChainCode>,
+    pub chain_code: Option<hd_wallet::ChainCode>,
     /// $u_i$
     #[serde(with = "hex::serde")]
     #[udigest(as_bytes)]
@@ -141,7 +141,7 @@ pub async fn run_threshold_keygen<E, R, M, L, D>(
     sid: ExecutionId<'_>,
     rng: &mut R,
     party: M,
-    #[cfg(feature = "hd-wallets")] hd_enabled: bool,
+    #[cfg(feature = "hd-wallet")] hd_enabled: bool,
 ) -> Result<CoreKeyShare<E>, KeygenError>
 where
     E: Curve,
@@ -183,9 +183,9 @@ where
         .collect::<Vec<_>>();
     debug_assert_eq!(sigmas.len(), usize::from(n));
 
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     let chain_code_local = if hd_enabled {
-        let mut chain_code = slip_10::ChainCode::default();
+        let mut chain_code = hd_wallet::ChainCode::default();
         rng.fill_bytes(&mut chain_code);
         Some(chain_code)
     } else {
@@ -197,7 +197,7 @@ where
         rid,
         F: F.clone(),
         sch_commit: h,
-        #[cfg(feature = "hd-wallets")]
+        #[cfg(feature = "hd-wallet")]
         chain_code: chain_code_local,
         decommit: {
             let mut nonce = L::Rid::default();
@@ -343,7 +343,7 @@ where
         .iter_including_me(&my_decommitment)
         .map(|d| &d.rid)
         .fold(L::Rid::default(), utils::xor_array);
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     let chain_code = if hd_enabled {
         tracer.stage("Compute chain_code");
         let blame = utils::collect_simple_blame(&decommitments, |decom| decom.chain_code.is_none());
@@ -351,7 +351,7 @@ where
             return Err(KeygenAborted::MissingChainCode(blame).into());
         }
         Some(decommitments.iter_including_me(&my_decommitment).try_fold(
-            slip_10::ChainCode::default(),
+            hd_wallet::ChainCode::default(),
             |acc, decom| {
                 Ok::<_, Bug>(utils::xor_array(
                     acc,
@@ -449,7 +449,7 @@ where
                 min_signers: t,
                 I: key_shares_indexes,
             }),
-            #[cfg(feature = "hd-wallets")]
+            #[cfg(feature = "hd-wallet")]
             chain_code,
         },
         x: sigma,

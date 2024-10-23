@@ -56,10 +56,10 @@ core_key_share! {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vss_setup: Option<crate::VssSetup<E>>,
 
-    #[cfg(feature = "hd-wallets")]
+    #[cfg(feature = "hd-wallet")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "As::<Option<crate::utils::HexOrBin>>")]
-    pub chain_code: Option<slip_10::ChainCode>,
+    pub chain_code: Option<hd_wallet::ChainCode>,
 
     #[serde(with = "As::<generic_ec::serde::Compact>")]
     pub x: NonZero<SecretScalar<E>>,

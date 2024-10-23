@@ -271,7 +271,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "cggmp21-keygen",
  "digest",
@@ -279,6 +279,7 @@ dependencies = [
  "generic-ec",
  "generic-ec-zkp",
  "generic-tests",
+ "hd-wallet",
  "hex",
  "key-share",
  "paillier-zk",
@@ -290,19 +291,19 @@ dependencies = [
  "serde",
  "serde_with 2.3.3",
  "sha2",
- "slip-10",
  "thiserror",
  "udigest",
 ]
 
 [[package]]
 name = "cggmp21-keygen"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "digest",
  "displaydoc",
  "generic-ec",
  "generic-ec-zkp",
+ "hd-wallet",
  "hex",
  "key-share",
  "rand_core",
@@ -310,7 +311,6 @@ dependencies = [
  "serde",
  "serde_with 2.3.3",
  "sha2",
- "slip-10",
  "thiserror",
  "udigest",
 ]
@@ -1084,6 +1084,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
 
 [[package]]
+name = "hd-wallet"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4111172d55e2217d689df0fc9038cbd65826dd842ac5df9a04363accfa0769a3"
+dependencies = [
+ "generic-array",
+ "generic-ec",
+ "hmac",
+ "sha2",
+ "subtle",
+]
+
+[[package]]
 name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1357,16 +1370,16 @@ dependencies = [
 
 [[package]]
 name = "key-share"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "displaydoc",
  "generic-ec",
  "generic-ec-zkp",
+ "hd-wallet",
  "hex",
  "rand_core",
  "serde",
  "serde_with 2.3.3",
- "slip-10",
  "thiserror",
  "udigest",
 ]
@@ -2099,19 +2112,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4614a76b2a8be0058caa9dbbaf66d988527d86d003c11a94fbd335d7661edcef"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "slip-10"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10c50b6de806a216bce1d98e9107e03f60b54abcfbe6be3935a528ab57c19f6a"
-dependencies = [
- "generic-array",
- "generic-ec",
- "hmac",
- "sha2",
- "subtle",
 ]
 
 [[package]]
