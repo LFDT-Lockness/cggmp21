@@ -70,7 +70,7 @@ let outgoing: impl Sink<Outgoing<Msg>>;
 
 where:
 * `Msg` is a protocol message (e.g., `signing::msg::Msg`)
-* `round_based::Incoming` and `round_based::Outgoing` wrap `Msg` and provide additional data (e.g., sender/recepient)
+* `round_based::Incoming` and `round_based::Outgoing` wrap `Msg` and provide additional data (e.g., sender/recipient)
 * `futures::Stream` and `futures::Sink` are well-known async primitives.
 
 Once you have that, you can construct an `MpcParty`:
