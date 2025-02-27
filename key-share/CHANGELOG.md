@@ -1,7 +1,7 @@
 # Changelog
 
 ## v0.6.1
-* Trusted dealer now generates random share preimages by default [#136]
+* Trusted dealer can generate shares at random or non-standard preimages [#137]
 
 ## v0.6.0
 * Update `hd-wallet` dep to v0.6 [#120]

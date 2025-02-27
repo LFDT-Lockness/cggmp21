@@ -14,7 +14,7 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 generic-ec = { workspace = true, features = ["alloc"] }
 generic-ec-zkp = { workspace = true, features = ["alloc"] }
 rand_core = { workspace = true, optional = true }
-rand = { workspace = true, optional = true }
+rand = { workspace = true, optional = true, features = ["alloc"] }
 
 hd-wallet = { workspace = true, optional = true }
 udigest = { workspace = true, features = ["alloc", "derive"], optional = true }

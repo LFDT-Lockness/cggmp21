@@ -98,9 +98,33 @@ impl<E: Curve> TrustedDealerBuilder<E> {
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
     ///
-    /// For Shamir secret sharing, the points at which the value is shared at
-    /// are chosen at random between `1` and `u16::MAX`
+    /// For Shamir secret sharing, it's shared at points `1` to `n`
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
     pub fn generate_shares(
+        self,
+        rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
+    ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
+        let key_shares_indexes = (1..=self.n)
+            .map(|i| generic_ec::NonZero::from_scalar(Scalar::from(i)))
+            .collect::<Option<Vec<_>>>()
+            .ok_or(Reason::DeriveKeyShareIndex)?;
+        self.generate_shares_at(key_shares_indexes, rng)
+    }
+
+    /// Generates [`CoreKeyShare`]s shared at random points
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
+    ///
+    /// For Shamir secret sharing, the points at which the value is shared at
+    /// are chosen at random between `1` and `u16::MAX`. For additive shares,
+    /// this is the same as [`TrustedDealerBuilder::generate_shares`]
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
+    pub fn generate_shares_at_random(
         self,
         rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
@@ -116,8 +140,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
     /// Generates [`CoreKeyShare`]s shared at preimages provided. Each share is
     /// going to have the given `preimages` as its `I` component.
     ///
-    /// Preimages are ignored for additive key shares, and for them the
-    /// operation is exactly the same as [`generate_shares`]
+    /// Preimages are ignored for additive key shares.
     ///
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
