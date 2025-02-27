@@ -97,18 +97,39 @@ impl<E: Curve> TrustedDealerBuilder<E> {
     ///
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
+    ///
+    /// For Shamir secret sharing, the points at which the value is shared at
+    /// are chosen at random between `1` and `u16::MAX`
     pub fn generate_shares(
         self,
+        rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
+    ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
+        let key_shares_indexes =
+            rand::seq::index::sample(rng, usize::from(u16::MAX - 1), usize::from(self.n))
+                .iter()
+                .map(|i| generic_ec::NonZero::from_scalar(Scalar::from(i + 1)))
+                .collect::<Option<Vec<_>>>()
+                .ok_or(Reason::DeriveKeyShareIndex)?;
+        self.generate_shares_at(key_shares_indexes, rng)
+    }
+
+    /// Generates [`CoreKeyShare`]s shared at preimages provided. Each share is
+    /// going to have the given `preimages` as its `I` component.
+    ///
+    /// Preimages are ignored for additive key shares, and for them the
+    /// operation is exactly the same as [`generate_shares`]
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
+    pub fn generate_shares_at(
+        self,
+        preimages: Vec<NonZero<Scalar<E>>>,
         rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
         let shared_secret_key = self
             .shared_secret_key
             .unwrap_or_else(|| NonZero::<SecretScalar<_>>::random(rng));
         let shared_public_key = Point::generator() * &shared_secret_key;
-        let key_shares_indexes = (1..=self.n)
-            .map(|i| generic_ec::NonZero::from_scalar(Scalar::from(i)))
-            .collect::<Option<Vec<_>>>()
-            .ok_or(Reason::DeriveKeyShareIndex)?;
         let secret_shares = if let Some(t) = self.t {
             let f = generic_ec_zkp::polynomial::Polynomial::sample_with_const_term(
                 rng,
@@ -120,7 +141,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
                 Point::generator() * f.value::<_, Scalar<_>>(&Scalar::zero())
             );
 
-            key_shares_indexes
+            preimages
                 .iter()
                 .map(|I_i| f.value(I_i))
                 .map(|mut x_i| SecretScalar::new(&mut x_i))
@@ -150,7 +171,7 @@ impl<E: Curve> TrustedDealerBuilder<E> {
 
         let vss_setup = self.t.map(|t| VssSetup {
             min_signers: t,
-            I: key_shares_indexes,
+            I: preimages,
         });
 
         #[cfg(feature = "hd-wallet")]

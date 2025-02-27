@@ -1,6 +1,6 @@
 [package]
 name = "key-share"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Key share of any Threshold Signature Scheme (TSS)"
@@ -14,6 +14,7 @@ keywords = ["mpc", "threshold-signatures", "tss"]
 generic-ec = { workspace = true, features = ["alloc"] }
 generic-ec-zkp = { workspace = true, features = ["alloc"] }
 rand_core = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 
 hd-wallet = { workspace = true, optional = true }
 udigest = { workspace = true, features = ["alloc", "derive"], optional = true }
@@ -33,7 +34,7 @@ default = ["std"]
 
 serde = ["dep:serde", "serde_with", "hex", "generic-ec/serde"]
 hd-wallet = ["dep:hd-wallet"]
-spof = ["dep:rand_core"]
+spof = ["dep:rand_core", "dep:rand"]
 udigest = ["dep:udigest", "generic-ec/udigest"]
 
 std = ["dep:thiserror"]

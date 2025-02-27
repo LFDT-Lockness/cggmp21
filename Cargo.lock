@@ -1507,6 +1507,7 @@ dependencies = [
  "generic-ec-zkp",
  "hd-wallet",
  "hex",
+ "rand",
  "rand_core",
  "serde",
  "serde_with 2.3.3",
