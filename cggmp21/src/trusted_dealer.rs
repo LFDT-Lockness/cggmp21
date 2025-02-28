@@ -147,6 +147,8 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
 
     /// Generates [`IncompleteKeyShare`]s
     ///
+    /// For Shamir secret sharing, it's shared at points `1` to `n`
+    ///
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
     pub fn generate_core_shares(
@@ -169,11 +171,10 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         self,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
-        let preimages = (1..=self.n)
-            .map(|i| generic_ec::NonZero::from_scalar(generic_ec::Scalar::from(i)))
-            .collect::<Option<Vec<_>>>()
-            .ok_or(Reason::DeriveKeyShareIndex)?;
-        self.generate_shares_at(preimages, rng)
+        self.generate_shares_at_internal(
+            key_share::trusted_dealer::TrustedDealerBuilder::generate_shares,
+            rng,
+        )
     }
 
     /// Generates [`KeyShare`]s shared at preimages provided. Each share is
@@ -184,33 +185,17 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
     pub fn generate_shares_at(
-        mut self,
+        self,
         preimages: Vec<NonZero<generic_ec::Scalar<E>>>,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
-        let n = self.n;
-        let enable_multiexp = self.enable_mulitexp;
-        let enable_crt = self.enable_crt;
-
-        let primes = self.pregenerated_primes.take();
-        let core_key_shares = self.inner.generate_shares_at(preimages, rng).map_err(Reason::CoreError)?;
-        let aux_data = if let Some(primes) = primes {
-            generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)?
-        } else {
-            generate_aux_data(rng, n, enable_multiexp, enable_crt)?
-        };
-
-        let key_shares = core_key_shares
-            .into_iter()
-            .zip(aux_data)
-            .map(|(core, aux)| KeyShare::from_parts((core, aux)))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| Reason::InvalidKeyShare(err.into_error()))?;
-
-        Ok(key_shares)
+        self.generate_shares_at_internal(
+            |builder, rng| builder.generate_shares_at(preimages, rng),
+            rng,
+        )
     }
 
-    /// Generates [`CoreKeyShare`]s shared at random points
+    /// Generates [`KeyShare`]s shared at random points
     ///
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
@@ -225,13 +210,47 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
         self,
         rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
-        let key_shares_indexes =
-            rand::seq::index::sample(rng, usize::from(u16::MAX - 1), usize::from(self.n))
-                .iter()
-                .map(|i| generic_ec::NonZero::from_scalar(generic_ec::Scalar::from(i + 1)))
-                .collect::<Option<Vec<_>>>()
-                .ok_or(Reason::DeriveKeyShareIndex)?;
-        self.generate_shares_at(key_shares_indexes, rng)
+        self.generate_shares_at_internal(
+            key_share::trusted_dealer::TrustedDealerBuilder::generate_shares_at_random,
+            rng,
+        )
+    }
+
+    fn generate_shares_at_internal<R, F>(
+        mut self,
+        inner_generate: F,
+        rng: &mut R,
+    ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError>
+    where
+        F: FnOnce(
+            CoreBuilder<E>,
+            &mut R,
+        ) -> Result<
+            Vec<IncompleteKeyShare<E>>,
+            key_share::trusted_dealer::TrustedDealerError,
+        >,
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        let n = self.n;
+        let enable_multiexp = self.enable_mulitexp;
+        let enable_crt = self.enable_crt;
+
+        let primes = self.pregenerated_primes.take();
+        let core_key_shares = inner_generate(self.inner, rng).map_err(Reason::CoreError)?;
+        let aux_data = if let Some(primes) = primes {
+            generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)?
+        } else {
+            generate_aux_data(rng, n, enable_multiexp, enable_crt)?
+        };
+
+        let key_shares = core_key_shares
+            .into_iter()
+            .zip(aux_data)
+            .map(|(core, aux)| KeyShare::from_parts((core, aux)))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| Reason::InvalidKeyShare(err.into_error()))?;
+
+        Ok(key_shares)
     }
 }
 
@@ -334,8 +353,6 @@ enum Reason {
     BuildCrt(#[source] InvalidKeyShare),
     #[error("couldn't build multiexp tables")]
     BuildMultiexp(#[source] InvalidKeyShare),
-    #[error("deriving key share index failed")]
-    DeriveKeyShareIndex,
     #[error(transparent)]
     CoreError(#[from] key_share::trusted_dealer::TrustedDealerError),
 }

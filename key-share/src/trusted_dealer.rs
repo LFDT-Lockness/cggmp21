@@ -128,13 +128,20 @@ impl<E: Curve> TrustedDealerBuilder<E> {
         self,
         rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
-        let key_shares_indexes =
-            rand::seq::index::sample(rng, usize::from(u16::MAX - 1), usize::from(self.n))
-                .iter()
-                .map(|i| generic_ec::NonZero::from_scalar(Scalar::from(i + 1)))
-                .collect::<Option<Vec<_>>>()
-                .ok_or(Reason::DeriveKeyShareIndex)?;
-        self.generate_shares_at(key_shares_indexes, rng)
+        let mut points = Vec::with_capacity(self.n.into());
+        'each_point: for _ in 0..self.n {
+            for _ in 0..u16::MAX {
+                let point = generic_ec::NonZero::<Scalar<E>>::random(rng);
+                if !points.contains(&point) {
+                    points.push(point);
+                    continue 'each_point;
+                }
+            }
+            // if we did not continue in inner loop, it means we couldn't
+            // generate a distinct scalar
+            return Err(Reason::BadRandom.into());
+        }
+        self.generate_shares_at(points, rng)
     }
 
     /// Generates [`CoreKeyShare`]s shared at preimages provided. Each share is
@@ -149,6 +156,10 @@ impl<E: Curve> TrustedDealerBuilder<E> {
         preimages: Vec<NonZero<Scalar<E>>>,
         rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
+        if preimages.len() != usize::from(self.n) {
+            return Err(Reason::InvalidPreimages.into());
+        }
+
         let shared_secret_key = self
             .shared_secret_key
             .unwrap_or_else(|| NonZero::<SecretScalar<_>>::random(rng));
@@ -242,6 +253,10 @@ enum Reason {
     DeriveKeyShareIndex,
     #[displaydoc("randomly generated share is zero - probability of that is negligible")]
     ZeroShare,
+    #[displaydoc("invalid share preimages given")]
+    InvalidPreimages,
+    #[displaydoc("randomness source doesn't have enough entropy")]
+    BadRandom,
 }
 
 impl From<Reason> for TrustedDealerError {

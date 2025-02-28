@@ -26,7 +26,6 @@ digest = { workspace = true }
 sha2 = { workspace = true }
 rand_core = { workspace = true }
 rand_hash = { workspace = true }
-rand = { workspace = true, optional = true, features = ["alloc"] }
 
 futures = { workspace = true }
 
@@ -54,7 +53,7 @@ curve-stark = ["generic-ec/curve-stark", "hd-wallet?/curve-stark"]
 hd-wallet = ["dep:hd-wallet", "cggmp21-keygen/hd-wallet"]
 hd-slip10 = ["hd-wallet/slip10"]
 hd-stark = ["hd-wallet/stark"]
-spof = ["key-share/spof", "dep:rand"]
+spof = ["key-share/spof"]
 
 state-machine = ["cggmp21-keygen/state-machine"]
 
