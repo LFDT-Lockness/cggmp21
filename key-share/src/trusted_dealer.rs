@@ -128,19 +128,12 @@ impl<E: Curve> TrustedDealerBuilder<E> {
         self,
         rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> Result<Vec<CoreKeyShare<E>>, TrustedDealerError> {
-        let mut points = Vec::with_capacity(self.n.into());
-        'each_point: for _ in 0..self.n {
-            for _ in 0..u16::MAX {
-                let point = generic_ec::NonZero::<Scalar<E>>::random(rng);
-                if !points.contains(&point) {
-                    points.push(point);
-                    continue 'each_point;
-                }
-            }
-            // if we did not continue in inner loop, it means we couldn't
-            // generate a distinct scalar
-            return Err(Reason::BadRandom.into());
-        }
+        // The chance of scalars repeating is negligible for usual fields in EC.
+        // But in any case the dupliactes are checked during the validation of
+        // CoreKeyShare
+        let points = (0..self.n)
+            .map(|_| generic_ec::NonZero::<Scalar<E>>::random(rng))
+            .collect();
         self.generate_shares_at(points, rng)
     }
 
@@ -255,8 +248,6 @@ enum Reason {
     ZeroShare,
     #[displaydoc("invalid share preimages given")]
     InvalidPreimages,
-    #[displaydoc("randomness source doesn't have enough entropy")]
-    BadRandom,
 }
 
 impl From<Reason> for TrustedDealerError {
