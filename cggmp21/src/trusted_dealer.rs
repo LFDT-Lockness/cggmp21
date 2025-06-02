@@ -147,6 +147,8 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
 
     /// Generates [`IncompleteKeyShare`]s
     ///
+    /// For Shamir secret sharing, it's shared at points `1` to `n`
+    ///
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
     pub fn generate_core_shares(
@@ -161,18 +163,80 @@ impl<E: Curve, L: SecurityLevel> TrustedDealerBuilder<E, L> {
 
     /// Generates [`KeyShare`]s
     ///
+    /// For Shamir secret sharing, it's shared at points `1` to `n`
+    ///
     /// Returns error if provided inputs are invalid, or if internal
     /// error has occurred.
     pub fn generate_shares(
-        mut self,
+        self,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
+        self.generate_shares_at_internal(
+            key_share::trusted_dealer::TrustedDealerBuilder::generate_shares,
+            rng,
+        )
+    }
+
+    /// Generates [`KeyShare`]s shared at preimages provided. Each share is
+    /// going to have the given `preimages` as its `I` component.
+    ///
+    /// Preimages are ignored for additive key shares.
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
+    pub fn generate_shares_at(
+        self,
+        preimages: Vec<NonZero<generic_ec::Scalar<E>>>,
+        rng: &mut (impl RngCore + CryptoRng),
+    ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
+        self.generate_shares_at_internal(
+            |builder, rng| builder.generate_shares_at(preimages, rng),
+            rng,
+        )
+    }
+
+    /// Generates [`KeyShare`]s shared at random points
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
+    ///
+    /// For Shamir secret sharing, the points at which the value is shared at
+    /// are chosen at random between `1` and `u16::MAX`. For additive shares,
+    /// this is the same as [`TrustedDealerBuilder::generate_shares`]
+    ///
+    /// Returns error if provided inputs are invalid, or if internal
+    /// error has occurred.
+    pub fn generate_shares_at_random(
+        self,
+        rng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
+    ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError> {
+        self.generate_shares_at_internal(
+            key_share::trusted_dealer::TrustedDealerBuilder::generate_shares_at_random,
+            rng,
+        )
+    }
+
+    fn generate_shares_at_internal<R, F>(
+        mut self,
+        inner_generate: F,
+        rng: &mut R,
+    ) -> Result<Vec<KeyShare<E, L>>, TrustedDealerError>
+    where
+        F: FnOnce(
+            CoreBuilder<E>,
+            &mut R,
+        ) -> Result<
+            Vec<IncompleteKeyShare<E>>,
+            key_share::trusted_dealer::TrustedDealerError,
+        >,
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
         let n = self.n;
         let enable_multiexp = self.enable_mulitexp;
         let enable_crt = self.enable_crt;
 
         let primes = self.pregenerated_primes.take();
-        let core_key_shares = self.inner.generate_shares(rng).map_err(Reason::CoreError)?;
+        let core_key_shares = inner_generate(self.inner, rng).map_err(Reason::CoreError)?;
         let aux_data = if let Some(primes) = primes {
             generate_aux_data_with_primes(rng, primes, enable_multiexp, enable_crt)?
         } else {
