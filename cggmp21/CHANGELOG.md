@@ -1,7 +1,14 @@
 # Changelog
 
+## v0.6.2
+* Update the protocol to match the spec
+
+[#145]: https://github.com/LFDT-Lockness/cggmp21/pull/145
+
 ## v0.6.1
 * Trusted dealer can generate shares at random or non-standard preimages [#137]
+
+[#137]: https://github.com/LFDT-Lockness/cggmp21/pull/137
 
 ## v0.6.0
 * Update `hd-wallet` dep to v0.6 [#120]

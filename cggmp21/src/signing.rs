@@ -826,8 +826,8 @@ where
 
         let r_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
         let hat_r_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
-        let s_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
-        let hat_s_ij = N_i.random_below_ref(&mut utils::external_rand(rng)).into();
+        let s_ij = N_j.random_below_ref(&mut utils::external_rand(rng)).into();
+        let hat_s_ij = N_j.random_below_ref(&mut utils::external_rand(rng)).into();
 
         let beta_ij = Integer::from_rng_pm(&J, rng);
         let hat_beta_ij = Integer::from_rng_pm(&J, rng);
