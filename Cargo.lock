@@ -298,7 +298,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp21"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "cggmp21-keygen",
  "digest",
@@ -1645,9 +1645,8 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41f7666e5a36fe77ef28a4f8306367a759c7caacbdf8eeea89f524ccc2ade933"
+version = "0.4.3"
+source = "git+https://github.com/dfnsco/paillier-zk-private-security-fix?branch=cggmp21%2Fadd-missing-check#91ce589ebed7b5cf92f0f77240d515377002eff1"
 dependencies = [
  "digest",
  "fast-paillier",
