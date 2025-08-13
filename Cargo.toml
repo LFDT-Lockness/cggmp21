@@ -19,7 +19,7 @@ generic-ec = { version = "0.4.1", default-features = false }
 generic-ec-zkp = { version = "0.4.1", default-features = false } 
 round-based = { version = "0.4.1", default-features = false }
 
-paillier-zk = { version = "0.4.3", git = "https://github.com/dfnsco/paillier-zk-private-security-fix", branch = "cggmp21/add-missing-check" } 
+paillier-zk = { version = "0.4.3", git = "https://github.com/dfnsco/paillier-zk-private-security-fix", branch = "cggmp21/security-fix" } 
 udigest = { version = "0.2.1", default-features = false }
 
 digest = { version = "0.10", default-features = false }
