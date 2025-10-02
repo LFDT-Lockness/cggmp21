@@ -1,5 +1,5 @@
 use generic_ec::{Curve, Scalar};
-use paillier_zk::rug::{self, Integer};
+use paillier_zk::backend::Integer;
 use paillier_zk::IntegerExt;
 use paillier_zk::{
     paillier_affine_operation_in_range as pi_aff,
@@ -10,12 +10,10 @@ use round_based::{MsgId, PartyIndex};
 
 use crate::security_level::SecurityLevel;
 
-pub use paillier_zk::fast_paillier::utils::external_rand;
-
 /// Converts `&Scalar<E>` into Integer
 pub fn scalar_to_pm_bignumber<E: Curve>(scalar: impl AsRef<Scalar<E>>) -> Integer {
     let q = Integer::curve_order::<E>();
-    let x = Integer::from_digits(&scalar.as_ref().to_be_bytes(), rug::integer::Order::Msf);
+    let x = Integer::from_bytes_msf(&scalar.as_ref().to_be_bytes());
     let half_q = (q.clone() - 1) / 2;
     if x <= half_q {
         x
@@ -150,11 +148,7 @@ pub fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
 /// Binary search for rounded down square root. For non-positive numbers returns
 /// one
 pub fn sqrt(x: &Integer) -> Integer {
-    if x.cmp0().is_le() {
-        Integer::ONE.clone()
-    } else {
-        x.sqrt_ref().into()
-    }
+    x.sqrt_ref().unwrap_or_else(Integer::one)
 }
 
 /// Returns `[list[indexes[0]], list[indexes[1]], ..., list[indexes[n-1]]]`
@@ -176,9 +170,7 @@ pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Opt
 #[cfg(test)]
 pub fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) -> Integer {
     loop {
-        let mut n: Integer = Integer::random_bits(bits_size, &mut external_rand(rng)).into();
-        n.set_bit(bits_size - 1, true);
-        n.next_prime_mut();
+        let n = Integer::generate_prime(rng, bits_size);
 
         if n.mod_u(4) == 3 {
             break n;
@@ -192,16 +184,13 @@ pub fn generate_pedersen_params(
     p: Integer,
     q: Integer,
 ) -> Result<(crate::key_share::PedersenParams, Integer, Integer), GenPedersenError> {
-    use paillier_zk::IntegerExt;
-    use rug::Complete;
-
     let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q)
         .ok_or(GenPedersenError::BuildCrt)?;
-    let N = (&p * &q).complete();
-    let phi_N = (&p - 1u8).complete() * (&q - 1u8).complete();
+    let N = &p * &q;
+    let phi_N = (&p - 1u8) * (&q - 1u8);
 
-    let r = Integer::gen_invertible(&N, rng);
-    let lambda = Integer::random_below(phi_N.clone() >> 2, &mut external_rand(rng));
+    let r = Integer::sample_in_mult_group_of(rng, &N);
+    let lambda = Integer::random_below(phi_N.clone() >> 2, rng);
 
     let t = r.square().modulo(&N);
     let s = crt
@@ -229,23 +218,21 @@ pub enum GenPedersenError {
 
 /// Unambiguous encoding for different types for which it was not defined
 pub mod encoding {
-    use paillier_zk::rug;
+    use paillier_zk::backend;
 
     pub struct Integer;
-    impl udigest::DigestAs<rug::Integer> for Integer {
+    impl udigest::DigestAs<backend::Integer> for Integer {
         fn digest_as<B: udigest::Buffer>(
-            x: &rug::Integer,
+            x: &backend::Integer,
             encoder: udigest::encoding::EncodeValue<B>,
         ) {
-            encoder.encode_leaf_value(x.to_digits(rug::integer::Order::Msf))
+            encoder.encode_leaf_value(x.to_bytes_msf())
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use paillier_zk::rug::Complete;
-
     #[test]
     fn test_sqrt() {
         use super::{sqrt, Integer};
@@ -259,18 +246,19 @@ mod test {
         assert_eq!(sqrt(&Integer::from(7)), Integer::from(2));
         assert_eq!(sqrt(&Integer::from(8)), Integer::from(2));
         assert_eq!(sqrt(&Integer::from(9)), Integer::from(3));
-        assert_eq!(sqrt(&(Integer::from(1) << 1024)), Integer::from(1) << 512);
+        assert_eq!(
+            sqrt(&(Integer::from(1) << 1024_u32)),
+            Integer::from(1) << 512_u32
+        );
 
-        let modulo = (Integer::ONE << 1024_u32).complete();
+        let modulo = Integer::one() << 1024_u32;
         let mut rng = rand_dev::DevRng::new();
         for _ in 0..100 {
-            let x = modulo
-                .random_below_ref(&mut super::external_rand(&mut rng))
-                .into();
+            let x = modulo.random_below_ref(&mut rng);
             let root = sqrt(&x);
-            assert!(root.square_ref().complete() <= x);
+            assert!(root.square_ref() <= x);
             let root = root + 1u8;
-            assert!(root.square_ref().complete() > x);
+            assert!(root.square_ref() > x);
         }
     }
 }

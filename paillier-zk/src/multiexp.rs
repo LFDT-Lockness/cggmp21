@@ -5,7 +5,7 @@
 
 #![allow(non_snake_case)]
 
-use rug::{Complete, Integer};
+use fast_paillier::backend::Integer;
 
 /// Precomputed table for performing faster multiexponentiation
 #[derive(Debug, Clone)]
@@ -29,9 +29,9 @@ impl MultiexpTable {
     pub fn build(s: &Integer, t: &Integer, x_bits: u32, y_bits: u32, N: Integer) -> Option<Self> {
         if s.cmp0().is_le()
             || t.cmp0().is_le()
-            || N <= *Integer::ONE
-            || s.gcd_ref(&N).complete() != *Integer::ONE
-            || t.gcd_ref(&N).complete() != *Integer::ONE
+            || N <= Integer::one()
+            || s.gcd_ref(&N) != Integer::one()
+            || t.gcd_ref(&N) != Integer::one()
         {
             return None;
         }
@@ -42,20 +42,20 @@ impl MultiexpTable {
 
         let B: u32 = 256;
         for i in 0..k_x {
-            let B_to_i = Integer::u_pow_u(B, i).complete();
-            s_table.push(s.clone().pow_mod(&B_to_i, &N).ok()?);
+            let B_to_i = Integer::u_pow_u(B, i);
+            s_table.push(s.pow_mod_ref(&B_to_i, &N)?);
         }
         for i in 0..k_y {
-            let B_to_i = Integer::u_pow_u(B, i).complete();
-            t_table.push(t.clone().pow_mod(&B_to_i, &N).ok()?);
+            let B_to_i = Integer::u_pow_u(B, i);
+            t_table.push(t.pow_mod_ref(&B_to_i, &N)?);
         }
 
         // smallest negative value possible for `x`
-        let ell_x = -(Integer::ONE.clone() << (k_x * 8)) + 1;
-        let s_to_ell_x = s.pow_mod_ref(&ell_x, &N)?.into();
+        let ell_x = -(Integer::one() << (k_x * 8)) + 1;
+        let s_to_ell_x = s.pow_mod_ref(&ell_x, &N)?;
         // smallest negative value possible for `y`
-        let ell_y = -(Integer::ONE.clone() << (k_y * 8)) + 1;
-        let t_to_ell_y = t.pow_mod_ref(&ell_y, &N)?.into();
+        let ell_y = -(Integer::one() << (k_y * 8)) + 1;
+        let t_to_ell_y = t.pow_mod_ref(&ell_y, &N)?;
 
         Some(Self {
             s: s_table,
@@ -72,32 +72,30 @@ impl MultiexpTable {
     ///
     /// Returns `None` if either `x` or `y` do not fit into `x_bits` or `y_bits` provided in [`MultiexpTable::build`].
     pub fn prod_exp(&self, x: &Integer, y: &Integer) -> Option<Integer> {
-        let order = rug::integer::Order::Lsf;
-
         let x_is_neg = x.cmp0().is_lt();
         // `x_digits` correspond to digits of `x` is it's non-negative, and `x - ell_x` otherwise
         let x_digits = if !x_is_neg {
-            x.to_digits::<u8>(order)
+            x.to_bytes_lsf()
         } else {
-            let x = (x - &self.ell_x).complete();
+            let x = x - &self.ell_x;
             if x.cmp0().is_lt() {
                 // `x` is less than lower bound
                 return None;
             }
-            x.to_digits::<u8>(order)
+            x.to_bytes_lsf()
         };
 
         let y_is_neg = y.cmp0().is_lt();
         // `y_digits` correspond to digits of `y` is it's non-negative, and `y - ell_y` otherwise
         let y_digits = if !y_is_neg {
-            y.to_digits::<u8>(order)
+            y.to_bytes_lsf()
         } else {
-            let y = (y - &self.ell_y).complete();
+            let y = y - &self.ell_y;
             if y.cmp0().is_lt() {
                 // `y` is less than lower bound
                 return None;
             }
-            y.to_digits::<u8>(order)
+            y.to_bytes_lsf()
         };
 
         if x_digits.len() > self.s.len() || y_digits.len() > self.t.len() {
@@ -109,8 +107,8 @@ impl MultiexpTable {
         build_digits_table(&mut digits_table, &self.s, &x_digits, &self.N);
         build_digits_table(&mut digits_table, &self.t, &y_digits, &self.N);
 
-        let mut res = Integer::ONE.clone();
-        let mut acc = Integer::ONE.clone();
+        let mut res = Integer::one();
+        let mut acc = Integer::one();
         for d in digits_table.iter().rev() {
             if let Some(d) = d {
                 acc = (acc * d) % &self.N;
@@ -153,17 +151,16 @@ impl MultiexpTable {
         // And a few bytes more to encode length of each integer
         let int_len = (5 + s.len() + t.len()) * (usize::BITS as usize / 8);
 
-        type Limb = u32;
-        let s: usize = s.iter().map(|s_i| s_i.significant_digits::<Limb>()).sum();
-        let ell_x = ell_x.significant_digits::<Limb>();
-        let s_to_ell_x = s_to_ell_x.significant_digits::<Limb>();
-        let t: usize = t.iter().map(|t_i| t_i.significant_digits::<Limb>()).sum();
-        let ell_y = ell_y.significant_digits::<Limb>();
-        let t_to_ell_y = t_to_ell_y.significant_digits::<Limb>();
-        let N = N.significant_digits::<Limb>();
+        let s: usize = s.iter().map(|s_i| s_i.significant_dwords()).sum();
+        let ell_x = ell_x.significant_dwords();
+        let s_to_ell_x = s_to_ell_x.significant_dwords();
+        let t: usize = t.iter().map(|t_i| t_i.significant_dwords()).sum();
+        let ell_y = ell_y.significant_dwords();
+        let t_to_ell_y = t_to_ell_y.significant_dwords();
+        let N = N.significant_dwords();
 
         let limbs_bytes =
-            (Limb::BITS as usize / 8) * (s + ell_x + s_to_ell_x + t + ell_y + t_to_ell_y + N);
+            (u32::BITS as usize / 8) * (s + ell_x + s_to_ell_x + t + ell_y + t_to_ell_y + N);
 
         vec_len + int_len + limbs_bytes
     }
@@ -190,7 +187,7 @@ fn build_digits_table(
 
 #[cfg(test)]
 mod test {
-    use rug::Integer;
+    use fast_paillier::backend::Integer;
 
     use super::MultiexpTable;
 
@@ -205,23 +202,22 @@ mod test {
 
         let table = MultiexpTable::build(&s, &t, x_bits, y_bits, N.clone()).unwrap();
 
-        let mut rng = rug::rand::RandState::new_mersenne_twister();
+        let mut rng = rand_dev::DevRng::new();
 
         for _ in 0..100 {
-            let mut x = Integer::from(Integer::random_bits(x_bits, &mut rng));
-            if rng.bits(1) == 1 {
+            let mut x = Integer::random_bits(x_bits, &mut rng);
+            if rand::Rng::gen(&mut rng) {
                 x = -x
             }
 
-            let mut y = Integer::from(Integer::random_bits(y_bits, &mut rng));
-            if rng.bits(1) == 1 {
+            let mut y = Integer::random_bits(y_bits, &mut rng);
+            if rand::Rng::gen(&mut rng) {
                 y = -y
             }
             println!("x={x} y={y}");
 
             let actual = table.prod_exp(&x, &y).unwrap();
-            let expected =
-                (s.clone().pow_mod(&x, &N).unwrap() * t.clone().pow_mod(&y, &N).unwrap()) % &N;
+            let expected = (s.pow_mod_ref(&x, &N).unwrap() * t.pow_mod_ref(&y, &N).unwrap()) % &N;
             assert_eq!(actual, expected);
         }
     }

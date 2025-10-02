@@ -20,6 +20,7 @@
 - [Sync API](#sync-api)
 - [HD wallets support](#hd-wallets-support)
 - [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
+- [Big integer implementation](#big-integer-implementation)
 - [Differences between the implementation and CGGMP24](#differences-between-the-implementation-and-cggmp24)
 - [Timing attacks](#timing-attacks)
 - [Join us in Discord!](#join-us-in-discord)
@@ -231,6 +232,16 @@ from TSS.
 Such use-cases contradict to nature of MPC so we don't include those primitives by default.
 However, you may opt for them by enabling `spof` feature, then you can use `trusted_dealer`
 for key import and `key_share::reconstruct_secret_key` for key export.
+
+## Big integer implementation
+
+This protocol relies heavily on big integer arithmetic, and provides a
+choice between two backends: rug and num-bigint.
+
+- To use rug, select the feature `backend-rug`. This backend is faster, in
+some applications by several times, but requires an LGPL dependency
+- To use num-bigint, select the feature `backend-num-bigint` (selected as
+**default** feature)
 
 ## Differences between the implementation and CGGMP24
 [CGGMP24] only defines a non-threshold protocol. To support general thresholds,

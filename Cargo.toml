@@ -47,3 +47,9 @@ hd-wallet = { version = "0.6", default-features = false }
 
 generic-tests = "0.1"
 
+# Make the backend less slow in debug builds to speed up tests
+[profile.dev.package]
+num-bigint.opt-level = 3
+num-traits.opt-level = 3
+num-integer.opt-level = 3
+glass_pumpkin.opt-level = 3

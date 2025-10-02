@@ -4,8 +4,8 @@ use std::ops;
 use std::sync::Arc;
 
 use generic_ec::{Curve, NonZero, Point};
+use paillier_zk::backend::Integer;
 use paillier_zk::paillier_encryption_in_range as π_enc;
-use paillier_zk::rug::{Complete, Integer};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -93,8 +93,7 @@ impl<L: SecurityLevel> Validate for DirtyAuxInfo<L> {
 
     fn is_valid(&self) -> Result<(), InvalidKeyShare> {
         if self.pedersen_params.iter().any(|p| {
-            p.s.gcd_ref(&p.hat_N).complete() != *Integer::ONE
-                || p.t.gcd_ref(&p.hat_N).complete() != *Integer::ONE
+            p.s.gcd_ref(&p.hat_N) != Integer::one() || p.t.gcd_ref(&p.hat_N) != Integer::one()
         }) {
             return Err(InvalidKeyShareReason::StGcdN.into());
         }
@@ -230,7 +229,7 @@ impl PedersenParams {
     /// Note: CRT parameters contain secret information. Leaking them exposes secret Paillier key. Keep
     /// them secret (as well as rest of the key share).
     pub fn precompute_crt(&mut self, p: &Integer, q: &Integer) -> Result<(), InvalidKeyShare> {
-        if (p * q).complete() != self.hat_N {
+        if p * q != self.hat_N {
             return Err(InvalidKeyShareReason::CrtInvalidPq.into());
         }
         let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(p, q)
@@ -278,7 +277,7 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
         }
 
         let N_i = &aux.N[usize::from(core.i)];
-        if *N_i != (&aux.p * &aux.q).complete() {
+        if *N_i != &aux.p * &aux.q {
             return Err(InvalidKeyShareReason::PrimesMul.into());
         }
 
@@ -403,9 +402,9 @@ enum InvalidKeyShareReason {
     #[error("paillier secret key doesn't match security level (primes are too small)")]
     PaillierSkTooSmall,
     #[error("paillier public key of one of the signers doesn't match security level: required bit length = {required}, actual = {actual}")]
-    PaillierPkTooSmall { required: u32, actual: u32 },
+    PaillierPkTooSmall { required: u32, actual: u64 },
     #[error("pedersen module of one of the signers doesn't match security level: required bit length = {required}, actual = {actual}")]
-    PedersenModuleTooSmall { required: u32, actual: u32 },
+    PedersenModuleTooSmall { required: u32, actual: u64 },
     #[error("couldn't build a multiexp table")]
     BuildMultiexpTable,
     #[error("provided index `i` does not correspond to an index of the signer at key generation")]

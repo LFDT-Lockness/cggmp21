@@ -8,12 +8,12 @@ use rand_core::{CryptoRng, RngCore};
 use round_based::Mpc;
 use thiserror::Error;
 
+use crate::backend::Integer;
 use crate::utils;
 use crate::{
     errors::IoError, key_share::AuxInfo, progress::Tracer, security_level::SecurityLevel,
     utils::AbortBlame, ExecutionId,
 };
-use crate::{fast_paillier, rug::Integer};
 
 #[doc(no_inline)]
 pub use self::msg::Msg;
@@ -71,8 +71,7 @@ impl<L: SecurityLevel> PregeneratedPrimes<L> {
     /// Generates primes. Takes some time.
     pub fn generate<R: RngCore>(rng: &mut R) -> Self {
         Self {
-            primes: [(); 4]
-                .map(|_| fast_paillier::utils::generate_safe_prime(rng, L::RSA_PRIME_BITLEN)),
+            primes: [(); 4].map(|_| Integer::generate_safe_prime(rng, L::RSA_PRIME_BITLEN)),
             _phantom: std::marker::PhantomData,
         }
     }

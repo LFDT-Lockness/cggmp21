@@ -14,7 +14,7 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![forbid(unused_crate_dependencies)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 
 #[cfg(feature = "std")]

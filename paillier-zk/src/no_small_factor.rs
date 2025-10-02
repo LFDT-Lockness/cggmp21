@@ -11,13 +11,13 @@
 //! ## Example
 //!
 //! ```rust
-//! use rug::{Integer, Complete};
+//! use fast_paillier::backend::Integer;
 //! use paillier_zk::no_small_factor as p;
 //! # mod pregenerated {
 //! #     use super::*;
 //! #     paillier_zk::load_pregenerated_data!(
 //! #         verifier_aux: p::Aux,
-//! #         primes_1536bits: [rug::Integer; 4],
+//! #         primes_1536bits: [Integer; 4],
 //! #     );
 //! # }
 //!
@@ -38,8 +38,8 @@
 //! // 1. Prover prepares the data to obtain proof about
 //!
 //! let [p, q, ..] = pregenerated::primes_1536bits();
-//! let n = (&p * &q).complete();
-//! let n_root = n.sqrt_ref().complete();
+//! let n = &p * &q;
+//! let n_root = n.sqrt_ref().unwrap();
 //! let data = p::Data {
 //!     n: &n,
 //!     n_root: &n_root,
@@ -65,7 +65,7 @@
 //!
 //! # let recv = || (data.n, proof);
 //! let (n, proof) = recv();
-//! let n_root = n.sqrt_ref().complete();;
+//! let n_root = n.sqrt_ref().unwrap();
 //! let data = p::Data {
 //!     n: &n,
 //!     n_root: &n_root,
@@ -79,7 +79,7 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use rug::Integer;
+use fast_paillier::backend::Integer;
 
 pub use crate::common::{Aux, InvalidProof};
 
@@ -169,8 +169,8 @@ pub struct NiProof {
 
 /// Interactive version of the proof
 pub mod interactive {
+    use fast_paillier::backend::Integer;
     use rand_core::RngCore;
-    use rug::{Complete, Integer};
 
     use crate::{
         common::{fail_if, fail_if_ne, IntegerExt, InvalidProofReason},
@@ -190,26 +190,29 @@ pub mod interactive {
         security: &SecurityParams,
         mut rng: R,
     ) -> Result<(Commitment, PrivateCommitment), Error> {
-        let two_to_l = (Integer::ONE << security.l).complete();
-        let two_to_l_plus_e = (Integer::ONE << (security.l + security.epsilon)).complete();
-        let n_root_at_two_to_l_plus_e = (&two_to_l_plus_e * data.n_root).complete();
-        let aux_n_at_two_to_l = (&two_to_l * &aux.rsa_modulo).complete();
-        let aux_n_at_two_to_l_plus_e = (&two_to_l_plus_e * &aux.rsa_modulo).complete();
-        let n_at_aux_n = (&aux.rsa_modulo * data.n).complete();
+        let two_to_l = Integer::one() << security.l;
+        let two_to_l_plus_e = Integer::one() << (security.l + security.epsilon);
+        let n_root_at_two_to_l_plus_e = &two_to_l_plus_e * data.n_root;
+        let aux_n_at_two_to_l = &two_to_l * &aux.rsa_modulo;
+        let aux_n_at_two_to_l_plus_e = &two_to_l_plus_e * &aux.rsa_modulo;
+        let n_at_aux_n = &aux.rsa_modulo * data.n;
 
-        let alpha = Integer::from_rng_half_pm(&n_root_at_two_to_l_plus_e, &mut rng);
-        let beta = Integer::from_rng_half_pm(&n_root_at_two_to_l_plus_e, &mut rng);
-        let mu = Integer::from_rng_half_pm(&aux_n_at_two_to_l, &mut rng);
-        let nu = Integer::from_rng_half_pm(&aux_n_at_two_to_l, &mut rng);
-        let r = Integer::from_rng_half_pm(&(&two_to_l_plus_e * &n_at_aux_n).complete(), &mut rng);
-        let x = Integer::from_rng_half_pm(&aux_n_at_two_to_l_plus_e, &mut rng);
-        let y = Integer::from_rng_half_pm(&aux_n_at_two_to_l_plus_e, &mut rng);
+        let alpha = Integer::from_rng_half_pm(&mut rng, &n_root_at_two_to_l_plus_e);
+        let beta = Integer::from_rng_half_pm(&mut rng, &n_root_at_two_to_l_plus_e);
+        let mu = Integer::from_rng_half_pm(&mut rng, &aux_n_at_two_to_l);
+        let nu = Integer::from_rng_half_pm(&mut rng, &aux_n_at_two_to_l);
+        let r = Integer::from_rng_half_pm(&mut rng, &(&two_to_l_plus_e * &n_at_aux_n));
+        let x = Integer::from_rng_half_pm(&mut rng, &aux_n_at_two_to_l_plus_e);
+        let y = Integer::from_rng_half_pm(&mut rng, &aux_n_at_two_to_l_plus_e);
 
         let p = aux.combine(pdata.p, &mu)?;
         let q = aux.combine(pdata.q, &nu)?;
         let a = aux.combine(&alpha, &x)?;
         let b = aux.combine(&beta, &y)?;
-        let t = aux.rsa_modulo.combine(&q, &alpha, &aux.t, &r)?;
+        let t = aux
+            .rsa_modulo
+            .combine(&q, &alpha, &aux.t, &r)
+            .ok_or_else(crate::BadExponent::undefined)?;
 
         let commitment = Commitment { p, q, a, b, t };
         let private_commitment = PrivateCommitment {
@@ -228,7 +231,7 @@ pub mod interactive {
     ///
     /// `security` parameter is used to generate challenge in correct range
     pub fn challenge<R: RngCore>(security: &SecurityParams, rng: &mut R) -> Challenge {
-        Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), rng)
+        Integer::from_rng_half_pm(rng, &(Integer::one() << security.l))
     }
 
     /// Compute proof for given data and prior protocol values
@@ -238,11 +241,11 @@ pub mod interactive {
         challenge: &Challenge,
     ) -> Result<Proof, Error> {
         Ok(Proof {
-            z1: (&pcomm.alpha + challenge * pdata.p).complete(),
-            z2: (&pcomm.beta + challenge * pdata.q).complete(),
-            w1: (&pcomm.x + challenge * &pcomm.mu).complete(),
-            w2: (&pcomm.y + challenge * &pcomm.nu).complete(),
-            v: &pcomm.r - challenge * (&pcomm.nu * pdata.p).complete(),
+            z1: &pcomm.alpha + challenge * pdata.p,
+            z2: &pcomm.beta + challenge * pdata.q,
+            w1: &pcomm.x + challenge * &pcomm.mu,
+            w2: &pcomm.y + challenge * &pcomm.nu,
+            v: &pcomm.r - challenge * (&pcomm.nu * pdata.p),
         })
     }
 
@@ -313,14 +316,15 @@ pub mod interactive {
             let lhs = (q_to_z1 * t_to_v).modulo(&aux.rsa_modulo);
             let rhs = aux
                 .rsa_modulo
-                .combine(&commitment.t, Integer::ONE, &r, challenge)?;
+                .combine(&commitment.t, &Integer::one(), &r, challenge)
+                .ok_or_else(crate::BadExponent::undefined)?;
             fail_if_ne(InvalidProofReason::EqualityCheck(10), &lhs, &rhs)?;
             fail_if(
                 InvalidProofReason::MultGroupCheck(11),
                 aux.is_in_mult_group(&lhs),
             )?;
         }
-        let range = (Integer::from(1) << (security.l + security.epsilon)) * data.n_root;
+        let range = (Integer::from(1_u32) << (security.l + security.epsilon)) * data.n_root;
         // range check for z1
         fail_if(
             InvalidProofReason::RangeCheck(12),
@@ -404,7 +408,7 @@ pub mod non_interactive {
 
 #[cfg(test)]
 mod test {
-    use rug::{Complete, Integer};
+    use fast_paillier::backend::Integer;
 
     use crate::common::test::generate_blum_prime;
     use crate::common::InvalidProofReason;
@@ -422,14 +426,14 @@ mod test {
         let mut rng = rand_dev::DevRng::new();
         let p = generate_blum_prime(&mut rng, n_bitlen / 2);
         let q = generate_blum_prime(&mut rng, n_bitlen / 2);
-        let n = (&p * &q).complete();
-        let n_root = n.sqrt_ref().complete();
+        let n = &p * &q;
+        let n_root = n.sqrt_ref().unwrap();
         let data = super::Data {
             n: &n,
             n_root: &n_root,
         };
 
-        assert!(n.significant_bits() >= n_bitlen - 1);
+        assert!(n.significant_bits() >= u64::from(n_bitlen) - 1);
 
         let aux = crate::common::test::aux(&mut rng);
         let shared_state = "shared state";
@@ -462,14 +466,14 @@ mod test {
         let mut rng = rand_dev::DevRng::new();
         let p = generate_blum_prime(&mut rng, n_bitlen - (security.l as u32) / 2);
         let q = generate_blum_prime(&mut rng, security.l as u32 / 2);
-        let n = (&p * &q).complete();
-        let n_root = n.sqrt_ref().complete();
+        let n = &p * &q;
+        let n_root = n.sqrt_ref().unwrap();
         let data = super::Data {
             n: &n,
             n_root: &n_root,
         };
 
-        assert!(n.significant_bits() >= n_bitlen - 1);
+        assert!(n.significant_bits() >= u64::from(n_bitlen) - 1);
 
         let aux = crate::common::test::aux(&mut rng);
         let shared_state = "shared state";
@@ -492,14 +496,14 @@ mod test {
 
     #[test]
     fn test_sqrt() {
-        assert_eq!(Integer::from(1).sqrt(), Integer::from(1));
-        assert_eq!(Integer::from(2).sqrt(), Integer::from(1));
-        assert_eq!(Integer::from(3).sqrt(), Integer::from(1));
-        assert_eq!(Integer::from(4).sqrt(), Integer::from(2));
-        assert_eq!(Integer::from(5).sqrt(), Integer::from(2));
-        assert_eq!(Integer::from(6).sqrt(), Integer::from(2));
-        assert_eq!(Integer::from(7).sqrt(), Integer::from(2));
-        assert_eq!(Integer::from(8).sqrt(), Integer::from(2));
-        assert_eq!(Integer::from(9).sqrt(), Integer::from(3));
+        assert_eq!(Integer::from(1).sqrt().unwrap(), Integer::from(1));
+        assert_eq!(Integer::from(2).sqrt().unwrap(), Integer::from(1));
+        assert_eq!(Integer::from(3).sqrt().unwrap(), Integer::from(1));
+        assert_eq!(Integer::from(4).sqrt().unwrap(), Integer::from(2));
+        assert_eq!(Integer::from(5).sqrt().unwrap(), Integer::from(2));
+        assert_eq!(Integer::from(6).sqrt().unwrap(), Integer::from(2));
+        assert_eq!(Integer::from(7).sqrt().unwrap(), Integer::from(2));
+        assert_eq!(Integer::from(8).sqrt().unwrap(), Integer::from(2));
+        assert_eq!(Integer::from(9).sqrt().unwrap(), Integer::from(3));
     }
 }

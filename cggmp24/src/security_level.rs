@@ -9,7 +9,7 @@
 //! analyzed the CGGMP paper and you understand implications. Inconsistent security level may cause unexpected
 //! unverbose runtime error or reduced security of the protocol.
 
-use crate::rug::Integer;
+use crate::backend::Integer;
 
 /// Security level of CGGMP24 DKG protocol
 pub use cggmp24_keygen::security_level::SecurityLevel as KeygenSecurityLevel;
@@ -63,7 +63,7 @@ pub fn max_exponents_size<L: SecurityLevel>() -> (u32, u32) {
 #[doc(hidden)]
 pub mod _internal {
 
-    pub use crate::rug::Integer;
+    pub use crate::backend::Integer;
     pub use cggmp24_keygen::security_level::{
         define_security_level as define_keygen_security_level, SecurityLevel as KeygenSecurityLevel,
     };
@@ -78,7 +78,6 @@ pub mod _internal {
 /// choice of parameters is random, it does not correspond to meaningful security level):
 /// ```rust
 /// use cggmp24::security_level::define_security_level;
-/// use cggmp24::rug::Integer;
 ///
 /// #[derive(Clone)]
 /// pub struct MyLevel;
@@ -167,10 +166,10 @@ define_security_level!(SecurityLevel128 {
 
 /// Checks that public paillier key meets security level constraints
 pub(crate) fn validate_public_paillier_key_size<L: SecurityLevel>(N: &Integer) -> bool {
-    N.significant_bits() >= L::RSA_PUBKEY_BITLEN
+    N.significant_bits() >= u64::from(L::RSA_PUBKEY_BITLEN)
 }
 
 /// Checks that a prime, that is a part of secret paillier key, meets security level constraints
 pub(crate) fn validate_secret_paillier_prime_size<L: SecurityLevel>(prime: &Integer) -> bool {
-    prime.significant_bits() >= L::RSA_PRIME_BITLEN
+    prime.significant_bits() >= u64::from(L::RSA_PRIME_BITLEN)
 }

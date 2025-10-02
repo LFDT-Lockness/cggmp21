@@ -2,8 +2,8 @@ pub mod sqrt;
 
 use std::sync::Arc;
 
+use fast_paillier::backend::Integer;
 use generic_ec::Scalar;
-use rug::Integer;
 
 /// Auxiliary data known to both prover and verifier
 #[cfg_attr(
@@ -47,7 +47,9 @@ impl Aux {
         }
 
         // Naive exponentiation when optimizations are not enabled
-        self.rsa_modulo.combine(&self.s, x, &self.t, y)
+        self.rsa_modulo
+            .combine(&self.s, x, &self.t, y)
+            .ok_or_else(BadExponent::undefined)
     }
 
     /// Returns `x^e mod rsa_modulo`
@@ -59,24 +61,22 @@ impl Aux {
             }
             None => Ok(x
                 .pow_mod_ref(e, &self.rsa_modulo)
-                .ok_or_else(BadExponent::undefined)?
-                .into()),
+                .ok_or_else(BadExponent::undefined)?),
         }
     }
 
     /// Checks if `x` is in multiplicative group Z<super>*</super><sub>N</sub> where `N = ` [`rsa_modulo`](Self::rsa_modulo)
     pub fn is_in_mult_group(&self, x: &Integer) -> bool {
-        x.is_in_mult_group(&self.rsa_modulo)
+        x.in_mult_group_of(&self.rsa_modulo)
     }
 
     /// Returns a stripped version of `Aux` that contains only public data which can be digested
     /// via [`udigest::Digestable`]
     pub fn digest_public_data(&self) -> impl udigest::Digestable {
-        let order = rug::integer::Order::Msf;
         udigest::inline_struct!("paillier_zk.aux" {
-            s: udigest::Bytes(self.s.to_digits::<u8>(order)),
-            t: udigest::Bytes(self.t.to_digits::<u8>(order)),
-            rsa_modulo: udigest::Bytes(self.rsa_modulo.to_digits::<u8>(order)),
+            s: udigest::Bytes(self.s.to_bytes_msf()),
+            t: udigest::Bytes(self.t.to_bytes_msf()),
+            rsa_modulo: udigest::Bytes(self.rsa_modulo.to_bytes_msf()),
         })
     }
 }
@@ -156,15 +156,6 @@ impl From<PaillierError> for InvalidProof {
 pub struct PaillierError;
 
 pub trait IntegerExt: Sized {
-    /// Generate element in Zm*. Does so by trial.
-    fn gen_invertible<R: rand_core::RngCore>(modulo: &Self, rng: &mut R) -> Self;
-
-    /// Checks if `self` is in Z<super>*</super><sub>N</sub> group
-    fn is_in_mult_group(&self, n: &Self) -> bool;
-
-    /// Compute l^le * r^re modulo self
-    fn combine(&self, l: &Self, le: &Self, r: &Self, re: &Self) -> Result<Self, BadExponent>;
-
     /// Embed BigInt into chosen scalar type
     fn to_scalar<C: generic_ec::Curve>(&self) -> Scalar<C>;
 
@@ -174,7 +165,7 @@ pub trait IntegerExt: Sized {
     /// Generates a random integer in interval
     /// `[-range/2; range/2]` if range is even
     /// `[-(range-1)/2; (range-1)/2]` if range is odd
-    fn from_rng_half_pm<R: rand_core::RngCore>(range: &Self, rng: &mut R) -> Self;
+    fn from_rng_half_pm<R: rand_core::RngCore>(rng: &mut R, range: &Self) -> Self;
 
     /// Checks whether `self` is in interval
     /// `[-range/2; range/2]` when range is even
@@ -183,28 +174,8 @@ pub trait IntegerExt: Sized {
 }
 
 impl IntegerExt for Integer {
-    fn gen_invertible<R: rand_core::RngCore>(modulo: &Integer, rng: &mut R) -> Self {
-        fast_paillier::utils::sample_in_mult_group(rng, modulo)
-    }
-
-    fn is_in_mult_group(&self, n: &Self) -> bool {
-        fast_paillier::utils::in_mult_group(self, n)
-    }
-
-    fn combine(&self, l: &Self, le: &Self, r: &Self, re: &Self) -> Result<Self, BadExponent> {
-        let l_to_le: Integer = l
-            .pow_mod_ref(le, self)
-            .ok_or_else(BadExponent::undefined)?
-            .into();
-        let r_to_re: Integer = r
-            .pow_mod_ref(re, self)
-            .ok_or_else(BadExponent::undefined)?
-            .into();
-        Ok((l_to_le * r_to_re).modulo(self))
-    }
-
     fn to_scalar<C: generic_ec::Curve>(&self) -> Scalar<C> {
-        let bytes_be = self.to_digits::<u8>(rug::integer::Order::Msf);
+        let bytes_be = self.to_bytes_msf();
         let s = Scalar::<C>::from_be_bytes_mod_order(bytes_be);
         if self.cmp0().is_ge() {
             s
@@ -215,35 +186,28 @@ impl IntegerExt for Integer {
 
     fn curve_order<C: generic_ec::Curve>() -> Self {
         let order_minus_one = -Scalar::<C>::one();
-        let i = Integer::from_digits(&order_minus_one.to_be_bytes(), rug::integer::Order::Msf);
+        let i = Integer::from_bytes_msf(&order_minus_one.to_be_bytes());
         i + 1
     }
 
-    fn from_rng_half_pm<R: rand_core::RngCore>(range: &Self, rng: &mut R) -> Self {
-        let mut rng = fast_paillier::utils::external_rand(rng);
-
+    fn from_rng_half_pm<R: rand_core::RngCore>(rng: &mut R, range: &Self) -> Self {
         if range.is_even() {
-            let half_range = range.clone() >> 1u32;
-            let range_plus_one = range.clone() + Integer::ONE;
-            return range_plus_one.random_below(&mut rng) - half_range;
+            let half_range = range >> 1u32;
+            let range_plus_one = range + 1u32;
+            range_plus_one.random_below(rng) - half_range
+        } else {
+            // range is odd, so half of the range minus one is range / 2
+            let half_range_minus_one = range >> 1u32;
+            range.random_below_ref(rng) - half_range_minus_one
         }
-
-        let range_minus_one = range.clone() - Integer::ONE;
-        let half_range_minus_one = range_minus_one >> 1u32;
-        range.clone().random_below(&mut rng) - half_range_minus_one
     }
 
     fn is_in_half_pm(&self, range: &Self) -> bool {
-        if range.is_even() {
-            let upper_bound = range.clone() >> 1u32;
-            let lower_bound = -upper_bound.clone();
-            return lower_bound <= *self && *self <= upper_bound;
-        }
-
-        let range_minus_one = range.clone() - Integer::ONE;
-        let upper_bound = range_minus_one >> 1u32;
-        let lower_bound = -upper_bound.clone();
-        lower_bound <= *self && *self <= upper_bound
+        // If range is even, range >> 1 is exactly range / 2
+        // If range is odd, range >> 1 == (range - 1) >> 1 == (range - 1) / 2 as
+        // the lowest bit is discarded either way
+        let bound = range >> 1u32;
+        self.cmp_abs(&bound).is_le()
     }
 }
 
@@ -267,7 +231,7 @@ enum BadExponentReason {
     Undefined,
     #[error("multiexp error: exponent size is too large (exponents size: {exp_size:?}, max exponent size: {max_exp_size:?})")]
     ExpSize {
-        exp_size: (u32, u32),
+        exp_size: (u64, u64),
         max_exp_size: (usize, usize),
     },
 }
@@ -291,14 +255,14 @@ pub fn fail_if_ne<T: PartialEq, E>(err: E, lhs: T, rhs: T) -> Result<(), E> {
 }
 
 pub mod encoding {
-    /// Digests a rug integer
+    /// Digests a fast-paillier backend integer
     pub struct Integer;
-    impl udigest::DigestAs<rug::Integer> for Integer {
+    impl udigest::DigestAs<fast_paillier::backend::Integer> for Integer {
         fn digest_as<B: udigest::Buffer>(
-            value: &rug::Integer,
+            value: &fast_paillier::backend::Integer,
             encoder: udigest::encoding::EncodeValue<B>,
         ) {
-            let digits = value.to_digits::<u8>(rug::integer::Order::Msf);
+            let digits = value.to_bytes_msf();
             encoder.encode_leaf_value(digits)
         }
     }
@@ -318,9 +282,7 @@ pub mod encoding {
 /// A common logic shared across tests and doctests
 #[cfg(test)]
 pub mod test {
-    use rug::{Complete, Integer};
-
-    use super::IntegerExt;
+    use fast_paillier::backend::Integer;
 
     pub fn random_key<R: rand_core::RngCore>(rng: &mut R) -> Option<fast_paillier::DecryptionKey> {
         let p = generate_blum_prime(rng, 1024);
@@ -331,15 +293,15 @@ pub mod test {
     pub fn aux<R: rand_core::RngCore>(rng: &mut R) -> super::Aux {
         let p = generate_blum_prime(rng, 1024);
         let q = generate_blum_prime(rng, 1024);
-        let n = (&p * &q).complete();
+        let n = &p * &q;
 
         let (s, t) = {
-            let phi_n = (p.clone() - 1u8) * (q.clone() - 1u8);
-            let r = Integer::gen_invertible(&n, rng);
-            let lambda = phi_n.random_below(&mut fast_paillier::utils::external_rand(rng));
+            let phi_n = (p - 1u8) * (q - 1u8);
+            let r = Integer::sample_in_mult_group_of(rng, &n);
+            let lambda = phi_n.random_below(rng);
 
             let t = r.square().modulo(&n);
-            let s = t.pow_mod_ref(&lambda, &n).unwrap().into();
+            let s = t.pow_mod_ref(&lambda, &n).unwrap();
 
             (s, t)
         };
@@ -355,25 +317,17 @@ pub mod test {
 
     pub fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) -> Integer {
         loop {
-            let n = generate_prime(rng, bits_size);
+            let n = Integer::generate_prime(rng, bits_size);
             if n.mod_u(4) == 3 {
                 break n;
             }
         }
     }
-
-    pub fn generate_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) -> Integer {
-        let mut n: Integer =
-            Integer::random_bits(bits_size, &mut fast_paillier::utils::external_rand(rng)).into();
-        n.set_bit(bits_size - 1, true);
-        n.next_prime_mut();
-        n
-    }
 }
 
 #[cfg(test)]
 mod _test {
-    use rug::Integer;
+    use fast_paillier::backend::Integer;
 
     use super::IntegerExt;
 
@@ -383,11 +337,11 @@ mod _test {
 
         let bytes = [123u8, 231u8];
         let int = u16::from_be_bytes(bytes);
-        let bn = rug::Integer::from(int);
+        let bn = Integer::from(int);
         let scalar = bn.to_scalar();
         assert_eq!(scalar, generic_ec::Scalar::<E>::from(int));
 
-        assert_eq!(bn.to_digits::<u8>(rug::integer::Order::Msf), &bytes);
+        assert_eq!(bn.to_bytes_msf(), &bytes);
 
         let curve_order = Integer::curve_order::<E>();
         assert_eq!(curve_order.to_scalar(), generic_ec::Scalar::<E>::zero());
@@ -409,8 +363,8 @@ mod _test {
         aux.multiexp = Some(table);
 
         // Corner case: upper bound
-        let x_max = (Integer::ONE.clone() << x_bits) - 1;
-        let y_max = (Integer::ONE.clone() << y_bits) - 1;
+        let x_max = (Integer::one() << x_bits) - 1;
+        let y_max = (Integer::one() << y_bits) - 1;
         let actual = aux.combine(&x_max, &y_max).unwrap();
         let expected = aux
             .rsa_modulo
@@ -419,8 +373,8 @@ mod _test {
         assert_eq!(actual, expected);
 
         // Corner case: lower bound
-        let x_min = -x_max.clone();
-        let y_min = -y_max.clone();
+        let x_min = -&x_max;
+        let y_min = -&y_max;
         let actual = aux.combine(&x_min, &y_min).unwrap();
         let expected = aux
             .rsa_modulo
@@ -429,13 +383,12 @@ mod _test {
         assert_eq!(actual, expected);
 
         // Random integers within the range
-        let mut rng = fast_paillier::utils::external_rand(&mut rng);
         for _ in 0..100 {
-            let x = (x_max.clone() + 1u8).random_below(&mut rng);
-            let y = (y_max.clone() + 1u8).random_below(&mut rng);
+            let x = (&x_max + 1u32).random_below(&mut rng);
+            let y = (&y_max + 1u32).random_below(&mut rng);
 
-            let x = if rng.bits(1) == 1 { x } else { -x };
-            let y = if rng.bits(1) == 1 { y } else { -y };
+            let x = if rand::Rng::gen(&mut rng) { x } else { -x };
+            let y = if rand::Rng::gen(&mut rng) { y } else { -y };
 
             println!("x: {x}");
             println!("y: {y}");
@@ -451,19 +404,19 @@ mod _test {
         let mut rng = rand_dev::DevRng::new();
         // Testing even case
         let range = Integer::from(10);
-        let upper_bound = range.clone() >> 1u32;
-        let lower_bound = -upper_bound.clone();
+        let upper_bound = &range >> 1u32;
+        let lower_bound = -&upper_bound;
         let mut min = Integer::from(0);
         let mut max = Integer::from(0);
 
         // Obtaining lower and upper bounds
         for _ in 0..10000 {
-            let value = Integer::from_rng_half_pm(&range, &mut rng);
+            let value = Integer::from_rng_half_pm(&mut rng, &range);
             if value > max {
-                max = value.clone();
+                max.clone_from(&value);
             }
             if value < min {
-                min = value.clone();
+                min.clone_from(&value);
             }
         }
 
@@ -478,20 +431,20 @@ mod _test {
 
         // Testing odd case
         let range = Integer::from(9);
-        let range_minus_one = range.clone() - Integer::ONE.clone();
+        let range_minus_one = &range - Integer::one();
         let upper_bound = range_minus_one >> 1u32;
-        let lower_bound = -upper_bound.clone();
+        let lower_bound = -&upper_bound;
         let mut min = Integer::from(0);
         let mut max = Integer::from(0);
 
         // Obtaining lower and upper bounds
         for _ in 0..10000 {
-            let value = Integer::from_rng_half_pm(&range, &mut rng);
+            let value = Integer::from_rng_half_pm(&mut rng, &range);
             if value > max {
-                max = value.clone();
+                max.clone_from(&value);
             }
             if value < min {
-                min = value.clone();
+                min.clone_from(&value);
             }
         }
 

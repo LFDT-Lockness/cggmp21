@@ -25,7 +25,6 @@
 use std::{iter, marker::PhantomData};
 
 use generic_ec::{Curve, NonZero, SecretScalar};
-use paillier_zk::rug::Complete;
 use rand_core::{CryptoRng, RngCore};
 use thiserror::Error;
 
@@ -205,7 +204,7 @@ pub fn generate_aux_data_with_primes<L: SecurityLevel, R: RngCore + CryptoRng>(
         .iter()
         .map(|primes| {
             let [p, q, hat_p, hat_q] = primes.primes_ref();
-            let N = (p * q).complete();
+            let N = p * q;
 
             let (mut params, _phi, _lambda) =
                 utils::generate_pedersen_params(rng, hat_p.clone(), hat_q.clone())?;

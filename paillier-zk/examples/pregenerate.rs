@@ -3,9 +3,7 @@
 //! This example shows how aux data can be generated to set up proofs. Generated data is used by doctests.
 
 use anyhow::{Context, Result};
-use rug::{Complete, Integer};
-
-use paillier_zk::IntegerExt;
+use fast_paillier::backend::Integer;
 
 fn main() -> Result<()> {
     let mut rng = rand_core::OsRng;
@@ -22,12 +20,12 @@ fn main() -> Result<()> {
     {
         let p = generate_blum_prime(&mut rng, 1536);
         let q = generate_blum_prime(&mut rng, 1536);
-        let n = (&p * &q).complete();
+        let n = &p * &q;
 
         let (s, t) = {
             let phi_n = (p.clone() - 1u8) * (q.clone() - 1u8);
-            let r = Integer::gen_invertible(&n, &mut rng);
-            let lambda = phi_n.random_below(&mut fast_paillier::utils::external_rand(&mut rng));
+            let r = Integer::sample_in_mult_group_of(&mut rng, &n);
+            let lambda = phi_n.random_below(&mut rng);
 
             let t = r.square().modulo(&n);
             let s = t.pow_mod_ref(&lambda, &n).unwrap().into();
@@ -101,10 +99,7 @@ fn generate_paillier_key(
 /// Safe primes can be generated using [`fast_paillier::utils::generate_safe_prime`]
 fn generate_blum_prime(rng: &mut impl rand_core::RngCore, bits_size: u32) -> Integer {
     loop {
-        let mut n: Integer =
-            Integer::random_bits(bits_size, &mut fast_paillier::utils::external_rand(rng)).into();
-        n.set_bit(bits_size - 1, true);
-        n.next_prime_mut();
+        let n = Integer::generate_prime(rng, bits_size);
         if n.mod_u(4) == 3 {
             break n;
         }

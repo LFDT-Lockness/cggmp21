@@ -1,11 +1,7 @@
 //! Пprm or Rprm in the paper. Proof that s ⋮ t modulo N. Non-interactive
 //! version only.
 use digest::Digest;
-use paillier_zk::{
-    fast_paillier::utils,
-    rug::{Complete, Integer},
-    IntegerExt,
-};
+use paillier_zk::backend::Integer;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -89,11 +85,10 @@ pub fn prove<const M: usize, D: Digest>(
     phi: &Integer,
     lambda: &Integer,
 ) -> Result<Proof<M>, ZkError> {
-    let private_commitment =
-        [(); M].map(|()| phi.random_below_ref(&mut utils::external_rand(rng)).into());
+    let private_commitment = [(); M].map(|()| phi.random_below_ref(rng));
     let commitment = private_commitment
         .clone()
-        .map(|a| data.t.pow_mod_ref(&a, data.N).map(|r| r.into()));
+        .map(|a| data.t.pow_mod_ref(&a, data.N));
     // TODO: since array::try_map is not stable yet, we have to be hacky here
     let commitment = if commitment.iter().any(Option::is_none) {
         return Err(Reason::PowMod.into());
@@ -123,14 +118,14 @@ pub fn verify<const M: usize, D: Digest>(
     proof: &Proof<M>,
 ) -> Result<(), InvalidProof> {
     // Verify that inputs are in expected domains
-    if !data.s.is_in_mult_group(data.N) {
+    if !data.s.in_mult_group_of(data.N) {
         return Err(InvalidProof);
     }
-    if !data.t.is_in_mult_group(data.N) {
+    if !data.t.in_mult_group_of(data.N) {
         return Err(InvalidProof);
     }
     for (A_i, z_i) in proof.commitment.iter().zip(&proof.zs) {
-        if !A_i.is_in_mult_group(data.N) || z_i.is_negative() || z_i >= data.N {
+        if !A_i.in_mult_group_of(data.N) || z_i.cmp0().is_lt() || z_i >= data.N {
             return Err(InvalidProof);
         }
     }
@@ -138,9 +133,9 @@ pub fn verify<const M: usize, D: Digest>(
     // Verify statement
     let challenge: Challenge<M> = derive_challenge::<M, D>(shared_state, data, &proof.commitment);
     for ((z, a), e) in proof.zs.iter().zip(&proof.commitment).zip(&challenge.es) {
-        let lhs: Integer = data.t.pow_mod_ref(z, data.N).ok_or(InvalidProof)?.into();
+        let lhs: Integer = data.t.pow_mod_ref(z, data.N).ok_or(InvalidProof)?;
         if *e {
-            let rhs = (data.s * a).complete().modulo(data.N);
+            let rhs = (data.s * a).modulo(data.N);
             if lhs != rhs {
                 return Err(InvalidProof);
             }
@@ -168,10 +163,7 @@ pub struct InvalidProof;
 // running with M=64 completed in 1.22 on my machine in debug build
 #[cfg(test)]
 mod test {
-    use paillier_zk::{
-        rug::{Complete, Integer},
-        IntegerExt,
-    };
+    use paillier_zk::backend::Integer;
 
     use crate::utils;
 
@@ -184,15 +176,13 @@ mod test {
 
         let p = utils::generate_blum_prime(&mut rng, 256);
         let q = utils::generate_blum_prime(&mut rng, 256);
-        let n = (&p * &q).complete();
-        let phi = (&p - 1u8).complete() * (&q - 1u8).complete();
+        let n = &p * &q;
+        let phi = (&p - 1u8) * (&q - 1u8);
 
-        let r = Integer::gen_invertible(&n, &mut rng);
-        let lambda = phi
-            .random_below_ref(&mut utils::external_rand(&mut rng))
-            .into();
+        let r = Integer::sample_in_mult_group_of(&mut rng, &n);
+        let lambda = phi.random_below_ref(&mut rng);
         let t = r.square().modulo(&n);
-        let s = t.pow_mod_ref(&lambda, &n).unwrap().into();
+        let s = t.pow_mod_ref(&lambda, &n).unwrap();
 
         let data = super::Data {
             N: &n,
@@ -212,15 +202,13 @@ mod test {
 
         let p = utils::generate_blum_prime(&mut rng, 256);
         let q = utils::generate_blum_prime(&mut rng, 256);
-        let n = (&p * &q).complete();
-        let phi = (&p - 1u8).complete() * (&q - 1u8).complete();
+        let n = &p * &q;
+        let phi = (&p - 1u8) * (&q - 1u8);
 
-        let r = Integer::gen_invertible(&n, &mut rng);
-        let lambda = phi
-            .random_below_ref(&mut utils::external_rand(&mut rng))
-            .into();
+        let r = Integer::sample_in_mult_group_of(&mut rng, &n);
+        let lambda = phi.random_below_ref(&mut rng);
         let t = r.square().modulo(&n);
-        let correct_s: Integer = t.pow_mod_ref(&lambda, &n).unwrap().into();
+        let correct_s = t.pow_mod_ref(&lambda, &n).unwrap();
         let s = (correct_s + 1u8).modulo(&n);
 
         let data = super::Data {

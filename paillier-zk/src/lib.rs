@@ -28,7 +28,7 @@ pub mod _doctest;
 
 use common::InvalidProofReason;
 pub use common::{BadExponent, IntegerExt, InvalidProof, PaillierError};
-pub use {fast_paillier, rug, rug::Integer};
+pub use fast_paillier::{self, backend};
 
 /// Library general error type
 #[derive(Debug, Error)]

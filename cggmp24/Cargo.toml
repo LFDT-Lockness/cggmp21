@@ -46,6 +46,8 @@ rand_dev = { workspace = true }
 generic-tests = { workspace = true }
 
 [features]
+default = ["backend-num-bigint"]
+
 all-curves = ["curve-secp256k1", "curve-secp256r1", "curve-stark"]
 curve-secp256k1 = ["generic-ec/curve-secp256k1", "hd-wallet?/curve-secp256k1"]
 curve-secp256r1 = ["generic-ec/curve-secp256r1", "hd-wallet?/curve-secp256r1"]
@@ -54,6 +56,9 @@ hd-wallet = ["dep:hd-wallet", "cggmp24-keygen/hd-wallet"]
 hd-slip10 = ["hd-wallet/slip10"]
 hd-stark = ["hd-wallet/stark"]
 spof = ["key-share/spof"]
+
+backend-rug = ["paillier-zk/backend-rug"]
+backend-num-bigint = ["paillier-zk/backend-num-bigint"]
 
 # Exposes insecure API which may lead to security vulnerabilities when used inappropriately. Only
 # for advanced users. Be sure you fully understand the implications if you enable this feature.

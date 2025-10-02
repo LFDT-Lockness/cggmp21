@@ -4,12 +4,11 @@ use digest::Digest;
 use futures::SinkExt;
 use generic_ec::{coords::AlwaysHasAffineX, Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::polynomial::lagrange_coefficient_at_zero;
-use paillier_zk::rug::Complete;
+use paillier_zk::{backend::Integer, fast_paillier};
 use paillier_zk::{
     dlog_with_el_gamal_commitment as pi_elog, paillier_affine_operation_in_range as pi_aff,
     paillier_encryption_in_range_with_el_gamal as pi_enc_elg, IntegerExt,
 };
-use paillier_zk::{fast_paillier, rug::Integer};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -829,8 +828,8 @@ where
     let gamma_i = SecretScalar::<E>::random(rng);
     let k_i = SecretScalar::<E>::random(rng);
 
-    let v_i = Integer::gen_invertible(dec_i.n(), rng);
-    let rho_i = Integer::gen_invertible(dec_i.n(), rng);
+    let v_i = Integer::sample_in_mult_group_of(rng, dec_i.n());
+    let rho_i = Integer::sample_in_mult_group_of(rng, dec_i.n());
 
     tracer.stage("Encrypt G_i and K_i");
     let G_i = dec_i
@@ -1069,7 +1068,7 @@ where
     .map_err(|e| Bug::PiElog(BugSource::psi, e))?;
     runtime.yield_now().await;
 
-    let J = (Integer::ONE << L::ELL_PRIME).complete();
+    let J = Integer::one() << L::ELL_PRIME;
 
     let mut beta_sum = Scalar::zero();
     let mut hat_beta_sum = Scalar::zero();
@@ -1078,25 +1077,13 @@ where
         let R_j = &R[usize::from(j)];
         let enc_j = &N[usize::from(j)];
 
-        let r_ij = dec_i
-            .n()
-            .random_below_ref(&mut utils::external_rand(rng))
-            .into();
-        let hat_r_ij = dec_i
-            .n()
-            .random_below_ref(&mut utils::external_rand(rng))
-            .into();
-        let s_ij = enc_j
-            .n()
-            .random_below_ref(&mut utils::external_rand(rng))
-            .into();
-        let hat_s_ij = enc_j
-            .n()
-            .random_below_ref(&mut utils::external_rand(rng))
-            .into();
+        let r_ij = dec_i.n().random_below_ref(rng);
+        let hat_r_ij = dec_i.n().random_below_ref(rng);
+        let s_ij = enc_j.n().random_below_ref(rng);
+        let hat_s_ij = enc_j.n().random_below_ref(rng);
 
-        let beta_ij = Integer::from_rng_half_pm(&J, rng);
-        let hat_beta_ij = Integer::from_rng_half_pm(&J, rng);
+        let beta_ij = Integer::from_rng_half_pm(rng, &J);
+        let hat_beta_ij = Integer::from_rng_half_pm(rng, &J);
 
         beta_sum += beta_ij.to_scalar();
         hat_beta_sum += hat_beta_ij.to_scalar();
@@ -1108,7 +1095,7 @@ where
                 .omul(&utils::scalar_to_pm_bignumber(&gamma_i), &ciphertext_j.K)
                 .map_err(|_| Bug::PaillierOp(BugSource::gamma_i_times_K_j))?;
             let neg_beta_ij_enc = enc_j
-                .encrypt_with(&(-&beta_ij).complete(), &s_ij)
+                .encrypt_with(&-&beta_ij, &s_ij)
                 .map_err(|_| Bug::PaillierEnc(BugSource::neg_beta_ij_enc))?;
             enc_j
                 .oadd(&gamma_i_times_K_j, &neg_beta_ij_enc)
@@ -1117,7 +1104,7 @@ where
 
         tracer.stage("Encrypt F_ji");
         let F_ji = dec_i
-            .encrypt_with(&(-&beta_ij).complete(), &r_ij)
+            .encrypt_with(&-&beta_ij, &r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::F_ji))?;
 
         tracer.stage("Encrypt hat_D_ji");
@@ -1127,7 +1114,7 @@ where
                 .omul(&utils::scalar_to_pm_bignumber(x_i), &ciphertext_j.K)
                 .map_err(|_| Bug::PaillierOp(BugSource::x_i_times_K_j))?;
             let neg_hat_beta_ij_enc = enc_j
-                .encrypt_with(&(-&hat_beta_ij).complete(), &hat_s_ij)
+                .encrypt_with(&-&hat_beta_ij, &hat_s_ij)
                 .map_err(|_| Bug::PaillierEnc(BugSource::hat_beta_ij_enc))?;
             enc_j
                 .oadd(&x_i_times_K_j, &neg_hat_beta_ij_enc)
@@ -1137,7 +1124,7 @@ where
 
         tracer.stage("Encrypt hat_F_ji");
         let hat_F_ji = dec_i
-            .encrypt_with(&(-&hat_beta_ij).complete(), &hat_r_ij)
+            .encrypt_with(&-&hat_beta_ij, &hat_r_ij)
             .map_err(|_| Bug::PaillierEnc(BugSource::hat_F))?;
 
         tracer.stage("Prove psi_ji");
@@ -1158,7 +1145,7 @@ where
             },
             pi_aff::PrivateData {
                 x: &utils::scalar_to_pm_bignumber(&gamma_i),
-                y: &(-&beta_ij).complete(),
+                y: &-&beta_ij,
                 nonce: &s_ij,
                 nonce_y: &r_ij,
             },
@@ -1186,7 +1173,7 @@ where
             },
             pi_aff::PrivateData {
                 x: &utils::scalar_to_pm_bignumber(x_i),
-                y: &(-&hat_beta_ij).complete(),
+                y: &-&hat_beta_ij,
                 nonce: &hat_s_ij,
                 nonce_y: &hat_r_ij,
             },

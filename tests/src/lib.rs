@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use cggmp24::{
+    backend::Integer,
     key_share::{KeyShare, Validate},
-    rug::Integer,
     security_level::SecurityLevel128,
     IncompleteKeyShare,
 };
@@ -265,13 +265,7 @@ impl PregeneratedPrimes {
 /// Only to be used in the tests.
 pub fn generate_blum_prime(rng: &mut impl rand::RngCore, bits_size: u32) -> Integer {
     loop {
-        let mut n: Integer = Integer::random_bits(
-            bits_size,
-            &mut cggmp24::fast_paillier::utils::external_rand(rng),
-        )
-        .into();
-        n.set_bit(bits_size - 1, true);
-        n.next_prime_mut();
+        let n: Integer = Integer::generate_prime(rng, bits_size);
         if n.mod_u(4) == 3 {
             break n;
         }

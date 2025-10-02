@@ -257,6 +257,16 @@
 //! However, you may opt for them by enabling `spof` feature, then you can use [`trusted_dealer`]
 //! for key import and [`key_share::reconstruct_secret_key`] for key export.
 //!
+//! ## Big integer implementation
+//!
+//! This protocol relies heavily on big integer arithmetic, and provides a
+//! choice between two backends: rug and num-bigint.
+//!
+//! - To use rug, select the feature `backend-rug`. This backend is faster, in
+//! some applications by several times, but requires an LGPL dependency
+//! - To use num-bigint, select the feature `backend-num-bigint` (selected as
+//! **default** feature)
+//!
 //! ## Differences between the implementation and CGGMP24
 //! [CGGMP24] only defines a non-threshold protocol. To support general thresholds,
 //! we defined our own CGGMP24-like key generation and threshold signing
@@ -295,13 +305,13 @@
 )]
 #![forbid(clippy::disallowed_methods, missing_docs, unsafe_code)]
 #![cfg_attr(not(test), forbid(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "hd-wallet")]
 pub use hd_wallet;
 pub use {
     generic_ec, paillier_zk,
-    paillier_zk::{fast_paillier, rug},
+    paillier_zk::{backend, fast_paillier},
     round_based,
 };
 

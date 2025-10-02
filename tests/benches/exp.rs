@@ -1,6 +1,5 @@
 use cggmp24::{
-    fast_paillier::utils::external_rand,
-    rug::{self, Complete},
+    backend,
     security_level::{SecurityLevel, SecurityLevel128},
 };
 use generic_ec::{curves::Secp256k1 as E, Point, Scalar};
@@ -31,17 +30,16 @@ fn criterion_benchmark(c: &mut criterion::Criterion) {
         SecurityLevel128::ELL + SecurityLevel128::EPSILON,
         SecurityLevel128::ELL_PRIME + SecurityLevel128::EPSILON,
     ];
-    let mut rand = external_rand(&mut rng);
     for bits in bits {
         let bits: u32 = bits.try_into().unwrap();
         c.bench_function(&format!("x^e mod N, |e| = {bits}"), |b| {
             b.iter_batched(
                 || {
-                    let base = rug::Integer::random_below_ref(&n, &mut rand).into();
-                    let exp = rug::Integer::random_bits(bits, &mut rand).into();
+                    let base = backend::Integer::random_below_ref(&n, &mut rng).into();
+                    let exp = backend::Integer::random_bits(bits, &mut rng).into();
                     (base, exp)
                 },
-                |(base, exp): (rug::Integer, rug::Integer)| base.pow_mod(&exp, &n).unwrap(),
+                |(base, exp): (backend::Integer, backend::Integer)| base.pow_mod(&exp, &n).unwrap(),
                 criterion::BatchSize::SmallInput,
             )
         });
@@ -53,17 +51,17 @@ fn criterion_benchmark(c: &mut criterion::Criterion) {
         SecurityLevel128::ELL + SecurityLevel128::EPSILON,
         n.significant_bits().try_into().unwrap(),
     ];
-    let nn = (&n * &n).complete();
+    let nn = n.square_ref();
     for bits in bits {
         let bits: u32 = bits.try_into().unwrap();
         c.bench_function(&format!("x^e mod N^2, |e| = {bits}"), |b| {
             b.iter_batched(
                 || {
-                    let x = rug::Integer::random_below_ref(&nn, &mut rand).into();
-                    let e = rug::Integer::random_bits(bits, &mut rand).into();
+                    let x = backend::Integer::random_below_ref(&nn, &mut rng).into();
+                    let e = backend::Integer::random_bits(bits, &mut rng).into();
                     (x, e)
                 },
-                |(x, e): (rug::Integer, rug::Integer)| x.pow_mod(&e, &nn).unwrap(),
+                |(x, e): (backend::Integer, backend::Integer)| x.pow_mod(&e, &nn).unwrap(),
                 criterion::BatchSize::SmallInput,
             )
         });

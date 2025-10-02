@@ -21,7 +21,7 @@
 //!
 //! ```
 //! use paillier_zk::{paillier_encryption_in_range_with_el_gamal as p, IntegerExt};
-//! use rug::{Integer, Complete};
+//! use fast_paillier::backend::Integer;
 //! use generic_ec::{Point, Scalar, curves::Secp256k1 as E};
 //! # mod pregenerated {
 //! #     use super::*;
@@ -50,8 +50,8 @@
 //! // Prover knows its secret `pdata` and `a`
 //! let a = Scalar::random(&mut rng);
 //! let pdata = p::PrivateData {
-//!     plaintext: &Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng),
-//!     nonce: &Integer::gen_invertible(key.n(), &mut rng),
+//!     plaintext: &Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l)),
+//!     nonce: &Integer::sample_in_mult_group_of(&mut rng, key.n()),
 //!     b: &Scalar::random(&mut rng),
 //! };
 //!
@@ -96,9 +96,9 @@
 //!
 //! If the verification succeeded, verifier can continue communication with prover
 
+use fast_paillier::backend::Integer;
 use fast_paillier::{AnyEncryptionKey, Ciphertext, Nonce, Plaintext};
 use generic_ec::{Curve, Point, Scalar};
-use rug::Integer;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -198,9 +198,9 @@ pub struct NiProof<E: Curve> {
 /// prover commits to data, verifier responds with a random challenge, and
 /// prover gives proof with commitment and challenge.
 pub mod interactive {
+    use fast_paillier::backend::Integer;
     use generic_ec::{Curve, Point, Scalar};
     use rand_core::RngCore;
-    use rug::{Complete, Integer};
 
     use crate::{
         common::{fail_if, fail_if_ne, InvalidProofReason},
@@ -221,15 +221,15 @@ pub mod interactive {
         security: &SecurityParams,
         rng: &mut impl RngCore,
     ) -> Result<(Commitment<E>, PrivateCommitment<E>), Error> {
-        let two_to_l_plus_e = (Integer::ONE << (security.l + security.epsilon)).complete();
-        let n_j_at_two_to_l = (Integer::ONE << security.l).complete() * &aux.rsa_modulo;
-        let n_j_at_two_to_l_plus_e = (&two_to_l_plus_e * &aux.rsa_modulo).complete();
+        let two_to_l_plus_e = Integer::one() << (security.l + security.epsilon);
+        let n_j_at_two_to_l = (Integer::one() << security.l) * &aux.rsa_modulo;
+        let n_j_at_two_to_l_plus_e = &two_to_l_plus_e * &aux.rsa_modulo;
 
-        let alpha = Integer::from_rng_half_pm(&two_to_l_plus_e, rng);
-        let mu = Integer::from_rng_half_pm(&n_j_at_two_to_l, rng);
-        let r = Integer::gen_invertible(data.key.n(), rng);
+        let alpha = Integer::from_rng_half_pm(rng, &two_to_l_plus_e);
+        let mu = Integer::from_rng_half_pm(rng, &n_j_at_two_to_l);
+        let r = Integer::sample_in_mult_group_of(rng, data.key.n());
         let beta = Scalar::random(rng);
-        let gamma = Integer::from_rng_half_pm(&n_j_at_two_to_l_plus_e, rng);
+        let gamma = Integer::from_rng_half_pm(rng, &n_j_at_two_to_l_plus_e);
 
         let s = aux.combine(pdata.plaintext, &mu)?;
         let t = aux.combine(&alpha, &gamma)?;
@@ -256,16 +256,15 @@ pub mod interactive {
         private_commitment: &PrivateCommitment<E>,
         challenge: &Challenge,
     ) -> Result<Proof<E>, Error> {
-        let z1 = (&private_commitment.alpha + (challenge * pdata.plaintext)).complete();
+        let z1 = &private_commitment.alpha + (challenge * pdata.plaintext);
         let z2 = {
             let nonce_to_challenge_mod_n: Integer = pdata
                 .nonce
                 .pow_mod_ref(challenge, data.key.n())
-                .ok_or(BadExponent::undefined())?
-                .into();
+                .ok_or(BadExponent::undefined())?;
             (&private_commitment.r * nonce_to_challenge_mod_n).modulo(data.key.n())
         };
-        let z3 = (&private_commitment.gamma + (challenge * &private_commitment.mu)).complete();
+        let z3 = &private_commitment.gamma + (challenge * &private_commitment.mu);
         let w = private_commitment.beta + (challenge.to_scalar() * pdata.b);
         Ok(Proof { z1, z2, z3, w })
     }
@@ -282,7 +281,7 @@ pub mod interactive {
         // Verify that inputs are in expected domains:
         fail_if(
             InvalidProofReason::RangeCheck(1),
-            data.ciphertext.is_in_mult_group(data.key.nn()),
+            data.ciphertext.in_mult_group_of(data.key.nn()),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(2),
@@ -294,7 +293,7 @@ pub mod interactive {
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(4),
-            commitment.d.is_in_mult_group(data.key.nn()),
+            commitment.d.in_mult_group_of(data.key.nn()),
         )?;
 
         // Verify statement
@@ -337,7 +336,7 @@ pub mod interactive {
             InvalidProofReason::RangeCheck(9),
             proof
                 .z1
-                .is_in_half_pm(&(Integer::ONE << (security.l + security.epsilon)).complete()),
+                .is_in_half_pm(&(Integer::one() << (security.l + security.epsilon))),
         )?;
 
         Ok(())
@@ -347,7 +346,7 @@ pub mod interactive {
     ///
     /// `security` parameter is used to generate challenge in correct range
     pub fn challenge<E: Curve>(rng: &mut impl RngCore) -> Challenge {
-        Integer::from_rng_half_pm(&Integer::curve_order::<E>(), rng)
+        Integer::from_rng_half_pm(rng, &Integer::curve_order::<E>())
     }
 }
 
@@ -421,8 +420,8 @@ pub mod non_interactive {
 
 #[cfg(test)]
 mod test {
+    use fast_paillier::backend::Integer;
     use generic_ec::{Curve, Point, Scalar};
-    use rug::{Complete, Integer};
     use sha2::Digest;
 
     use crate::common::{IntegerExt, InvalidProofReason};
@@ -438,7 +437,7 @@ mod test {
         let a = Scalar::random(rng);
         let pdata = super::PrivateData {
             plaintext: &plaintext,
-            nonce: &Integer::gen_invertible(private_key.n(), rng),
+            nonce: &Integer::sample_in_mult_group_of(rng, private_key.n()),
             b: &Scalar::random(rng),
         };
 
@@ -465,8 +464,7 @@ mod test {
             l: 1024,
             epsilon: 300,
         };
-        let plaintext =
-            Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng);
+        let plaintext = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l));
         run_with::<C, D>(&mut rng, security, plaintext).expect("proof failed");
     }
 
@@ -476,7 +474,7 @@ mod test {
             l: 1024,
             epsilon: 300,
         };
-        let plaintext = (Integer::ONE << (security.l + security.epsilon - 1)).complete() + 1;
+        let plaintext = (Integer::one() << (security.l + security.epsilon - 1)) + 1;
         let r = run_with::<C, D>(&mut rng, security, plaintext).expect_err("proof should not pass");
         match r.reason() {
             InvalidProofReason::RangeCheck(9) => (),

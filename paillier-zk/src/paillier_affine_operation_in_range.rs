@@ -30,7 +30,7 @@
 //!
 //! ```rust
 //! use paillier_zk::{paillier_affine_operation_in_range as p, IntegerExt};
-//! use rug::{Integer, Complete};
+//! use fast_paillier::backend::Integer;
 //! use generic_ec::{Point, curves::Secp256k1 as E};
 //! # mod pregenerated {
 //! #     use super::*;
@@ -66,19 +66,19 @@
 //!
 //! // C is some number encrypted using key_j. Neither of parties
 //! // need to know the plaintext
-//! let ciphertext_c = Integer::gen_invertible(&key_j.nn(), &mut rng);
+//! let ciphertext_c = Integer::sample_in_mult_group_of(&mut rng, &key_j.nn());
 //!
 //! // 2. Setup: prover prepares all plaintexts
 //!
 //! // x in paper
 //! let plaintext_x = Integer::from_rng_half_pm(
-//!     &(Integer::ONE << security.l_x).complete(),
 //!     &mut rng,
+//!     &(Integer::one() << security.l_x),
 //! );
 //! // y in paper
 //! let plaintext_y = Integer::from_rng_half_pm(
-//!     &(Integer::ONE << security.l_y).complete(),
 //!     &mut rng,
+//!     &(Integer::one() << security.l_y),
 //! );
 //!
 //! // 3. Setup: prover encrypts everything on correct keys and remembers some nonces
@@ -152,9 +152,9 @@
 //!
 //! If the verification succeeded, verifier can continue communication with prover
 
+use fast_paillier::backend::Integer;
 use fast_paillier::{AnyEncryptionKey, Ciphertext, Nonce};
 use generic_ec::{Curve, Point};
-use rug::Integer;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -274,9 +274,9 @@ pub struct NiProof<C: Curve> {
 /// prover commits to data, verifier responds with a random challenge, and
 /// prover gives proof with commitment and challenge.
 pub mod interactive {
+    use fast_paillier::backend::Integer;
     use generic_ec::{Curve, Point};
     use rand_core::RngCore;
-    use rug::{Complete, Integer};
 
     use crate::common::{fail_if, fail_if_ne, IntegerExt, InvalidProof, InvalidProofReason};
     use crate::Error;
@@ -291,20 +291,20 @@ pub mod interactive {
         security: &SecurityParams,
         mut rng: R,
     ) -> Result<(Commitment<C>, PrivateCommitment), Error> {
-        let two_to_l = (Integer::ONE << security.l_x).complete();
-        let two_to_l_e = (Integer::ONE << (security.l_x + security.epsilon)).complete();
-        let two_to_l_prime_e = (Integer::ONE << (security.l_y + security.epsilon)).complete();
-        let hat_n_at_two_to_l_e = (&aux.rsa_modulo * &two_to_l_e).complete();
-        let hat_n_at_two_to_l = (&aux.rsa_modulo * &two_to_l).complete();
+        let two_to_l = Integer::one() << security.l_x;
+        let two_to_l_e = Integer::one() << (security.l_x + security.epsilon);
+        let two_to_l_prime_e = Integer::one() << (security.l_y + security.epsilon);
+        let hat_n_at_two_to_l_e = &aux.rsa_modulo * &two_to_l_e;
+        let hat_n_at_two_to_l = &aux.rsa_modulo * &two_to_l;
 
-        let alpha = Integer::from_rng_half_pm(&two_to_l_e, &mut rng);
-        let beta = Integer::from_rng_half_pm(&two_to_l_prime_e, &mut rng);
-        let r = Integer::gen_invertible(data.key_j.n(), &mut rng);
-        let r_y = Integer::gen_invertible(data.key_i.n(), &mut rng);
-        let gamma = Integer::from_rng_half_pm(&hat_n_at_two_to_l_e, &mut rng);
-        let delta = Integer::from_rng_half_pm(&hat_n_at_two_to_l_e, &mut rng);
-        let m = Integer::from_rng_half_pm(&hat_n_at_two_to_l, &mut rng);
-        let mu = Integer::from_rng_half_pm(&hat_n_at_two_to_l, &mut rng);
+        let alpha = Integer::from_rng_half_pm(&mut rng, &two_to_l_e);
+        let beta = Integer::from_rng_half_pm(&mut rng, &two_to_l_prime_e);
+        let r = Integer::sample_in_mult_group_of(&mut rng, data.key_j.n());
+        let r_y = Integer::sample_in_mult_group_of(&mut rng, data.key_i.n());
+        let gamma = Integer::from_rng_half_pm(&mut rng, &hat_n_at_two_to_l_e);
+        let delta = Integer::from_rng_half_pm(&mut rng, &hat_n_at_two_to_l_e);
+        let m = Integer::from_rng_half_pm(&mut rng, &hat_n_at_two_to_l);
+        let mu = Integer::from_rng_half_pm(&mut rng, &hat_n_at_two_to_l);
 
         let commitment = Commitment {
             a: {
@@ -340,19 +340,21 @@ pub mod interactive {
         challenge: &Challenge,
     ) -> Result<Proof, Error> {
         Ok(Proof {
-            z1: (&pcomm.alpha + challenge * pdata.x).complete(),
-            z2: (&pcomm.beta + challenge * pdata.y).complete(),
-            z3: (&pcomm.gamma + challenge * &pcomm.m).complete(),
-            z4: (&pcomm.delta + challenge * &pcomm.mu).complete(),
+            z1: &pcomm.alpha + challenge * pdata.x,
+            z2: &pcomm.beta + challenge * pdata.y,
+            z3: &pcomm.gamma + challenge * &pcomm.m,
+            z4: &pcomm.delta + challenge * &pcomm.mu,
             w: data
                 .key_j
                 .n()
-                .combine(&pcomm.r, Integer::ONE, pdata.nonce, challenge)?,
+                .combine(&pcomm.r, &Integer::one(), pdata.nonce, challenge)
+                .ok_or_else(crate::BadExponent::undefined)?,
             // TODO: this can be optimized as prover knows key_i factorization
             w_y: data
                 .key_i
                 .n()
-                .combine(&pcomm.r_y, Integer::ONE, pdata.nonce_y, challenge)?,
+                .combine(&pcomm.r_y, &Integer::one(), pdata.nonce_y, challenge)
+                .ok_or_else(crate::BadExponent::undefined)?,
         })
     }
 
@@ -368,24 +370,24 @@ pub mod interactive {
         // Verify public data
         fail_if(
             InvalidProofReason::RangeCheck(1),
-            data.c.is_in_mult_group(data.key_j.nn()),
+            data.c.in_mult_group_of(data.key_j.nn()),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(2),
-            data.d.is_in_mult_group(data.key_j.nn()),
+            data.d.in_mult_group_of(data.key_j.nn()),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(3),
-            data.y.is_in_mult_group(data.key_i.nn()),
+            data.y.in_mult_group_of(data.key_i.nn()),
         )?;
         // Verify commitment
         fail_if(
             InvalidProofReason::RangeCheck(4),
-            commitment.a.is_in_mult_group(data.key_j.nn()),
+            commitment.a.in_mult_group_of(data.key_j.nn()),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(5),
-            commitment.b_y.is_in_mult_group(data.key_i.nn()),
+            commitment.b_y.in_mult_group_of(data.key_i.nn()),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(6),
@@ -467,13 +469,13 @@ pub mod interactive {
             InvalidProofReason::RangeCheck(15),
             proof
                 .z1
-                .is_in_half_pm(&(Integer::ONE << (security.l_x + security.epsilon)).complete()),
+                .is_in_half_pm(&(Integer::one() << (security.l_x + security.epsilon))),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(16),
             proof
                 .z2
-                .is_in_half_pm(&(Integer::ONE << (security.l_y + security.epsilon)).complete()),
+                .is_in_half_pm(&(Integer::one() << (security.l_y + security.epsilon))),
         )?;
         Ok(())
     }
@@ -481,7 +483,7 @@ pub mod interactive {
     /// Generate random challenge
     pub fn challenge<C: Curve>(rng: &mut impl rand_core::RngCore) -> Integer {
         let q = Integer::curve_order::<C>();
-        Integer::from_rng_half_pm(&q, rng)
+        Integer::from_rng_half_pm(rng, &q)
     }
 }
 
@@ -556,8 +558,8 @@ pub mod non_interactive {
 
 #[cfg(test)]
 mod test {
+    use fast_paillier::backend::Integer;
     use generic_ec::{Curve, Point};
-    use rug::{Complete, Integer};
     use sha2::Digest;
 
     use crate::common::test::random_key;
@@ -575,7 +577,7 @@ mod test {
         let ek1 = dk1.encryption_key().clone();
 
         let (c, _) = {
-            let plaintext = Integer::from_rng_half_pm(ek0.n(), rng);
+            let plaintext = Integer::from_rng_half_pm(rng, ek0.n());
             ek0.encrypt_with_random(rng, &plaintext).unwrap()
         };
 
@@ -617,8 +619,8 @@ mod test {
             l_y: 1024,
             epsilon: 300,
         };
-        let x = Integer::from_rng_half_pm(&(Integer::ONE << security.l_x).complete(), &mut rng);
-        let y = Integer::from_rng_half_pm(&(Integer::ONE << security.l_y).complete(), &mut rng);
+        let x = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_x));
+        let y = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_y));
         run::<_, C, D>(&mut rng, security, x, y).expect("proof failed");
     }
 
@@ -629,8 +631,8 @@ mod test {
             l_y: 1024,
             epsilon: 300,
         };
-        let x = Integer::from_rng_half_pm(&(Integer::ONE << security.l_x).complete(), &mut rng);
-        let y = (Integer::ONE << (security.l_y + security.epsilon - 1)).complete() + 1;
+        let x = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_x));
+        let y = (Integer::one() << (security.l_y + security.epsilon - 1)) + 1;
         let r = run::<_, C, D>(&mut rng, security, x, y).expect_err("proof should not pass");
         match r.reason() {
             InvalidProofReason::RangeCheck(16) => (),
@@ -645,8 +647,8 @@ mod test {
             l_y: 1024,
             epsilon: 300,
         };
-        let x = (Integer::ONE << (security.l_x + security.epsilon - 1)).complete() + 1;
-        let y = Integer::from_rng_half_pm(&(Integer::ONE << security.l_y).complete(), &mut rng);
+        let x = (Integer::one() << (security.l_x + security.epsilon - 1)) + 1;
+        let y = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_y));
         let r = run::<_, C, D>(&mut rng, security, x, y).expect_err("proof should not pass");
         match r.reason() {
             InvalidProofReason::RangeCheck(15) => (),

@@ -1,9 +1,6 @@
 use digest::Digest;
 use futures::SinkExt;
-use paillier_zk::{
-    no_small_factor as π_fac, paillier_blum_modulus as π_mod,
-    rug::{Complete, Integer},
-};
+use paillier_zk::{backend::Integer, no_small_factor as π_fac, paillier_blum_modulus as π_mod};
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
     rounds_router::{simple_store::RoundInput, RoundsRouter},
@@ -189,7 +186,7 @@ where
     let [p, q, hat_p, hat_q] = pregenerated.into_primes();
 
     tracer.stage("Build Paillier key");
-    let N = (&p * &q).complete();
+    let N = &p * &q;
 
     tracer.stage("Build Pedersen params");
     let (pedersen_params, phi_hat_N, lambda) = utils::generate_pedersen_params(rng, hat_p, hat_q)?;
