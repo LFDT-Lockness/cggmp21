@@ -464,7 +464,7 @@ In all the cases where this proof is used in the protocol, the prover knows the 
 \algoName{$\commit{enc}^L(R_j, N_i; k, [, \sk_i]) \to ((S, A, C); (\alpha, \mu, r, \gamma))$}
 \algoInputsList{
     \item security level $L = (\ell, \varepsilon, \dots)$
-    \item auxilary data $R_j = (N_j, s_j, t_j) \in (\Z, \Z, \Z)$
+    \item auxiliary data $R_j = (N_j, s_j, t_j) \in (\Z, \Z, \Z)$
     \item public encryption key $N_i \in \Z$ and, if known, corresponding secret key $\sk_i$
     \item secret plaintext $k \in \Z$
 }
@@ -545,7 +545,7 @@ In all the cases where this proof is used in the protocol, the prover knows the 
 \algoInputsList{
     \item security level $L = (Q, \dots)$,
     \item shared state $\state \in \Byte^*$,
-    \item auxilary data $R_j$,
+    \item auxiliary data $R_j$,
     \item public encryption key $N_i \in \Z$ and, if known, corresponding secret key $\sk_i$,
     \item public ciphertext $K \in \Z$,
     \item secret plaintext $k \in \Z$ and secret nonce $\rho \in \Z$
@@ -570,7 +570,7 @@ In all the cases where this proof is used in the protocol, the prover knows the 
 \algoInputsList{
     \item security level $L = (Q, \dots)$,
     \item shared state $\state \in \Byte^*$,
-    \item auxilary data $R_j$,
+    \item auxiliary data $R_j$,
     \item public data:
         \begin{itemize}
         \item encryption key $N_i \in \Z$,
@@ -628,13 +628,13 @@ Proof guarantees: $x \in \pm 2^{\ell + \varepsilon}$ and $y \in \pm 2^{\ell' + \
 )$}
 \algoInputsList{
     \item security level $L = (\ell, \varepsilon, \dots)$,
-    \item auxilary data $R_j = (N_j, s_j, t_j) \in (\Z, \Z, \Z)$,
-    \item public data $N_i, C \in \Z, \Z$
-    \item secret data $x, y \in \Z, \Z$
+    \item auxiliary data $R_j = (N_j, s_j, t_j) \in \Z^3$,
+    \item public data $(N_i, C) \in \Z^2$,
+    \item secret data $(x, y) \in \Z^2$
 }
 \algoOutputsList{
     \item public commitment $(A, B_x, B_y, E, S, F, T) \in (\Z, \E, \Z, \Z, \Z, \Z, \Z)$,
-    \item proof $(\alpha, \beta, r, r_y, \gamma, \delta, m, \mu) \in \Z^8$
+    \item secret commitment nonce $(\alpha, \beta, r, r_y, \gamma, \delta, m, \mu) \in \Z^8$
 }
 \begin{algorithmic}[1]
 \State Sample:
@@ -674,9 +674,9 @@ Proof guarantees: $x \in \pm 2^{\ell + \varepsilon}$ and $y \in \pm 2^{\ell' + \
     (\alpha, \beta, r, r_y, \gamma, \delta, m, \mu)
 ) \to (z_1, z_2, z_3, z_4, w, w_y)$}
 \algoInputsList{
-    \item public data $(N_j, N_i, C, D, Y, X) \in (\Z, \Z, \Z, \Z, \Z, \E)$
-    \item challenge $e \in \Z$
-    \item secret data $(x, y, \rho, \rho_y) \in \Z^4$
+    \item public data $(N_j, N_i, C, D, Y, X) \in (\Z, \Z, \Z, \Z, \Z, \E)$,
+    \item challenge $e \in \Z$,
+    \item secret data $(x, y, \rho, \rho_y) \in \Z^4$,
     \item secret commitment nonce $(\alpha, \beta, r, r_y, \gamma, \delta, m, \mu) \in \Z^8$
 }
 \algoOutputs{proof $(z_1, z_2, z_3, z_4, w, w_y) \in \Z^6$}
@@ -703,7 +703,7 @@ Proof guarantees: $x \in \pm 2^{\ell + \varepsilon}$ and $y \in \pm 2^{\ell' + \
 )$}
 \algoInputsList{
     \item security level $L = (\ell, \ell', \varepsilon, \dots)$
-    \item auxilary data $R_j = (s, t, \dots) \in (\Z, \Z, \dots)$
+    \item auxiliary data $R_j = (s, t, \dots) \in (\Z, \Z, \dots)$
     \item public data $(N_j, N_i, C, D, Y, X) \in (\Z, \Z, \Z, \Z, \Z, \E)$
     \item commiment $(A, B_x, B_y, E, S, F, T) \in (\Z, \E, \Z, \Z, \Z, \Z, \Z)$
     \item challenge $e \in \Z$
@@ -1385,7 +1385,7 @@ Prover has secret input $(y, \lambda) \in \Z_q^2$ such that $L = \lambda G, M = 
 \item
 \begin{inlineAlgorithm}
 \algoName{$\challenge{elog}() \to e$}
-\algoOutputs{challenge $q \in \Z_q$}
+\algoOutputs{challenge $e \in \Z_q$}
 \begin{algorithmic}[1]
 \State $e \gets \Z_q$
 \State \Return $e$
@@ -1479,7 +1479,7 @@ Prover has secret input $(y, \lambda) \in \Z_q^2$ such that $L = \lambda G, M = 
 
 Common (public) input:
     security level $L = (\ell, \varepsilon, \dots)$,
-    verifier's auxilary data $R_j = (N_j, s_j, t_j) \in (\Z, \Z^*_{N_j}, \Z^*_{N_j})$,
+    verifier's auxiliary data $R_j = (N_j, s_j, t_j) \in (\Z, \Z^*_{N_j}, \Z^*_{N_j})$,
     curve $\E$ with generator $G$ of prime order $q$,
     Paillier public key $N_0 \in \Z$,
     Paillier ciphertext $C \in \Z^*_{N_0^2}$,

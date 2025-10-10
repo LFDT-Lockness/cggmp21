@@ -377,7 +377,7 @@ mod test {
 
     #[test]
     fn passing_million() {
-        passing_test::<crate::curve::C, sha2::Sha256>()
+        passing_test::<crate::curve::E, sha2::Sha256>()
     }
     #[test]
     fn failing_check_1_p256() {
@@ -386,7 +386,7 @@ mod test {
 
     #[test]
     fn failing_check_1_million() {
-        failing_check_lambda_::<crate::curve::C, sha2::Sha256>()
+        failing_check_lambda_::<crate::curve::E, sha2::Sha256>()
     }
     #[test]
     fn failing_check_2_p256() {
@@ -395,6 +395,6 @@ mod test {
 
     #[test]
     fn failing_check_2_million() {
-        failing_check_y_::<crate::curve::C, sha2::Sha256>()
+        failing_check_y_::<crate::curve::E, sha2::Sha256>()
     }
 }

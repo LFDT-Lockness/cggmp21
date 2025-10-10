@@ -11,18 +11,18 @@
 //! Given:
 //! - `key0`, `pkey0`, `key1`, `pkey1` - pairs of public and private keys in
 //!   paillier cryptosystem
-//! - `nonce_y`, `nonce` - nonces in paillier encryption
+//! - `rho_y`, `rho` - nonces in paillier encryption
 //! - `x`, `y` - some numbers
 //! - `q`, `g` such that `<g> = Zq*` - prime order group
 //! - `C` is some ciphertext encrypted by `key0`
-//! - `Y = key1.encrypt(y, nonce_y)`
+//! - `Y = key1.encrypt(y, rho_y)`
 //! - `X = g * x`
-//! - `D = oadd(enc(y, nonce), omul(x, C))` where `enc`, `oadd` and `omul` are
+//! - `D = oadd(enc(y, rho), omul(x, C))` where `enc`, `oadd` and `omul` are
 //!   paillier encryption, homomorphic addition and multiplication with `key0`
 //!
 //! Prove:
-//! - `bitsize(abs(x)) <= l_x`
-//! - `bitsize(abs(y)) <= l_y`
+//! - `bitsize(abs(x)) <= l`
+//! - `bitsize(abs(y)) <= l_prime`
 //!
 //! Disclosing only: `key0`, `key1`, `C`, `D`, `Y`, `X`
 //!
@@ -52,32 +52,32 @@
 //!
 //! let aux: p::Aux = pregenerated::verifier_aux();
 //! let security = p::SecurityParams {
-//!     l_x: 256,
-//!     l_y: 256 * 5,
+//!     l: 256,
+//!     l_prime: 256 * 5,
 //!     epsilon: 256 * 2,
 //! };
 //!
 //! // 1. Setup: prover prepares the paillier keys
 //!
 //! // C and D are encrypted by this key
-//! let key_j: fast_paillier::EncryptionKey = pregenerated::someone_encryption_key0();
+//! let n_j: fast_paillier::EncryptionKey = pregenerated::someone_encryption_key0();
 //! // Y is encrypted using this key
-//! let key_i: fast_paillier::EncryptionKey = pregenerated::someone_encryption_key1();
+//! let n_i: fast_paillier::EncryptionKey = pregenerated::someone_encryption_key1();
 //!
-//! // C is some number encrypted using key_j. Neither of parties
+//! // C is some number encrypted using n_j. Neither of parties
 //! // need to know the plaintext
-//! let ciphertext_c = Integer::gen_invertible(&key_j.nn(), &mut rng);
+//! let ciphertext_c = Integer::gen_invertible(&n_j.nn(), &mut rng);
 //!
 //! // 2. Setup: prover prepares all plaintexts
 //!
 //! // x in paper
 //! let plaintext_x = Integer::from_rng_half_pm(
-//!     &(Integer::ONE << security.l_x).complete(),
+//!     &(Integer::ONE << security.l).complete(),
 //!     &mut rng,
 //! );
 //! // y in paper
 //! let plaintext_y = Integer::from_rng_half_pm(
-//!     &(Integer::ONE << security.l_y).complete(),
+//!     &(Integer::ONE << security.l_prime).complete(),
 //!     &mut rng,
 //! );
 //!
@@ -86,28 +86,28 @@
 //! // X in paper
 //! let ciphertext_x = Point::<E>::generator() * plaintext_x.to_scalar();
 //! // Y and ρ_y in paper
-//! let (ciphertext_y, nonce_y) = key_i.encrypt_with_random(
+//! let (ciphertext_y, rho_y) = n_i.encrypt_with_random(
 //!     &mut rng,
 //!     &(plaintext_y),
 //! )?;
-//! // nonce is ρ in paper
-//! let (ciphertext_y_by_key_j, nonce) = key_j.encrypt_with_random(
+//! // ρ in paper
+//! let (ciphertext_y_by_n_j, rho) = n_j.encrypt_with_random(
 //!     &mut rng,
 //!     &(plaintext_y)
 //! )?;
 //! // D in paper
-//! let ciphertext_d = key_j
+//! let ciphertext_d = n_j
 //!     .oadd(
-//!         &key_j.omul(&plaintext_x, &ciphertext_c)?,
-//!         &ciphertext_y_by_key_j,
+//!         &n_j.omul(&plaintext_x, &ciphertext_c)?,
+//!         &ciphertext_y_by_n_j,
 //!     )?;
 //!
 //! // 4. Prover computes a non-interactive proof that plaintext_x and
-//! //    plaintext_y are at most `l_x` and `l_y` bits
+//! //    plaintext_y are at most `l` and `l_prime` bits
 //!
 //! let data = p::Data {
-//!     key_j: &key_j,
-//!     key_i: &key_i,
+//!     n_j: &n_j,
+//!     n_i: &n_i,
 //!     c: &ciphertext_c,
 //!     d: &ciphertext_d,
 //!     x: &ciphertext_x,
@@ -116,8 +116,8 @@
 //! let pdata = p::PrivateData {
 //!     x: &plaintext_x,
 //!     y: &plaintext_y,
-//!     nonce: &nonce,
-//!     nonce_y: &nonce_y,
+//!     rho: &rho,
+//!     rho_y: &rho_y,
 //! };
 //! let proof =
 //!     p::non_interactive::prove::<E, sha2::Sha256>(
@@ -167,9 +167,9 @@ pub use crate::common::{Aux, InvalidProof};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SecurityParams {
     /// l in paper, bit size of +-x
-    pub l_x: usize,
+    pub l: usize,
     /// l' in paper, bit size of +-y
-    pub l_y: usize,
+    pub l_prime: usize,
     /// Epsilon in paper, slackness parameter
     pub epsilon: usize,
 }
@@ -177,13 +177,13 @@ pub struct SecurityParams {
 /// Public data that both parties know
 #[derive(Debug, Clone, Copy, udigest::Digestable)]
 #[udigest(bound = "")]
-pub struct Data<'a, C: Curve> {
-    /// Nj in the spec, public key that C was encrypted on
+pub struct Data<'a, E: Curve> {
+    /// N_j in the spec, public key that C was encrypted on
     #[udigest(as = crate::common::encoding::AnyEncryptionKey)]
-    pub key_j: &'a dyn AnyEncryptionKey,
+    pub n_j: &'a dyn AnyEncryptionKey,
     /// Ni in the spec, public key that y -> Y was encrypted on
     #[udigest(as = crate::common::encoding::AnyEncryptionKey)]
-    pub key_i: &'a dyn AnyEncryptionKey,
+    pub n_i: &'a dyn AnyEncryptionKey,
     /// C in the spec, some data encrypted on Nj
     #[udigest(as = &crate::common::encoding::Integer)]
     pub c: &'a Ciphertext,
@@ -194,7 +194,7 @@ pub struct Data<'a, C: Curve> {
     #[udigest(as = &crate::common::encoding::Integer)]
     pub y: &'a Ciphertext,
     /// X in the spec, obtained as `x G`
-    pub x: &'a Point<C>,
+    pub x: &'a Point<E>,
 }
 
 /// Private data of prover
@@ -205,19 +205,19 @@ pub struct PrivateData<'a> {
     /// y in the spec, preimage of Y
     pub y: &'a Integer,
     /// rho in the spec, nonce in encryption of y for additive action
-    pub nonce: &'a Nonce,
+    pub rho: &'a Nonce,
     /// rho_y in the spec, nonce in encryption of y to obtain Y
-    pub nonce_y: &'a Nonce,
+    pub rho_y: &'a Nonce,
 }
 
 /// Prover's first message, obtained by [`interactive::commit`]
 #[derive(Debug, Clone, udigest::Digestable)]
 #[udigest(bound = "")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = ""))]
-pub struct Commitment<C: Curve> {
+pub struct Commitment<E: Curve> {
     #[udigest(as = crate::common::encoding::Integer)]
     pub a: Integer,
-    pub b_x: Point<C>,
+    pub b_x: Point<E>,
     #[udigest(as = crate::common::encoding::Integer)]
     pub b_y: Integer,
     #[udigest(as = crate::common::encoding::Integer)]
@@ -265,8 +265,8 @@ pub struct Proof {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound = ""))]
-pub struct NiProof<C: Curve> {
-    pub commitment: Commitment<C>,
+pub struct NiProof<E: Curve> {
+    pub commitment: Commitment<E>,
     pub proof: Proof,
 }
 
@@ -284,23 +284,23 @@ pub mod interactive {
     use super::*;
 
     /// Create random commitment
-    pub fn commit<C: Curve, R: RngCore>(
+    pub fn commit<E: Curve, R: RngCore>(
         aux: &Aux,
-        data: Data<C>,
+        data: Data<E>,
         pdata: PrivateData,
         security: &SecurityParams,
         mut rng: R,
-    ) -> Result<(Commitment<C>, PrivateCommitment), Error> {
-        let two_to_l = (Integer::ONE << security.l_x).complete();
-        let two_to_l_e = (Integer::ONE << (security.l_x + security.epsilon)).complete();
-        let two_to_l_prime_e = (Integer::ONE << (security.l_y + security.epsilon)).complete();
+    ) -> Result<(Commitment<E>, PrivateCommitment), Error> {
+        let two_to_l = (Integer::ONE << security.l).complete();
+        let two_to_l_e = (Integer::ONE << (security.l + security.epsilon)).complete();
+        let two_to_l_prime_e = (Integer::ONE << (security.l_prime + security.epsilon)).complete();
         let hat_n_at_two_to_l_e = (&aux.rsa_modulo * &two_to_l_e).complete();
         let hat_n_at_two_to_l = (&aux.rsa_modulo * &two_to_l).complete();
 
         let alpha = Integer::from_rng_half_pm(&two_to_l_e, &mut rng);
         let beta = Integer::from_rng_half_pm(&two_to_l_prime_e, &mut rng);
-        let r = Integer::gen_invertible(data.key_j.n(), &mut rng);
-        let r_y = Integer::gen_invertible(data.key_i.n(), &mut rng);
+        let r = Integer::gen_invertible(data.n_j.n(), &mut rng);
+        let r_y = Integer::gen_invertible(data.n_i.n(), &mut rng);
         let gamma = Integer::from_rng_half_pm(&hat_n_at_two_to_l_e, &mut rng);
         let delta = Integer::from_rng_half_pm(&hat_n_at_two_to_l_e, &mut rng);
         let m = Integer::from_rng_half_pm(&hat_n_at_two_to_l, &mut rng);
@@ -308,12 +308,12 @@ pub mod interactive {
 
         let commitment = Commitment {
             a: {
-                let beta_enc_key0 = data.key_j.encrypt_with(&beta, &r)?;
-                let alpha_at_c = data.key_j.omul(&alpha, data.c)?;
-                data.key_j.oadd(&alpha_at_c, &beta_enc_key0)?
+                let beta_enc_key0 = data.n_j.encrypt_with(&beta, &r)?;
+                let alpha_at_c = data.n_j.omul(&alpha, data.c)?;
+                data.n_j.oadd(&alpha_at_c, &beta_enc_key0)?
             },
-            b_x: Point::<C>::generator() * alpha.to_scalar(),
-            b_y: data.key_i.encrypt_with(&beta, &r_y)?,
+            b_x: Point::<E>::generator() * alpha.to_scalar(),
+            b_y: data.n_i.encrypt_with(&beta, &r_y)?,
             e: aux.combine(&alpha, &gamma)?,
             s: aux.combine(pdata.x, &m)?,
             f: aux.combine(&beta, &delta)?,
@@ -333,8 +333,8 @@ pub mod interactive {
     }
 
     /// Compute proof for given data and prior protocol values
-    pub fn prove<C: Curve>(
-        data: Data<C>,
+    pub fn prove<E: Curve>(
+        data: Data<E>,
         pdata: PrivateData,
         pcomm: &PrivateCommitment,
         challenge: &Challenge,
@@ -345,22 +345,22 @@ pub mod interactive {
             z3: (&pcomm.gamma + challenge * &pcomm.m).complete(),
             z4: (&pcomm.delta + challenge * &pcomm.mu).complete(),
             w: data
-                .key_j
+                .n_j
                 .n()
-                .combine(&pcomm.r, Integer::ONE, pdata.nonce, challenge)?,
-            // TODO: this can be optimized as prover knows key_i factorization
+                .combine(&pcomm.r, Integer::ONE, pdata.rho, challenge)?,
+            // TODO: this can be optimized as prover knows n_i factorization
             w_y: data
-                .key_i
+                .n_i
                 .n()
-                .combine(&pcomm.r_y, Integer::ONE, pdata.nonce_y, challenge)?,
+                .combine(&pcomm.r_y, Integer::ONE, pdata.rho_y, challenge)?,
         })
     }
 
     /// Verify the proof
-    pub fn verify<C: Curve>(
+    pub fn verify<E: Curve>(
         aux: &Aux,
-        data: Data<C>,
-        commitment: &Commitment<C>,
+        data: Data<E>,
+        commitment: &Commitment<E>,
         security: &SecurityParams,
         challenge: &Challenge,
         proof: &Proof,
@@ -368,48 +368,48 @@ pub mod interactive {
         // Five equality checks and two range checks
         {
             let lhs = {
-                let z1_at_c = data
-                    .key_j
-                    .omul(&proof.z1, data.c)
+                let e_at_d = data
+                    .n_j
+                    .omul(challenge, data.d)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
-                let enc = data
-                    .key_j
-                    .encrypt_with(&proof.z2, &proof.w)
-                    .map_err(|_| InvalidProofReason::PaillierEnc)?;
-                data.key_j
-                    .oadd(&z1_at_c, &enc)
+                data.n_j
+                    .oadd(&commitment.a, &e_at_d)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
             let rhs = {
-                let e_at_d = data
-                    .key_j
-                    .omul(challenge, data.d)
+                let z1_at_c = data
+                    .n_j
+                    .omul(&proof.z1, data.c)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
-                data.key_j
-                    .oadd(&commitment.a, &e_at_d)
+                let enc = data
+                    .n_j
+                    .encrypt_with(&proof.z2, &proof.w)
+                    .map_err(|_| InvalidProofReason::PaillierEnc)?;
+                data.n_j
+                    .oadd(&z1_at_c, &enc)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
             fail_if_ne(InvalidProofReason::EqualityCheck(1), lhs, rhs)?;
         }
         {
-            let lhs = Point::<C>::generator() * proof.z1.to_scalar();
+            let lhs = Point::<E>::generator() * proof.z1.to_scalar();
             let rhs = commitment.b_x + data.x * challenge.to_scalar();
             fail_if_ne(InvalidProofReason::EqualityCheck(2), lhs, rhs)?;
         }
         {
-            let lhs = data
-                .key_i
-                .encrypt_with(&proof.z2, &proof.w_y)
-                .map_err(|_| InvalidProofReason::PaillierEnc)?;
-            let rhs = {
+            let lhs = {
                 let e_at_y = data
-                    .key_i
+                    .n_i
                     .omul(challenge, data.y)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
-                data.key_i
+                data.n_i
                     .oadd(&commitment.b_y, &e_at_y)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
+            let rhs = data
+                .n_i
+                .encrypt_with(&proof.z2, &proof.w_y)
+                .map_err(|_| InvalidProofReason::PaillierEnc)?;
             fail_if_ne(InvalidProofReason::EqualityCheck(3), lhs, rhs)?;
         }
         {
@@ -428,20 +428,20 @@ pub mod interactive {
             InvalidProofReason::RangeCheck(6),
             proof
                 .z1
-                .is_in_half_pm(&(Integer::ONE << (security.l_x + security.epsilon)).complete()),
+                .is_in_half_pm(&(Integer::ONE << (security.l + security.epsilon)).complete()),
         )?;
         fail_if(
             InvalidProofReason::RangeCheck(7),
             proof
                 .z2
-                .is_in_half_pm(&(Integer::ONE << (security.l_y + security.epsilon)).complete()),
+                .is_in_half_pm(&(Integer::ONE << (security.l_prime + security.epsilon)).complete()),
         )?;
         Ok(())
     }
 
     /// Generate random challenge
-    pub fn challenge<C: Curve>(rng: &mut impl rand_core::RngCore) -> Integer {
-        let q = Integer::curve_order::<C>();
+    pub fn challenge<E: Curve>(rng: &mut impl rand_core::RngCore) -> Integer {
+        let q = Integer::curve_order::<E>();
         Integer::from_rng_half_pm(&q, rng)
     }
 }
@@ -460,29 +460,29 @@ pub mod non_interactive {
     /// deriving determenistic challenge.
     ///
     /// Obtained from the above interactive proof via Fiat-Shamir heuristic.
-    pub fn prove<C: Curve, D: Digest>(
+    pub fn prove<E: Curve, D: Digest>(
         shared_state: &impl udigest::Digestable,
         aux: &Aux,
-        data: Data<C>,
+        data: Data<E>,
         pdata: PrivateData,
         security: &SecurityParams,
         rng: &mut impl rand_core::RngCore,
-    ) -> Result<NiProof<C>, Error> {
+    ) -> Result<NiProof<E>, Error> {
         let (commitment, pcomm) = super::interactive::commit(aux, data, pdata, security, rng)?;
-        let challenge = challenge::<C, D>(shared_state, aux, data, &commitment, security);
+        let challenge = challenge::<E, D>(shared_state, aux, data, &commitment, security);
         let proof = super::interactive::prove(data, pdata, &pcomm, &challenge)?;
         Ok(NiProof { commitment, proof })
     }
 
     /// Verify the proof, deriving challenge independently from same data
-    pub fn verify<C: Curve, D: Digest>(
+    pub fn verify<E: Curve, D: Digest>(
         shared_state: &impl udigest::Digestable,
         aux: &Aux,
-        data: Data<C>,
+        data: Data<E>,
         security: &SecurityParams,
-        proof: &NiProof<C>,
+        proof: &NiProof<E>,
     ) -> Result<(), InvalidProof> {
-        let challenge = challenge::<C, D>(shared_state, aux, data, &proof.commitment, security);
+        let challenge = challenge::<E, D>(shared_state, aux, data, &proof.commitment, security);
         super::interactive::verify(
             aux,
             data,
@@ -494,11 +494,11 @@ pub mod non_interactive {
     }
 
     /// Deterministically compute challenge based on prior known values in protocol
-    pub fn challenge<C: Curve, D: Digest>(
+    pub fn challenge<E: Curve, D: Digest>(
         shared_state: &impl udigest::Digestable,
         aux: &Aux,
-        data: Data<C>,
-        commitment: &Commitment<C>,
+        data: Data<E>,
+        commitment: &Commitment<E>,
         security: &SecurityParams,
     ) -> Challenge {
         let tag = "paillier_zk.paillier_affine_operation_in_range.ni_challenge";
@@ -511,7 +511,7 @@ pub mod non_interactive {
             commitment,
         });
         let mut rng = rand_hash::HashRng::<D, _>::from_seed(seed);
-        super::interactive::challenge::<C>(&mut rng)
+        super::interactive::challenge::<E>(&mut rng)
     }
 }
 
@@ -524,7 +524,7 @@ mod test {
     use crate::common::test::random_key;
     use crate::common::{IntegerExt, InvalidProofReason};
 
-    fn run<R: rand_core::RngCore + rand_core::CryptoRng, C: Curve, D: Digest>(
+    fn run<R: rand_core::RngCore + rand_core::CryptoRng, E: Curve, D: Digest>(
         rng: &mut R,
         security: super::SecurityParams,
         x: Integer,
@@ -547,18 +547,18 @@ mod test {
         let d = ek0.oadd(&x_at_c, &y_enc_ek0).unwrap();
 
         let data = super::Data {
-            key_j: &ek0,
-            key_i: &ek1,
+            n_j: &ek0,
+            n_i: &ek1,
             c: &c,
             d: &d,
             y: &y_enc_ek1,
-            x: &(x.to_scalar::<C>() * Point::generator()),
+            x: &(x.to_scalar::<E>() * Point::generator()),
         };
         let pdata = super::PrivateData {
             x: &x,
             y: &y,
-            nonce: &rho,
-            nonce_y: &rho_y,
+            rho: &rho,
+            rho_y: &rho_y,
         };
 
         let aux = crate::common::test::aux(rng);
@@ -566,49 +566,49 @@ mod test {
         let shared_state = "shared state";
 
         let proof =
-            super::non_interactive::prove::<C, D>(&shared_state, &aux, data, pdata, &security, rng)
+            super::non_interactive::prove::<E, D>(&shared_state, &aux, data, pdata, &security, rng)
                 .unwrap();
-        super::non_interactive::verify::<C, D>(&shared_state, &aux, data, &security, &proof)
+        super::non_interactive::verify::<E, D>(&shared_state, &aux, data, &security, &proof)
     }
 
-    fn passing_test<C: Curve, D: Digest>() {
+    fn passing_test<E: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l_x: 1024,
-            l_y: 1024,
+            l: 1024,
+            l_prime: 1024,
             epsilon: 300,
         };
-        let x = Integer::from_rng_half_pm(&(Integer::ONE << security.l_x).complete(), &mut rng);
-        let y = Integer::from_rng_half_pm(&(Integer::ONE << security.l_y).complete(), &mut rng);
-        run::<_, C, D>(&mut rng, security, x, y).expect("proof failed");
+        let x = Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng);
+        let y = Integer::from_rng_half_pm(&(Integer::ONE << security.l_prime).complete(), &mut rng);
+        run::<_, E, D>(&mut rng, security, x, y).expect("proof failed");
     }
 
-    fn failing_on_additive<C: Curve, D: Digest>() {
+    fn failing_on_additive<E: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l_x: 1024,
-            l_y: 1024,
+            l: 1024,
+            l_prime: 1024,
             epsilon: 300,
         };
-        let x = Integer::from_rng_half_pm(&(Integer::ONE << security.l_x).complete(), &mut rng);
-        let y = (Integer::ONE << (security.l_y + security.epsilon - 1)).complete() + 1;
-        let r = run::<_, C, D>(&mut rng, security, x, y).expect_err("proof should not pass");
+        let x = Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng);
+        let y = (Integer::ONE << (security.l_prime + security.epsilon - 1)).complete() + 1;
+        let r = run::<_, E, D>(&mut rng, security, x, y).expect_err("proof should not pass");
         match r.reason() {
             InvalidProofReason::RangeCheck(7) => (),
             e => panic!("proof should not fail with: {e:?}"),
         }
     }
 
-    fn failing_on_multiplicative<C: Curve, D: Digest>() {
+    fn failing_on_multiplicative<E: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l_x: 1024,
-            l_y: 1024,
+            l: 1024,
+            l_prime: 1024,
             epsilon: 300,
         };
-        let x = (Integer::ONE << (security.l_x + security.epsilon - 1)).complete() + 1;
-        let y = Integer::from_rng_half_pm(&(Integer::ONE << security.l_y).complete(), &mut rng);
-        let r = run::<_, C, D>(&mut rng, security, x, y).expect_err("proof should not pass");
+        let x = (Integer::ONE << (security.l + security.epsilon - 1)).complete() + 1;
+        let y = Integer::from_rng_half_pm(&(Integer::ONE << security.l_prime).complete(), &mut rng);
+        let r = run::<_, E, D>(&mut rng, security, x, y).expect_err("proof should not pass");
         match r.reason() {
             InvalidProofReason::RangeCheck(6) => (),
             e => panic!("proof should not fail with: {e:?}"),
@@ -630,14 +630,14 @@ mod test {
 
     #[test]
     fn passing_million() {
-        passing_test::<crate::curve::C, sha2::Sha256>()
+        passing_test::<crate::curve::E, sha2::Sha256>()
     }
     #[test]
     fn failing_million_add() {
-        failing_on_additive::<crate::curve::C, sha2::Sha256>()
+        failing_on_additive::<crate::curve::E, sha2::Sha256>()
     }
     #[test]
     fn failing_million_mul() {
-        failing_on_multiplicative::<crate::curve::C, sha2::Sha256>()
+        failing_on_multiplicative::<crate::curve::E, sha2::Sha256>()
     }
 }
