@@ -368,12 +368,12 @@ pub mod interactive {
         // Five equality checks and two range checks
         {
             let lhs = {
-                let e_at_d = data
+                let challenge_at_d = data
                     .n_j
                     .omul(challenge, data.d)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
                 data.n_j
-                    .oadd(&commitment.a, &e_at_d)
+                    .oadd(&commitment.a, &challenge_at_d)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
             let rhs = {
@@ -398,12 +398,12 @@ pub mod interactive {
         }
         {
             let lhs = {
-                let e_at_y = data
+                let challenge_at_y = data
                     .n_i
                     .omul(challenge, data.y)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
                 data.n_i
-                    .oadd(&commitment.b_y, &e_at_y)
+                    .oadd(&commitment.b_y, &challenge_at_y)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
             let rhs = data
