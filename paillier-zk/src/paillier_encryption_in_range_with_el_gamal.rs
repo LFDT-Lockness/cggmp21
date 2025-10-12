@@ -476,10 +476,10 @@ mod test {
 
     #[test]
     fn passing_million() {
-        passing_test::<crate::curve::C, sha2::Sha256>()
+        passing_test::<crate::curve::E, sha2::Sha256>()
     }
     #[test]
     fn failing_million_add() {
-        failing_test::<crate::curve::C, sha2::Sha256>()
+        failing_test::<crate::curve::E, sha2::Sha256>()
     }
 }

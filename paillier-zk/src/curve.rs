@@ -260,9 +260,9 @@ impl generic_ec::core::IntegerEncoding for Scalar {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord, Default)]
-pub struct C;
+pub struct E;
 
-impl generic_ec::Curve for C {
+impl generic_ec::Curve for E {
     const CURVE_NAME: &'static str = "test curve Z/1000000007";
     type Point = MillionRing;
     type Scalar = Scalar;
