@@ -3,6 +3,8 @@ use rand::{seq::SliceRandom, Rng, RngCore};
 use rand_dev::DevRng;
 use sha2::Sha256;
 
+use crypto_ctrng::RandomBlockSource;
+
 use cggmp24::{
     key_share::{AnyKeyShare, IncompleteKeyShare, KeyShare},
     ExecutionId,
@@ -24,12 +26,25 @@ where
     Point<E>: generic_ec::coords::HasAffineX<E>,
 {
     let mut rng = DevRng::new();
-    let incomplete_shares = run_keygen(t, n, hd_enabled, &mut rng);
-    let shares = run_aux_gen(incomplete_shares, &mut rng);
-    run_signing(&shares, hd_enabled, &mut rng);
+
+    // 1) Initialize your IPFS randomness source
+    let gateway = "https://ipfs.io";
+    let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+    let mut ctrng = crypto_ctrng::IpfsCtrngClient::new(gateway, beacon_key);
+
+    // 2) Fetch one 32-byte block per simulated party
+    let mut base_seeds: Vec<[u8; 32]> = Vec::new();
+    for _ in 0..n {
+        let seed = ctrng.next_block().expect("failed to fetch IPFS block");
+        println!("Seed: {:?}", hex::encode(seed));
+        base_seeds.push(seed);
+    }
+    let incomplete_shares = run_keygen(t, n, hd_enabled, &base_seeds, &mut rng);
+    let shares = run_aux_gen(incomplete_shares, &base_seeds, &mut rng);
+    run_signing(&shares, hd_enabled, &base_seeds, &mut rng);
 }
 
-fn run_keygen<E>(t: u16, n: u16, hd_enabled: bool, rng: &mut DevRng) -> Vec<IncompleteKeyShare<E>>
+fn run_keygen<E>(t: u16, n: u16, hd_enabled: bool, base_seeds: &[[u8; 32]], rng: &mut DevRng) -> Vec<IncompleteKeyShare<E>>
 where
     E: Curve,
 {
@@ -41,7 +56,8 @@ where
 
     round_based::sim::run(n, |i, party| {
         let party = cggmp24_tests::buffer_outgoing(party);
-        let mut party_rng = rng.fork();
+        let stage_seed = crypto_ctrng::derive_seed(eid.as_bytes(), i, 1, &base_seeds[usize::from(i)]);
+        let mut party_rng = crypto_ctrng::rng_from_seed_block(stage_seed);
 
         async move {
             let keygen = cggmp24::keygen(eid, i, n).set_threshold(t);
@@ -57,7 +73,7 @@ where
     .into_vec()
 }
 
-fn run_aux_gen<E>(shares: Vec<IncompleteKeyShare<E>>, rng: &mut DevRng) -> Vec<KeyShare<E>>
+fn run_aux_gen<E>(shares: Vec<IncompleteKeyShare<E>>, base_seeds: &[[u8; 32]], rng: &mut DevRng) -> Vec<KeyShare<E>>
 where
     E: Curve,
 {
@@ -69,7 +85,8 @@ where
 
     let aux_infos = round_based::sim::run(n, |i, party| {
         let party = cggmp24_tests::buffer_outgoing(party);
-        let mut party_rng = rng.fork();
+        let stage_seed = crypto_ctrng::derive_seed(eid.as_bytes(), i, 2, &base_seeds[usize::from(i)]);
+        let mut party_rng = crypto_ctrng::rng_from_seed_block(stage_seed);
         let pregenerated_data = primes.next().expect("Can't fetch primes");
         async move {
             cggmp24::aux_info_gen(eid, i, n, pregenerated_data)
@@ -90,7 +107,7 @@ where
         .collect()
 }
 
-fn run_signing<E>(shares: &[KeyShare<E>], random_derivation_path: bool, rng: &mut DevRng)
+fn run_signing<E>(shares: &[KeyShare<E>], random_derivation_path: bool, base_seeds: &[[u8; 32]], rng: &mut DevRng)
 where
     E: Curve + cggmp24_tests::CurveParams,
     Point<E>: generic_ec::coords::HasAffineX<E>,
@@ -124,7 +141,9 @@ where
 
     let sig = round_based::sim::run_with_setup(participants_shares, |i, party, share| {
         let party = cggmp24_tests::buffer_outgoing(party);
-        let mut party_rng = rng.fork();
+        let pid: u16 = participants[usize::from(i)];
+        let stage_seed = crypto_ctrng::derive_seed(eid.as_bytes(), pid, 3, &base_seeds[usize::from(pid)]);
+        let mut party_rng = crypto_ctrng::rng_from_seed_block(stage_seed);
 
         #[cfg(feature = "hd-wallet")]
         let derivation_path = derivation_path.clone();

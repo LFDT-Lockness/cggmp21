@@ -8,6 +8,8 @@ publish = false
 
 [dependencies]
 cggmp24 = { workspace = true, features = ["all-curves", "spof", "state-machine"] }
+crypto-ctrng = { path = "../../crypto-ctrng" }
+
 
 anyhow = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
