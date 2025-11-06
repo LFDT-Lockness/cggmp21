@@ -92,9 +92,11 @@ impl<L: SecurityLevel> Validate for DirtyAuxInfo<L> {
     type Error = InvalidKeyShare;
 
     fn is_valid(&self) -> Result<(), InvalidKeyShare> {
-        if self.pedersen_params.iter().any(|p| {
-            p.s.gcd_ref(&p.hat_N) != Integer::one() || p.t.gcd_ref(&p.hat_N) != Integer::one()
-        }) {
+        if self
+            .pedersen_params
+            .iter()
+            .any(|p| !p.s.gcd_ref(&p.hat_N).is_one() || !p.t.gcd_ref(&p.hat_N).is_one())
+        {
             return Err(InvalidKeyShareReason::StGcdN.into());
         }
 

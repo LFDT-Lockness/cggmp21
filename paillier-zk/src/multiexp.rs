@@ -30,8 +30,8 @@ impl MultiexpTable {
         if s.cmp0().is_le()
             || t.cmp0().is_le()
             || N <= Integer::one()
-            || s.gcd_ref(&N) != Integer::one()
-            || t.gcd_ref(&N) != Integer::one()
+            || !s.gcd_ref(&N).is_one()
+            || !t.gcd_ref(&N).is_one()
         {
             return None;
         }
