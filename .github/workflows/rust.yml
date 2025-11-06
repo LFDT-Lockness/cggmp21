@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  RUSTFLAGS: -D warnings
+  RUSTFLAGS: --deny warnings
 
 jobs:
   build:
@@ -25,23 +25,26 @@ jobs:
       with:
         name: benchmark-tool
         path: target/release/measure_perf
-  # Checks each library without default features
+  # Checks each library without default features. Some libraries don't compile
+  # with missing feature for backend, so we have to add it back
   bare_check:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         package:
-        - key-share
-        - cggmp24-keygen
-        - cggmp24
-        - paillier-zk
+        - name: key-share
+        - name: cggmp24-keygen
+        - name: cggmp24
+          backend: "--features=backend-num-bigint"
+        - name: paillier-zk
+          backend: "--features=backend-num-bigint"
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
     - name: Build
-      run: cargo check --no-default-features -p ${{ matrix.package }}
+      run: cargo check --no-default-features ${{ matrix.package.backend }} --package ${{ matrix.package.name }}
   build-wasm-nostd:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +58,7 @@ jobs:
       run:
         (cd wasm/no_std && cargo build --target wasm32-unknown-unknown)
 
-  # Run tests with default features (without HD wallets support)
+  # Run tests with default features (num-bigint) (without HD wallets support)
   test-default-features:
     runs-on: ubuntu-latest
     steps:
@@ -64,9 +67,22 @@ jobs:
       with:
         cache-on-failure: "true"
     - name: Run tests
-      # we exclude paillier-zk, as tests require all features to be enabled
-      run: cargo test -r --workspace --exclude paillier-zk
-  # Run tests with all features, including HD wallets support
+      # we exclude paillier-zk, as tests require __internal_doctest to be enabled
+      run: cargo test --release --workspace --exclude paillier-zk
+  # Run tests with default features and rug (without HD wallets support)
+  test-rug-default-features:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Run tests
+      # we exclude paillier-zk, as tests require __internal_doctest to be enabled
+      run: |
+        cargo test --release --workspace --exclude paillier-zk \
+          --no-default-features --features std,backend-rug
+  # Run tests with all features, including HD wallets support (num-bigint)
   test-all-features:
     runs-on: ubuntu-latest
     steps:
@@ -75,7 +91,19 @@ jobs:
       with:
         cache-on-failure: "true"
     - name: Run tests
-      run: cargo test -r --all-features
+      run: cargo test --release --all-features
+  # Run tests with all features, including HD wallets support (rug)
+  test-rug-all-features:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
+    - name: Run tests
+      run: |
+        cargo test --release --no-default-features --features \
+          std,hd-wallet,serde,state-machine,all-curves,hd-slip10,hd-stark,spof,insecure-assume-preimage-known,__internal_doctest,backend-rug
 
   fmt:
     runs-on: ubuntu-latest
