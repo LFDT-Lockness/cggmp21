@@ -192,12 +192,12 @@ impl IntegerExt for Integer {
 
     fn from_rng_half_pm<R: rand_core::RngCore>(rng: &mut R, range: &Self) -> Self {
         if range.is_even() {
-            let half_range = range >> 1u32;
+            let half_range = range >> 1;
             let range_plus_one = range + 1u32;
             range_plus_one.random_below(rng) - half_range
         } else {
             // range is odd, so half of the range minus one is range / 2
-            let half_range_minus_one = range >> 1u32;
+            let half_range_minus_one = range >> 1;
             range.random_below_ref(rng) - half_range_minus_one
         }
     }
@@ -206,7 +206,7 @@ impl IntegerExt for Integer {
         // If range is even, range >> 1 is exactly range / 2
         // If range is odd, range >> 1 == (range - 1) >> 1 == (range - 1) / 2 as
         // the lowest bit is discarded either way
-        let bound = range >> 1u32;
+        let bound = range >> 1;
         self.cmp_abs(&bound).is_le()
     }
 }
@@ -384,8 +384,8 @@ mod _test {
 
         // Random integers within the range
         for _ in 0..100 {
-            let x = (&x_max + 1u32).random_below(&mut rng);
-            let y = (&y_max + 1u32).random_below(&mut rng);
+            let x = (&x_max + 1u8).random_below(&mut rng);
+            let y = (&y_max + 1u8).random_below(&mut rng);
 
             let x = if rand::Rng::gen(&mut rng) { x } else { -x };
             let y = if rand::Rng::gen(&mut rng) { y } else { -y };
@@ -404,7 +404,7 @@ mod _test {
         let mut rng = rand_dev::DevRng::new();
         // Testing even case
         let range = Integer::from(10);
-        let upper_bound = &range >> 1u32;
+        let upper_bound = &range >> 1;
         let lower_bound = -&upper_bound;
         let mut min = Integer::from(0);
         let mut max = Integer::from(0);
@@ -432,7 +432,7 @@ mod _test {
         // Testing odd case
         let range = Integer::from(9);
         let range_minus_one = &range - Integer::one();
-        let upper_bound = range_minus_one >> 1u32;
+        let upper_bound = range_minus_one >> 1;
         let lower_bound = -&upper_bound;
         let mut min = Integer::from(0);
         let mut max = Integer::from(0);

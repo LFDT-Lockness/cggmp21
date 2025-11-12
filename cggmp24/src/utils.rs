@@ -246,10 +246,7 @@ mod test {
         assert_eq!(sqrt(&Integer::from(7)), Integer::from(2));
         assert_eq!(sqrt(&Integer::from(8)), Integer::from(2));
         assert_eq!(sqrt(&Integer::from(9)), Integer::from(3));
-        assert_eq!(
-            sqrt(&(Integer::from(1) << 1024_u32)),
-            Integer::from(1) << 512_u32
-        );
+        assert_eq!(sqrt(&(Integer::from(1) << 1024)), Integer::from(1) << 512);
 
         let modulo = Integer::one() << 1024_u32;
         let mut rng = rand_dev::DevRng::new();

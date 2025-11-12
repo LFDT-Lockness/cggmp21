@@ -12,7 +12,7 @@ pub fn blum_sqrt(x: &Integer, p: &Integer, q: &Integer, n: &Integer) -> Integer 
     // Exponent in pq Blum modulus to obtain the principal square root.
     // Described in [Handbook of Applied cryptography, p. 75, Fact
     // 2.160](https://cacr.uwaterloo.ca/hac/about/chap2.pdf)
-    let e = ((p - 1u8) * (q - 1u8) + 4) / 8;
+    let e = ((p - 1) * (q - 1) + 4) / 8;
 
     // e guaranteed to be non-negative by the prerequisite that p and q are blum primes
     #[allow(clippy::expect_used)]

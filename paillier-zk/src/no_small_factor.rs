@@ -324,7 +324,7 @@ pub mod interactive {
                 aux.is_in_mult_group(&lhs),
             )?;
         }
-        let range = (Integer::from(1_u32) << (security.l + security.epsilon)) * data.n_root;
+        let range = (Integer::from(1) << (security.l + security.epsilon)) * data.n_root;
         // range check for z1
         fail_if(
             InvalidProofReason::RangeCheck(12),

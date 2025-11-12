@@ -153,7 +153,7 @@ pub mod interactive {
         challenge: &Challenge<M>,
     ) -> Result<Proof<M>, Error> {
         let blum_sqrt = |x| blum_sqrt(&x, p, q, n);
-        let phi = (p - 1u8) * (q - 1u8);
+        let phi = (p - 1) * (q - 1);
         let n_inverse = n.invert_ref(&phi).ok_or(ErrorReason::Invert)?;
 
         // We do an extra allocation as workaround while `array::try_map` is not stable
@@ -218,7 +218,7 @@ pub mod interactive {
             };
             if point
                 .x
-                .pow_mod_ref(&4_u32.into(), data.n)
+                .pow_mod_ref(&4.into(), data.n)
                 .ok_or(InvalidProofReason::ModPow)?
                 != y
             {
