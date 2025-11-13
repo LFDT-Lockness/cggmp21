@@ -12,7 +12,7 @@ exclude = [
 ]
 
 [workspace.dependencies]
-cggmp24 = { version = "0.7.0-alpha.1", path = "cggmp24" }
+cggmp24 = { version = "0.7.0-alpha.1", default-features = false, path = "cggmp24" }
 cggmp24-keygen = { version = "0.7.0-alpha.1", path = "cggmp24-keygen" }
 key-share = { version = "0.6.1", path = "key-share", default-features = false }
 paillier-zk = { version = "0.7.0-alpha.1", path = "paillier-zk", default-features = false }

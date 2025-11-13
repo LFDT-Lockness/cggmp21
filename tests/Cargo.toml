@@ -7,7 +7,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cggmp24 = { workspace = true, features = ["all-curves", "spof", "state-machine"] }
+cggmp24 = { workspace = true, default-features = false, features = ["all-curves", "spof", "state-machine"] }
 
 anyhow = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -44,7 +44,12 @@ url = "2.4"
 criterion = "0.5"
 
 [features]
+default = ["backend-num-bigint"]
+
 hd-wallet = ["cggmp24/hd-wallet", "cggmp24/hd-slip10", "cggmp24/hd-stark"]
+
+backend-rug = ["cggmp24/backend-rug"]
+backend-num-bigint = ["cggmp24/backend-num-bigint"]
 
 [[bin]]
 name = "precompute_shares"

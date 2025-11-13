@@ -19,7 +19,7 @@ generic-ec = { workspace = true, features = ["serde", "udigest", "hash-to-scalar
 generic-ec-zkp = { workspace = true, features = ["serde", "udigest"] }
 round-based = { workspace = true, features = ["derive"] }
 
-paillier-zk = { workspace = true, features = ["serde"] }
+paillier-zk = { workspace = true, default-features = false, features = ["serde"] }
 udigest = { workspace = true, features = ["std", "derive"]}
 
 digest = { workspace = true }
