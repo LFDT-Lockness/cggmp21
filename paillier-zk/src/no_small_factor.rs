@@ -314,10 +314,7 @@ pub mod interactive {
             let q_to_z1 = aux.pow_mod(&commitment.q, &proof.z1)?;
             let t_to_v = aux.pow_mod(&aux.t, &proof.v)?;
             let lhs = (q_to_z1 * t_to_v).modulo(&aux.rsa_modulo);
-            let rhs = aux
-                .rsa_modulo
-                .combine(&commitment.t, &Integer::one(), &r, challenge)
-                .ok_or_else(crate::BadExponent::undefined)?;
+            let rhs = &commitment.t * aux.pow_mod(&r, challenge)? % &aux.rsa_modulo;
             fail_if_ne(InvalidProofReason::EqualityCheck(10), &lhs, &rhs)?;
             fail_if(
                 InvalidProofReason::MultGroupCheck(11),
@@ -408,8 +405,6 @@ pub mod non_interactive {
 
 #[cfg(test)]
 mod test {
-    use fast_paillier::backend::Integer;
-
     use crate::common::test::generate_blum_prime;
     use crate::common::InvalidProofReason;
 
@@ -492,18 +487,5 @@ mod test {
             InvalidProofReason::RangeCheck(12) => (),
             e => panic!("Proof should not fail with {e:?}"),
         }
-    }
-
-    #[test]
-    fn test_sqrt() {
-        assert_eq!(Integer::from(1).sqrt().unwrap(), Integer::from(1));
-        assert_eq!(Integer::from(2).sqrt().unwrap(), Integer::from(1));
-        assert_eq!(Integer::from(3).sqrt().unwrap(), Integer::from(1));
-        assert_eq!(Integer::from(4).sqrt().unwrap(), Integer::from(2));
-        assert_eq!(Integer::from(5).sqrt().unwrap(), Integer::from(2));
-        assert_eq!(Integer::from(6).sqrt().unwrap(), Integer::from(2));
-        assert_eq!(Integer::from(7).sqrt().unwrap(), Integer::from(2));
-        assert_eq!(Integer::from(8).sqrt().unwrap(), Integer::from(2));
-        assert_eq!(Integer::from(9).sqrt().unwrap(), Integer::from(3));
     }
 }

@@ -196,7 +196,8 @@ impl IntegerExt for Integer {
             let range_plus_one = range + 1u32;
             range_plus_one.random_below(rng) - half_range
         } else {
-            // range is odd, so half of the range minus one is range / 2
+            // range is odd, so half of the range minus one (that is `(range -
+            // 1) / 2`) is range / 2
             let half_range_minus_one = range >> 1;
             range.random_below_ref(rng) - half_range_minus_one
         }
