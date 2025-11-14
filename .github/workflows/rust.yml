@@ -25,8 +25,9 @@ jobs:
       with:
         name: benchmark-tool
         path: target/release/measure_perf
-  # Checks each library without default features. Some libraries don't compile
-  # with missing feature for backend, so we have to add it back
+  # Checks each library without default features. For libraries that require a
+  # backend choice and thus don't compile with default features, test with both
+  # backends
   bare_check:
     runs-on: ubuntu-latest
     strategy:
@@ -38,6 +39,10 @@ jobs:
           backend: "--features=backend-num-bigint"
         - name: paillier-zk
           backend: "--features=backend-num-bigint"
+        - name: cggmp24
+          backend: "--features=backend-rug"
+        - name: paillier-zk
+          backend: "--features=backend-rug"
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
