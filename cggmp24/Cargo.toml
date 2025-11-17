@@ -57,6 +57,9 @@ hd-slip10 = ["hd-wallet/slip10"]
 hd-stark = ["hd-wallet/stark"]
 spof = ["key-share/spof"]
 
+std = ["paillier-zk/std"]
+no_std = ["paillier-zk/no_std"]
+
 backend-rug = ["paillier-zk/backend-rug"]
 backend-num-bigint = ["paillier-zk/backend-num-bigint"]
 

@@ -37,8 +37,11 @@ anyhow = "1"
 serde_json = "1"
 
 [features]
-default = ["backend-num-bigint"]
+default = ["backend-num-bigint", "std"]
 serde = ["dep:serde", "dep:serde_with", "generic-ec/serde", "fast-paillier/serde"]
+
+std = ["fast-paillier/std"]
+no_std = ["fast-paillier/no_std"]
 
 backend-rug = ["fast-paillier/backend-rug"]
 backend-num-bigint = ["fast-paillier/backend-num-bigint"]

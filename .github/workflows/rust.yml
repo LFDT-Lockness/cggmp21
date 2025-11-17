@@ -36,13 +36,13 @@ jobs:
         - name: key-share
         - name: cggmp24-keygen
         - name: cggmp24
-          backend: "--features=backend-num-bigint"
+          backend: "--features=backend-num-bigint,std"
         - name: paillier-zk
-          backend: "--features=backend-num-bigint"
+          backend: "--features=backend-num-bigint,std"
         - name: cggmp24
-          backend: "--features=backend-rug"
+          backend: "--features=backend-rug,std"
         - name: paillier-zk
-          backend: "--features=backend-rug"
+          backend: "--features=backend-rug,std"
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
@@ -50,7 +50,7 @@ jobs:
         cache-on-failure: "true"
     - name: Build
       run: cargo check --no-default-features ${{ matrix.package.backend }} --package ${{ matrix.package.name }}
-  build-wasm-nostd:
+  check-wasm-nostd:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -60,8 +60,12 @@ jobs:
     - name: Install wasm32-unknown-unknown toolchain
       run: rustup target add wasm32-unknown-unknown
     - name: Build on wasm32-unknown-unknown (no_std)
-      run:
-        (cd wasm/no_std && cargo build --target wasm32-unknown-unknown)
+      run: |
+        cargo check --no-default-features \
+          --features backend-num-bigint,no_std,serde,hd-wallet,spof,udigest,state-machine \
+          --workspace --exclude cggmp24-tests \
+          --target wasm32-unknown-unknown
+
 
   # Run tests with default features (num-bigint) (without HD wallets support)
   test-default-features:
