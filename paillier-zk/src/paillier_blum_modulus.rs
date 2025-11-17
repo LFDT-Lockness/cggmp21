@@ -50,6 +50,7 @@
 //!     &shared_state,
 //!     data,
 //!     &proof,
+//!     &mut rng,
 //! )?;
 //! # Ok(()) }
 //! ```
@@ -176,13 +177,16 @@ pub mod interactive {
 
     /// Verify the proof. If this succeeds, the relation Rmod holds with chance
     /// `1/2^M`
-    pub fn verify<const M: usize>(
+    ///
+    /// Rng is used for primality checking of input data
+    pub fn verify<const M: usize, R: RngCore>(
         data: Data,
         commitment: &Commitment,
         challenge: &Challenge<M>,
         proof: &Proof<M>,
+        rng: &mut R,
     ) -> Result<(), InvalidProof> {
-        if data.n.is_probably_prime(25) != fast_paillier::backend::IsPrime::No {
+        if data.n.is_probably_prime(25, rng) != fast_paillier::backend::IsPrime::No {
             return Err(InvalidProofReason::ModulusIsPrime.into());
         }
         if data.n.is_even() {
@@ -263,13 +267,16 @@ pub mod non_interactive {
     }
 
     /// Verify the proof, deriving challenge independently from same data
+    ///
+    /// Rng is used for primality checking of input data
     pub fn verify<const M: usize, D: Digest>(
         shared_state: &impl udigest::Digestable,
         data: Data,
         proof: &NiProof<M>,
+        rng: &mut impl rand_core::RngCore,
     ) -> Result<(), InvalidProof> {
         let challenge = challenge::<M, D>(shared_state, data, &proof.commitment);
-        super::interactive::verify(data, &proof.commitment, &challenge, &proof.proof)
+        super::interactive::verify(data, &proof.commitment, &challenge, &proof.proof, rng)
     }
 
     /// Deterministically compute challenge based on prior known values in protocol
@@ -307,7 +314,7 @@ mod test {
         let shared_state = "shared state";
         let proof =
             super::non_interactive::prove::<65, D>(&shared_state, data, pdata, &mut rng).unwrap();
-        let r = super::non_interactive::verify::<65, D>(&shared_state, data, &proof);
+        let r = super::non_interactive::verify::<65, D>(&shared_state, data, &proof, &mut rng);
         match r {
             Ok(()) => (),
             Err(e) => panic!("{e:?}"),
@@ -331,7 +338,7 @@ mod test {
         let shared_state = "shared state";
         let proof =
             super::non_interactive::prove::<65, D>(&shared_state, data, pdata, &mut rng).unwrap();
-        let r = super::non_interactive::verify::<65, D>(&shared_state, data, &proof);
+        let r = super::non_interactive::verify::<65, D>(&shared_state, data, &proof, &mut rng);
         if r.is_ok() {
             panic!("proof should not pass");
         }

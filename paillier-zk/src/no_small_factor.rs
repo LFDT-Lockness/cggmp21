@@ -314,7 +314,7 @@ pub mod interactive {
             let q_to_z1 = aux.pow_mod(&commitment.q, &proof.z1)?;
             let t_to_v = aux.pow_mod(&aux.t, &proof.v)?;
             let lhs = (q_to_z1 * t_to_v).modulo(&aux.rsa_modulo);
-            let rhs = &commitment.t * aux.pow_mod(&r, challenge)? % &aux.rsa_modulo;
+            let rhs = (&commitment.t * aux.pow_mod(&r, challenge)?).modulo(&aux.rsa_modulo);
             fail_if_ne(InvalidProofReason::EqualityCheck(10), &lhs, &rhs)?;
             fail_if(
                 InvalidProofReason::MultGroupCheck(11),

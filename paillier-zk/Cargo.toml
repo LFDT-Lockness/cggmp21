@@ -14,7 +14,7 @@ keywords = ["paillier", "zk-proofs", "zero-knowledge"]
 generic-ec = { version = "0.4", features = ["udigest"] }
 rand_core = { version = "0.6", default-features = false }
 digest = "0.10"
-fast-paillier = { version = "0.2", default-features = false }
+fast-paillier = { workspace = true }
 
 thiserror = "1"
 

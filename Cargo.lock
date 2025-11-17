@@ -862,9 +862,9 @@ dependencies = [
 
 [[package]]
 name = "fast-paillier"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f0904487b0a1bef71300cc2067e1f28368318bcd051cab7050c163ac21131d6"
+checksum = "c1508551853c688895dff13b40ab047b31ae9c90dccb3bb90183257ada04777d"
 dependencies = [
  "bytemuck",
  "glass_pumpkin",
@@ -875,7 +875,7 @@ dependencies = [
  "rand_core",
  "rug",
  "serde",
- "thiserror 1.0.48",
+ "thiserror 2.0.4",
 ]
 
 [[package]]
@@ -1150,9 +1150,9 @@ dependencies = [
 
 [[package]]
 name = "glass_pumpkin"
-version = "1.7.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56c7192ec6aa88ce6bcc2375ddcbf0df89a4f63e4b5b36ffe4ecf8277323cb69"
+checksum = "41923edfeadce2964192d185f7f9f9e5d8737e6f5b8ee2580b0f02f717e81bd0"
 dependencies = [
  "core2",
  "num-bigint 0.4.6",
@@ -1650,9 +1650,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.17.0"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "oorandom"

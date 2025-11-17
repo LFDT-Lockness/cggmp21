@@ -439,6 +439,7 @@ where
                 },
                 π_mod::Data { n: &decommitment.N },
                 &proof_msg.mod_proof,
+                rng,
             )
             .is_err()
         },
