@@ -298,7 +298,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cggmp24"
-version = "0.7.0-alpha.1"
+version = "0.7.0-alpha.2"
 dependencies = [
  "cggmp24-keygen",
  "digest",
@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "paillier-zk"
-version = "0.7.0-alpha.1"
+version = "0.7.0-alpha.2"
 dependencies = [
  "anyhow",
  "digest",

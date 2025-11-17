@@ -1,7 +1,8 @@
 # CGGMP24 releases
 
 ## v0.7.0
-Proofs are updated to follow the latest CGGMP24 paper revision.
+* Proofs are updated to follow the latest CGGMP24 paper revision.
+* Change big integer backend to be abstract, selectable between rug and num-bigint [#13]
 
 # CGGMP21 releases
 
