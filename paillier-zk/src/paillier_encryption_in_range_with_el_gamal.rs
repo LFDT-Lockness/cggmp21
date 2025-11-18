@@ -40,8 +40,8 @@
 //! // Both parties know predefined security parameters and verifier's aux data
 //! let aux: p::Aux = pregenerated::verifier_aux();
 //! let security = p::SecurityParams {
-//!     l: 1024,
-//!     epsilon: 128,
+//!     l: 256,
+//!     epsilon: 512,
 //! };
 //! // ...and someone's encryption key
 //! let key: fast_paillier::EncryptionKey =
@@ -461,8 +461,8 @@ mod test {
     fn passing_test<C: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l: 1024,
-            epsilon: 300,
+            l: 256,
+            epsilon: 512,
         };
         let plaintext = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l));
         run_with::<C, D>(&mut rng, security, plaintext).expect("proof failed");
@@ -471,8 +471,8 @@ mod test {
     fn failing_test<C: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l: 1024,
-            epsilon: 300,
+            l: 256,
+            epsilon: 512,
         };
         let plaintext = (Integer::one() << (security.l + security.epsilon - 1)) + 1;
         let r = run_with::<C, D>(&mut rng, security, plaintext).expect_err("proof should not pass");

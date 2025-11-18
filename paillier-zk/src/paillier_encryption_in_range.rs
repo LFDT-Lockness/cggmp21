@@ -33,8 +33,8 @@
 //!
 //! let aux: p::Aux = pregenerated::verifier_aux();
 //! let security = p::SecurityParams {
-//!     l: 1024,
-//!     epsilon: 128,
+//!     l: 256,
+//!     epsilon: 512,
 //!     q: Integer::curve_order::<generic_ec::curves::Secp256k1>(),
 //! };
 //!
@@ -421,8 +421,8 @@ mod test {
     fn passing() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l: 1024,
-            epsilon: 256,
+            l: 256,
+            epsilon: 512,
             q: Integer::curve_order::<generic_ec::curves::Secp256k1>(),
         };
         let plaintext = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l));
@@ -436,8 +436,8 @@ mod test {
     fn failing() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l: 1024,
-            epsilon: 256,
+            l: 256,
+            epsilon: 512,
             q: Integer::curve_order::<generic_ec::curves::Secp256k1>(),
         };
         let plaintext = (Integer::one() << (security.l + security.epsilon)) + 1;

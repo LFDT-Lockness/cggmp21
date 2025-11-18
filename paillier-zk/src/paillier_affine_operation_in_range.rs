@@ -615,9 +615,9 @@ mod test {
     fn passing_test<C: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l_x: 1024,
-            l_y: 1024,
-            epsilon: 300,
+            l_x: 256,
+            l_y: 1280,
+            epsilon: 512,
         };
         let x = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_x));
         let y = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_y));
@@ -627,9 +627,9 @@ mod test {
     fn failing_on_additive<C: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l_x: 1024,
-            l_y: 1024,
-            epsilon: 300,
+            l_x: 256,
+            l_y: 1280,
+            epsilon: 512,
         };
         let x = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_x));
         let y = (Integer::one() << (security.l_y + security.epsilon - 1)) + 1;
@@ -643,9 +643,9 @@ mod test {
     fn failing_on_multiplicative<C: Curve, D: Digest>() {
         let mut rng = rand_dev::DevRng::new();
         let security = super::SecurityParams {
-            l_x: 1024,
-            l_y: 1024,
-            epsilon: 300,
+            l_x: 256,
+            l_y: 1280,
+            epsilon: 512,
         };
         let x = (Integer::one() << (security.l_x + security.epsilon - 1)) + 1;
         let y = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_y));
