@@ -111,8 +111,22 @@ jobs:
         cache-on-failure: "true"
     - name: Run tests
       run: |
-        cargo test --release --no-default-features --features \
-          std,hd-wallet,serde,state-machine,all-curves,hd-slip10,hd-stark,spof,insecure-assume-preimage-known,__internal_doctest,backend-rug
+        # We can't set --all-features as that will set backend-num-bigint which overrides rug, so we list all features except that
+        features=std,hd-wallet,serde,state-machine,all-curves,hd-slip10,hd-stark,spof,insecure-assume-preimage-known,__internal_doctest,backend-rug
+
+        # Check that num-bigint was not present as a dependency of fast-paillier
+        found=$(cargo tree --no-default-features --features $features --no-dedupe |
+          # In the output of cargo tree, find lines between fast-paillier,
+          # which with this indentation means it was a top-level dependency,
+          # until another top-level dependency, and in those lines grep for
+          # num-bigint
+          awk '/^├── fast-paillier/{p=1;next} /^[└├]/{p=0} p' | grep num-bigint -q || echo NOTFOUND)
+        if [ NOTFOUND != "$found" ]; then
+          echo "found num-bigint in dependencies of fast-paillier when the num-bigint backend should not be selected!"
+          exit 1
+        fi
+
+        cargo test --release --no-default-features --features $features
 
   fmt:
     runs-on: ubuntu-latest
