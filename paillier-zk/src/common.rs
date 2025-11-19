@@ -286,14 +286,14 @@ pub mod test {
     use fast_paillier::backend::Integer;
 
     pub fn random_key<R: rand_core::RngCore>(rng: &mut R) -> Option<fast_paillier::DecryptionKey> {
-        let p = generate_blum_prime(rng, 1024);
-        let q = generate_blum_prime(rng, 1024);
+        let p = generate_blum_prime(rng, 1536);
+        let q = generate_blum_prime(rng, 1536);
         fast_paillier::DecryptionKey::from_primes(p, q).ok()
     }
 
     pub fn aux<R: rand_core::RngCore>(rng: &mut R) -> super::Aux {
-        let p = generate_blum_prime(rng, 1024);
-        let q = generate_blum_prime(rng, 1024);
+        let p = generate_blum_prime(rng, 1536);
+        let q = generate_blum_prime(rng, 1536);
         let n = &p * &q;
 
         let (s, t) = {
