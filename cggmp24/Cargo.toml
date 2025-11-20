@@ -46,7 +46,7 @@ rand_dev = { workspace = true }
 generic-tests = { workspace = true }
 
 [features]
-default = ["backend-num-bigint"]
+default = ["std", "backend-num-bigint"]
 
 all-curves = ["curve-secp256k1", "curve-secp256r1", "curve-stark"]
 curve-secp256k1 = ["generic-ec/curve-secp256k1", "hd-wallet?/curve-secp256k1"]

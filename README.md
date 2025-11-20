@@ -21,6 +21,7 @@
 - [HD wallets support](#hd-wallets-support)
 - [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
 - [Big integer implementation](#big-integer-implementation)
+- [no\_std compatability](#no_std-compatability)
 - [Differences between the implementation and CGGMP24](#differences-between-the-implementation-and-cggmp24)
 - [Timing attacks](#timing-attacks)
 - [Join us in Discord!](#join-us-in-discord)
@@ -242,6 +243,23 @@ choice between two backends: rug and num-bigint.
 some applications by several times, but requires an LGPL dependency
 - To use num-bigint, select the feature `backend-num-bigint` (selected as
 **default** feature)
+
+## no\_std compatability
+
+Every crate in this project is compatible with no\_std, provided that
+`num-bigint` backend is chosen. The presence of `alloc` is still required. This
+means that `cggmp24` and `cggmp24-keygen` can be run on a
+`wasm32-unknown-unknown` platform.
+
+To compile the crates for `no_std`, you need to disable the default feature
+"std" and instead enable `no_std` for some crates. The dependencies in your
+cargo file should look like this:
+
+```toml
+cggmp24 = { version = "0.7", default-features = false, features = ["no_std", "backend-num-bigint"] }
+cggmp24-keygen = { version = "0.7", default-features = false }
+key-share = { version = "0.6", default-features = false }
+```
 
 ## Differences between the implementation and CGGMP24
 [CGGMP24] only defines a non-threshold protocol. To support general thresholds,
