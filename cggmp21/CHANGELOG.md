@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.6.3
+* Use `paillier-zk v0.4.3` that has patched ZK proof which includes a missing check
+
+> [!WARNING]  
+> This library version implements CGGMP21 which uses Zero-Knowledge proofs as defined the CGGMP21
+> paper, which contains a critical vulnerability that could lead to full private key recovery.
+> 
+> While we have patched this specific high-severity issue, ZK proofs still lacks other important
+> security checks introduced in the revised CGGMP24 paper. The absence of these checks may expose
+> other security risks.
+> 
+> For complete protection, please upgrade to the CGGMP24.
+
 ## v0.6.2
 * Update the protocol to match the spec
 
