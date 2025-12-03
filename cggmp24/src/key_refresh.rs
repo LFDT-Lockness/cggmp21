@@ -18,7 +18,7 @@ use crate::{
 #[doc(no_inline)]
 pub use self::msg::Msg;
 
-#[doc = include_str!("../docs/mpc_message.md")]
+#[doc = include_str!("../../docs/mpc_message.md")]
 pub mod msg {
     pub use crate::key_refresh::aux_only::{
         Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3,
@@ -186,7 +186,7 @@ where
         self
     }
 
-    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    #[doc = include_str!("../../docs/enforce_reliable_broadcast.md")]
     pub fn enforce_reliable_broadcast(self, v: bool) -> Self {
         Self {
             enforce_reliable_broadcast: v,
