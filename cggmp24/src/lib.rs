@@ -6,7 +6,7 @@
 //! # Threshold ECDSA based on [CGGMP24] paper
 //!
 //! <!-- TOC -->
-#![doc = include_str!("../docs/toc-cggmp24.md")]
+#![doc = include_str!("../../docs/toc-cggmp24.md")]
 //!
 //! [CGGMP24] is a state-of-art ECDSA TSS protocol that supports 1-round signing (requires 3 preprocessing rounds),
 //! identifiable abort, and a key refresh protocol.
