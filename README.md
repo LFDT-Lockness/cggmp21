@@ -9,24 +9,82 @@
 
 <!-- TOC STARTS -->
 
-- [Running the protocol](#running-the-protocol)
-  * [Networking](#networking)
-    + [Signer indices](#signer-indices)
-  * [Execution ID](#execution-id)
-  * [Auxiliary info generation](#auxiliary-info-generation)
-    + [On reusability of the auxiliary data](#on-reusability-of-the-auxiliary-data)
-  * [Distributed Key Generation (DKG)](#distributed-key-generation-dkg)
-  * [Signing](#signing)
-- [Sync API](#sync-api)
-- [HD wallets support](#hd-wallets-support)
-- [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
-- [Big integer implementation](#big-integer-implementation)
-- [no\_std compatability](#no_std-compatability)
-- [Differences between the implementation and CGGMP24](#differences-between-the-implementation-and-cggmp24)
-- [Timing attacks](#timing-attacks)
-- [Join us in Discord!](#join-us-in-discord)
+- [Threshold ECDSA based on CGGMP24 paper](#threshold-ecdsa-based-on-cggmp24-paper)
+  - [Quick Start](#quick-start)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Running Tests](#running-tests)
+      - [Signer indices](#signer-indices)
+    - [Execution ID](#execution-id)
+    - [Auxiliary info generation](#auxiliary-info-generation)
+      - [On reusability of the auxiliary data](#on-reusability-of-the-auxiliary-data)
+    - [Distributed Key Generation (DKG)](#distributed-key-generation-dkg)
+    - [Signing](#signing)
+  - [Sync API](#sync-api)
+  - [HD wallets support](#hd-wallets-support)
+  - [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
+  - [Big integer implementation](#big-integer-implementation)
+  - [no\_std compatability](#no_std-compatability)
+  - [Differences between the implementation and CGGMP24](#differences-between-the-implementation-and-cggmp24)
+  - [Timing attacks](#timing-attacks)
+  - [Join us in Discord!](#join-us-in-discord)
 
 <!-- TOC ENDS -->
+
+## Quick Start
+
+### Prerequisites
+
+**Windows (WSL2 Recommended)**
+```bash
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# Install build dependencies
+sudo apt update
+sudo apt install build-essential m4 pkg-config libssl-dev
+```
+
+**macOS**
+```bash
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install m4 (required for GMP)
+brew install m4
+```
+
+**Linux**
+```bash
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install build dependencies (Debian/Ubuntu)
+sudo apt install build-essential m4 pkg-config libssl-dev
+
+# Or for Fedora/RHEL
+sudo dnf install gcc m4 pkg-config openssl-devel
+```
+
+### Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+cggmp24 = "0.6"
+cggmp24-keygen = "0.6"
+generic-ec = "0.6"
+round-based = "0.4"
+```
+
+### Running Tests
+
+Run all tests in the workspace:
+```bash
+cargo test --workspace
+---
 
 [CGGMP24] is a state-of-art ECDSA TSS protocol that supports 1-round signing (requires 3 preprocessing rounds),
 identifiable abort, and a key refresh protocol.
