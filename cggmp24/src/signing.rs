@@ -192,7 +192,7 @@ pub struct Presignature<E: Curve> {
 /// Public part of the presignature that can be used to verify partial signatures from other parties
 ///
 /// They are used to validate partial signature produced by the signers from a presignature
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PresignaturePublicData<E: Curve> {
     /// $\Gamma$ presignature commitment
     pub Gamma: NonZero<Point<E>>,
@@ -201,7 +201,7 @@ pub struct PresignaturePublicData<E: Curve> {
 }
 
 /// Presignature commitment, used to verify partial signature correctness
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PresignatureCommitment<E: Curve> {
     /// $\tilde \Delta_j$
     pub tilde_Delta: Point<E>,
