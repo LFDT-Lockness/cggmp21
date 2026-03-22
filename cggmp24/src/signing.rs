@@ -479,6 +479,22 @@ where
         }
     }
 
+    /// Sets the additive shift directly as a raw scalar.
+    ///
+    /// The shift is added to the reconstructed secret during signing,
+    /// producing a signature for `shared_public_key + G * shift`.
+    /// Only party `i == 0` adds the shift to their secret share;
+    /// all parties update the public key commitment.
+    ///
+    /// This is useful for HD-wallet-like derivation schemes (e.g., BRC-42)
+    /// where the shift is computed externally rather than via
+    /// [`set_derivation_path`](Self::set_derivation_path).
+    #[cfg(feature = "hd-wallet")]
+    pub fn set_additive_shift(mut self, shift: Scalar<E>) -> Self {
+        self.additive_shift = Some(shift);
+        self
+    }
+
     /// Specifies HD derivation path
     ///
     /// ## Example
