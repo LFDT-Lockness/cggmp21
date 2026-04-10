@@ -363,6 +363,14 @@ enum Bug {
     ZeroShare,
     #[displaydoc("shared public key is zero - probability of that is negligible")]
     ZeroPk,
+    #[displaydoc("too few parties: n must be at least 2")]
+    TooFewParties,
+    #[displaydoc("threshold too small: t must be at least 2")]
+    ThresholdTooSmall,
+    #[displaydoc("threshold too large: t must not exceed n")]
+    ThresholdTooLarge,
+    #[displaydoc("party index out of range: i must be less than n")]
+    PartyIndexOutOfRange,
 }
 
 /// Distributed key generation protocol
