@@ -25,7 +25,6 @@
 //! * [Trusted dealer](crate::trusted_dealer) (importing key into TSS)
 //!
 //! This crate **does not** (currently) support:
-//! * Key refresh for both threshold (i.e., t-out-of-n) and non-threshold (i.e., n-out-of-n) keys
 //! * Identifiable abort
 //!
 //! Our implementation has been audited by Kudelski. Report can be found [here][report].
@@ -334,6 +333,8 @@ pub use {
 
 #[doc(inline)]
 pub use cggmp24_keygen::{keygen, progress, ExecutionId};
+/// Re-export of the key share refresh entry point from cggmp24-keygen
+pub use cggmp24_keygen::key_refresh as share_refresh;
 
 use generic_ec::{coords::HasAffineX, Curve, Point};
 use round_based::PartyIndex;
@@ -373,6 +374,15 @@ pub mod keygen {
 
     pub use msg::non_threshold::Msg as NonThresholdMsg;
     pub use msg::threshold::Msg as ThresholdMsg;
+
+    /// Key share refresh protocols
+    pub mod share_refresh {
+        pub use cggmp24_keygen::{
+            key_refresh, GenericKeyRefreshBuilder, KeyRefreshBuilder, KeyRefreshError,
+            ThresholdKeyRefreshBuilder,
+        };
+        pub use cggmp24_keygen::msg::key_refresh as msg;
+    }
 }
 
 pub use self::{

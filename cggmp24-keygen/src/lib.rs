@@ -21,6 +21,11 @@ mod non_threshold;
 /// Threshold DKG specific types
 mod threshold;
 
+/// Non-threshold key refresh specific types
+mod key_refresh_non_threshold;
+/// Threshold key refresh specific types
+mod key_refresh_threshold;
+
 mod errors;
 mod execution_id;
 mod utils;
@@ -45,6 +50,11 @@ use crate::{
 pub use self::execution_id::ExecutionId;
 #[doc(no_inline)]
 pub use self::msg::{non_threshold::Msg as NonThresholdMsg, threshold::Msg as ThresholdMsg};
+#[doc(no_inline)]
+pub use self::msg::key_refresh::{
+    NonThresholdMsg as KeyRefreshNonThresholdMsg,
+    ThresholdMsg as KeyRefreshThresholdMsg,
+};
 
 /// Defines default choice for digest and security level used across the crate
 mod default_choice {
@@ -63,6 +73,23 @@ pub mod msg {
         pub use crate::threshold::{
             Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
         };
+    }
+    /// Messages types related to key refresh protocols
+    pub mod key_refresh {
+        /// Messages for non-threshold key refresh
+        pub mod non_threshold {
+            pub use crate::key_refresh_non_threshold::{
+                Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
+            };
+        }
+        /// Messages for threshold key refresh
+        pub mod threshold {
+            pub use crate::key_refresh_threshold::{
+                Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
+            };
+        }
+        pub use non_threshold::Msg as NonThresholdMsg;
+        pub use threshold::Msg as ThresholdMsg;
     }
 }
 
@@ -371,4 +398,253 @@ enum Bug {
 /// (where $n$ is amount of parties in the protocol).
 pub fn keygen<E: Curve>(eid: ExecutionId, i: u16, n: u16) -> KeygenBuilder<E> {
     KeygenBuilder::new(eid, i, n)
+}
+
+/// Key refresh entry point for non-threshold keys
+pub type KeyRefreshBuilder<
+    'a,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeyRefreshBuilder<'a, E, NonThreshold, L, D>;
+
+/// Key refresh entry point for threshold keys
+pub type ThresholdKeyRefreshBuilder<
+    'a,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeyRefreshBuilder<'a, E, WithThreshold, L, D>;
+
+/// Key refresh builder with choice for threshold or non-threshold variant
+pub struct GenericKeyRefreshBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
+    i: u16,
+    n: u16,
+    reliable_broadcast_enforced: bool,
+    optional_t: M,
+    execution_id: ExecutionId<'a>,
+    tracer: Option<&'a mut dyn Tracer>,
+    current_key_share: &'a CoreKeyShare<E>,
+    _params: core::marker::PhantomData<(E, L, D)>,
+}
+
+impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, NonThreshold, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Constructs [KeyRefreshBuilder]
+    ///
+    /// Takes local party index $i$, number of parties $n$, and the current key share
+    pub fn new(eid: ExecutionId<'a>, i: u16, n: u16, key_share: &'a CoreKeyShare<E>) -> Self {
+        Self {
+            i,
+            n,
+            optional_t: NonThreshold,
+            reliable_broadcast_enforced: true,
+            execution_id: eid,
+            tracer: None,
+            current_key_share: key_share,
+            _params: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, E, L, D, M> GenericKeyRefreshBuilder<'a, E, M, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Specifies to refresh key shares for a threshold scheme
+    pub fn set_threshold(self, t: u16) -> GenericKeyRefreshBuilder<'a, E, WithThreshold, L, D> {
+        GenericKeyRefreshBuilder {
+            i: self.i,
+            n: self.n,
+            optional_t: WithThreshold(t),
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
+            execution_id: self.execution_id,
+            tracer: self.tracer,
+            current_key_share: self.current_key_share,
+            _params: core::marker::PhantomData,
+        }
+    }
+
+    /// Specifies another hash function to use
+    pub fn set_digest<D2>(self) -> GenericKeyRefreshBuilder<'a, E, M, L, D2>
+    where
+        D2: Digest + Clone + 'static,
+    {
+        GenericKeyRefreshBuilder {
+            i: self.i,
+            n: self.n,
+            optional_t: self.optional_t,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
+            execution_id: self.execution_id,
+            tracer: self.tracer,
+            current_key_share: self.current_key_share,
+            _params: core::marker::PhantomData,
+        }
+    }
+
+    /// Specifies [security level](crate::security_level)
+    pub fn set_security_level<L2>(self) -> GenericKeyRefreshBuilder<'a, E, M, L2, D>
+    where
+        L2: SecurityLevel,
+    {
+        GenericKeyRefreshBuilder {
+            i: self.i,
+            n: self.n,
+            optional_t: self.optional_t,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
+            execution_id: self.execution_id,
+            tracer: self.tracer,
+            current_key_share: self.current_key_share,
+            _params: core::marker::PhantomData,
+        }
+    }
+
+    /// Sets a tracer that tracks progress of protocol execution
+    pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
+        self.tracer = Some(tracer);
+        self
+    }
+
+    #[doc = include_str!("../docs/enforce_reliable_broadcast.md")]
+    pub fn enforce_reliable_broadcast(self, enforce: bool) -> Self {
+        Self {
+            reliable_broadcast_enforced: enforce,
+            ..self
+        }
+    }
+}
+
+impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, NonThreshold, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Starts non-threshold key refresh
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
+        party: M,
+    ) -> Result<CoreKeyShare<E>, KeyRefreshError>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = key_refresh_non_threshold::Msg<E, L, D>>,
+    {
+        key_refresh_non_threshold::run_key_refresh(
+            self.tracer,
+            self.i,
+            self.n,
+            self.reliable_broadcast_enforced,
+            self.execution_id,
+            rng,
+            party,
+            self.current_key_share,
+        )
+        .await
+    }
+}
+
+impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, WithThreshold, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Starts threshold key refresh
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
+        party: M,
+    ) -> Result<CoreKeyShare<E>, KeyRefreshError>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = key_refresh_threshold::Msg<E, L, D>>,
+    {
+        key_refresh_threshold::run_threshold_key_refresh(
+            self.tracer,
+            self.i,
+            self.optional_t.0,
+            self.n,
+            self.reliable_broadcast_enforced,
+            self.execution_id,
+            rng,
+            party,
+            self.current_key_share,
+        )
+        .await
+    }
+}
+
+/// Key refresh protocol error
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("key refresh protocol failed to complete")]
+pub struct KeyRefreshError(#[cfg_attr(feature = "std", source)] KeyRefreshReason);
+
+crate::errors::impl_from! {
+    impl From for KeyRefreshError {
+        err: KeyRefreshAborted => KeyRefreshError(KeyRefreshReason::Aborted(err)),
+        err: IoError => KeyRefreshError(KeyRefreshReason::IoError(err)),
+        err: Bug => KeyRefreshError(KeyRefreshReason::Bug(err)),
+    }
+}
+
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+enum KeyRefreshReason {
+    /// Protocol was maliciously aborted by another party
+    #[displaydoc("protocol was aborted by malicious party")]
+    Aborted(#[cfg_attr(feature = "std", source)] KeyRefreshAborted),
+    #[displaydoc("i/o error")]
+    IoError(#[cfg_attr(feature = "std", source)] IoError),
+    /// Bug occurred
+    #[displaydoc("bug occurred")]
+    Bug(Bug),
+}
+
+impl From<KeyRefreshAborted> for KeyRefreshReason {
+    fn from(err: KeyRefreshAborted) -> Self {
+        KeyRefreshReason::Aborted(err)
+    }
+}
+
+/// Error indicating that key refresh was aborted by malicious party
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+enum KeyRefreshAborted {
+    #[displaydoc("party decommitment doesn't match commitment: {0:?}")]
+    InvalidDecommitment(Vec<utils::AbortBlame>),
+    #[displaydoc("party provided invalid schnorr proof: {0:?}")]
+    InvalidSchnorrProof(Vec<utils::AbortBlame>),
+    #[displaydoc("party secret share update is not consistent: {parties:?}")]
+    FeldmanVerificationFailed { parties: Vec<u16> },
+    #[displaydoc("party data size is not suitable for parameters: {parties:?}")]
+    InvalidDataSize { parties: Vec<u16> },
+    #[displaydoc("party update polynomial has non-zero constant term: {parties:?}")]
+    NonZeroConstantTerm { parties: Vec<u16> },
+    #[displaydoc("party share update doesn't match public commitment: {parties:?}")]
+    ShareUpdateVerificationFailed { parties: Vec<u16> },
+    #[displaydoc("party update public keys don't sum to zero: {parties:?}")]
+    UpdatesDontSumToZero { parties: Vec<u16> },
+    #[displaydoc("round1 wasn't reliable")]
+    Round1NotReliable(Vec<(PartyIndex, MsgId)>),
+}
+
+/// Key share refresh protocol for non-threshold keys
+///
+/// Each party of the protocol should have uniquely assigned index $i$ such that $0 \le i < n$.
+/// All parties must provide their current key share from a previous keygen or key refresh.
+pub fn key_refresh<'a, E: Curve>(
+    eid: ExecutionId<'a>,
+    i: u16,
+    n: u16,
+    key_share: &'a CoreKeyShare<E>,
+) -> KeyRefreshBuilder<'a, E> {
+    KeyRefreshBuilder::new(eid, i, n, key_share)
 }
