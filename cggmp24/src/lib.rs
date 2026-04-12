@@ -371,6 +371,13 @@ pub mod keygen {
         ThresholdKeygenBuilder, WithThreshold,
     };
 
+    // Key share refresh protocol re-exports
+    #[doc(inline)]
+    pub use cggmp24_keygen::{
+        key_refresh, GenericKeyRefreshBuilder, KeyRefreshBuilder, KeyRefreshError,
+        ThresholdKeyRefreshBuilder,
+    };
+
     pub use msg::non_threshold::Msg as NonThresholdMsg;
     pub use msg::threshold::Msg as ThresholdMsg;
 }

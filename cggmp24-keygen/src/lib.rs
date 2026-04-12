@@ -21,6 +21,11 @@ mod non_threshold;
 /// Threshold DKG specific types
 mod threshold;
 
+/// Non-threshold key refresh specific types
+mod key_refresh_non_threshold;
+/// Threshold key refresh specific types
+mod key_refresh_threshold;
+
 mod errors;
 mod execution_id;
 mod utils;
@@ -61,6 +66,18 @@ pub mod msg {
     /// Messages types related to threshold DKG protocol
     pub mod threshold {
         pub use crate::threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
+        };
+    }
+    /// Messages types related to non-threshold key refresh protocol
+    pub mod key_refresh_non_threshold {
+        pub use crate::key_refresh_non_threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
+        };
+    }
+    /// Messages types related to threshold key refresh protocol
+    pub mod key_refresh_threshold {
+        pub use crate::key_refresh_threshold::{
             Msg, MsgReliabilityCheck, MsgRound1, MsgRound2Broad, MsgRound2Uni, MsgRound3,
         };
     }
@@ -349,6 +366,7 @@ enum KeygenAborted {
     MissingChainCode(Vec<utils::AbortBlame>),
 }
 
+/// Internal bugs for keygen (not caused by malicious parties)
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum Bug {
@@ -371,4 +389,274 @@ enum Bug {
 /// (where $n$ is amount of parties in the protocol).
 pub fn keygen<E: Curve>(eid: ExecutionId, i: u16, n: u16) -> KeygenBuilder<E> {
     KeygenBuilder::new(eid, i, n)
+}
+
+// ========== Key Refresh Protocol ==========
+
+/// Key refresh protocol error
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[displaydoc("key refresh protocol failed to complete")]
+pub struct KeyRefreshError(#[cfg_attr(feature = "std", source)] RefreshReason);
+
+crate::errors::impl_from! {
+    impl From for KeyRefreshError {
+        err: RefreshAborted => KeyRefreshError(RefreshReason::Aborted(err)),
+        err: IoError => KeyRefreshError(RefreshReason::IoError(err)),
+        err: RefreshBug => KeyRefreshError(RefreshReason::Bug(err)),
+    }
+}
+
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+enum RefreshReason {
+    /// Protocol was maliciously aborted by another party
+    #[displaydoc("protocol was aborted by malicious party")]
+    Aborted(#[cfg_attr(feature = "std", source)] RefreshAborted),
+    #[displaydoc("i/o error")]
+    IoError(#[cfg_attr(feature = "std", source)] IoError),
+    /// Bug occurred
+    #[displaydoc("bug occurred")]
+    Bug(RefreshBug),
+}
+
+/// Error indicating that key refresh was aborted by malicious party
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+enum RefreshAborted {
+    #[displaydoc("party decommitment doesn't match commitment: {0:?}")]
+    InvalidDecommitment(Vec<utils::AbortBlame>),
+    #[displaydoc("party provided invalid schnorr proof: {0:?}")]
+    InvalidSchnorrProof(Vec<utils::AbortBlame>),
+    #[displaydoc("party secret share is not consistent: {parties:?}")]
+    FeldmanVerificationFailed { parties: Vec<u16> },
+    #[displaydoc("party data size is not suitable for parameters: {parties:?}")]
+    InvalidDataSize { parties: Vec<u16> },
+    #[displaydoc("round1 wasn't reliable")]
+    Round1NotReliable(Vec<(PartyIndex, MsgId)>),
+}
+
+/// Internal bugs specific to key refresh (not caused by malicious parties)
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+enum RefreshBug {
+    #[displaydoc("resulting key share is not valid")]
+    InvalidKeyShare(#[cfg_attr(feature = "std", source)] InvalidCoreShare),
+    #[displaydoc("refreshed share is zero - probability of that is negligible")]
+    ZeroShare,
+    #[displaydoc("shared public key is zero - probability of that is negligible")]
+    ZeroPk,
+    #[displaydoc("public key changed after refresh - this is a bug")]
+    PublicKeyMismatch,
+    #[displaydoc("threshold refresh called on non-threshold key share (missing vss_setup)")]
+    MissingVssSetup,
+}
+
+/// Key refresh entry point for non-threshold (n-of-n) key shares
+///
+/// Refreshes secret shares without changing the public key or threshold.
+/// Uses the same execution model as DKG: provide an execution ID, key share,
+/// and MPC party, and receive the refreshed key share.
+///
+/// # Example
+/// ```ignore
+/// let eid = ExecutionId::new(b"unique refresh session id");
+/// let new_share = key_refresh(eid, &old_share)
+///     .start(&mut rng, party)
+///     .await?;
+/// ```
+pub fn key_refresh<'a, E: Curve>(
+    eid: ExecutionId<'a>,
+    old_key_share: &'a CoreKeyShare<E>,
+) -> KeyRefreshBuilder<'a, E> {
+    KeyRefreshBuilder::new(eid, old_key_share)
+}
+
+/// Builder for non-threshold key refresh protocol
+pub type KeyRefreshBuilder<
+    'a,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeyRefreshBuilder<'a, E, NonThreshold, L, D>;
+
+/// Builder for threshold key refresh protocol
+pub type ThresholdKeyRefreshBuilder<
+    'a,
+    E,
+    L = crate::default_choice::SecurityLevel,
+    D = crate::default_choice::Digest,
+> = GenericKeyRefreshBuilder<'a, E, WithThreshold, L, D>;
+
+/// Key refresh protocol builder
+pub struct GenericKeyRefreshBuilder<'a, E: Curve, M, L: SecurityLevel, D: Digest> {
+    old_key_share: &'a CoreKeyShare<E>,
+    reliable_broadcast_enforced: bool,
+    execution_id: ExecutionId<'a>,
+    tracer: Option<&'a mut dyn Tracer>,
+    _mode: core::marker::PhantomData<(M, L, D)>,
+}
+
+impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, NonThreshold, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Constructs a non-threshold key refresh builder
+    pub fn new(eid: ExecutionId<'a>, old_key_share: &'a CoreKeyShare<E>) -> Self {
+        Self {
+            old_key_share,
+            reliable_broadcast_enforced: true,
+            execution_id: eid,
+            tracer: None,
+            _mode: core::marker::PhantomData,
+        }
+    }
+
+    /// Switches to threshold key refresh mode
+    pub fn set_threshold(self) -> GenericKeyRefreshBuilder<'a, E, WithThreshold, L, D> {
+        GenericKeyRefreshBuilder {
+            old_key_share: self.old_key_share,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
+            execution_id: self.execution_id,
+            tracer: self.tracer,
+            _mode: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, E, L, D, M> GenericKeyRefreshBuilder<'a, E, M, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Specifies another hash function to use
+    pub fn set_digest<D2>(self) -> GenericKeyRefreshBuilder<'a, E, M, L, D2>
+    where
+        D2: Digest + Clone + 'static,
+    {
+        GenericKeyRefreshBuilder {
+            old_key_share: self.old_key_share,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
+            execution_id: self.execution_id,
+            tracer: self.tracer,
+            _mode: core::marker::PhantomData,
+        }
+    }
+
+    /// Specifies [security level](crate::security_level)
+    pub fn set_security_level<L2>(self) -> GenericKeyRefreshBuilder<'a, E, M, L2, D>
+    where
+        L2: SecurityLevel,
+    {
+        GenericKeyRefreshBuilder {
+            old_key_share: self.old_key_share,
+            reliable_broadcast_enforced: self.reliable_broadcast_enforced,
+            execution_id: self.execution_id,
+            tracer: self.tracer,
+            _mode: core::marker::PhantomData,
+        }
+    }
+
+    /// Sets a tracer that tracks progress of protocol execution
+    pub fn set_progress_tracer(mut self, tracer: &'a mut dyn Tracer) -> Self {
+        self.tracer = Some(tracer);
+        self
+    }
+
+    /// Whether to enforce reliable broadcast via echo round
+    pub fn enforce_reliable_broadcast(self, enforce: bool) -> Self {
+        Self {
+            reliable_broadcast_enforced: enforce,
+            ..self
+        }
+    }
+}
+
+impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, NonThreshold, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Starts the non-threshold key refresh protocol
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
+        party: M,
+    ) -> Result<CoreKeyShare<E>, KeyRefreshError>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = key_refresh_non_threshold::Msg<E, L, D>>,
+    {
+        key_refresh_non_threshold::run_key_refresh(
+            self.tracer,
+            self.old_key_share,
+            self.reliable_broadcast_enforced,
+            self.execution_id,
+            rng,
+            party,
+        )
+        .await
+    }
+
+    /// Returns a state machine for sync key refresh
+    #[cfg(feature = "state-machine")]
+    pub fn into_state_machine<R>(
+        self,
+        rng: &'a mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<CoreKeyShare<E>, KeyRefreshError>,
+        Msg = key_refresh_non_threshold::Msg<E, L, D>,
+    > + 'a
+    where
+        R: RngCore + CryptoRng,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.start(rng, party))
+    }
+}
+
+impl<'a, E, L, D> GenericKeyRefreshBuilder<'a, E, WithThreshold, L, D>
+where
+    E: Curve,
+    L: SecurityLevel,
+    D: Digest + Clone + 'static,
+{
+    /// Starts the threshold key refresh protocol
+    pub async fn start<R, M>(
+        self,
+        rng: &mut R,
+        party: M,
+    ) -> Result<CoreKeyShare<E>, KeyRefreshError>
+    where
+        R: RngCore + CryptoRng,
+        M: Mpc<ProtocolMessage = key_refresh_threshold::Msg<E, L, D>>,
+    {
+        key_refresh_threshold::run_threshold_key_refresh(
+            self.tracer,
+            self.old_key_share,
+            self.reliable_broadcast_enforced,
+            self.execution_id,
+            rng,
+            party,
+        )
+        .await
+    }
+
+    /// Returns a state machine for sync threshold key refresh
+    #[cfg(feature = "state-machine")]
+    pub fn into_state_machine<R>(
+        self,
+        rng: &'a mut R,
+    ) -> impl round_based::state_machine::StateMachine<
+        Output = Result<CoreKeyShare<E>, KeyRefreshError>,
+        Msg = key_refresh_threshold::Msg<E, L, D>,
+    > + 'a
+    where
+        R: RngCore + CryptoRng,
+    {
+        round_based::state_machine::wrap_protocol(|party| self.start(rng, party))
+    }
 }
