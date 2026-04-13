@@ -166,6 +166,9 @@ jobs:
     - name: Check docs
       run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
 
+
+
+
   bench:
     runs-on: ubuntu-latest
     permissions:
@@ -173,24 +176,53 @@ jobs:
       pull-requests: write
     needs: build
     steps:
-    - uses: actions/checkout@v4
+    - name: Check base branch
+      uses: actions/checkout@v4
+      with:
+        path: base_branch
+        ref: ${{ github.base_ref }}
+    - name: Check PR branch
+      uses: actions/checkout@v4
+      with:
+        path: pr_branch
+
+
+
+
     - uses: actions/download-artifact@v4
       with:
         name: benchmark-tool
     - name: Set file permissions
       run: chmod +x ./measure_perf
-    - name: Run benchmarks
+
+
+
+    - name: Run base bench
+      working-directory: base_branch
       run: |
-        ./measure_perf -n 3 --no-bench-primes-gen > perf_output
-        sed -e '/PERF_OUTPUT/{r perf_output' -e 'd}' .github/pr-comment.tpl > pr-comment
-    - name: Leave PR comment
-      uses: marocchino/sticky-pull-request-comment@v2
-      with:
-        header: bench
-        path: pr-comment
-  check-changelog:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Check changelogs
-      run: ./.github/changelog.sh
+        ../measure_perf -n 3 --no-bench-primes-gen > ../base_output
+    
+    - name: Run PR bench
+      working-directory: pr_branch
+      run: |
+        ../measure_perf -n 3 --no-bench-primes-gen > ../pr_output
+    - name: Debug Output
+      run: |
+        echo "--Base--"
+        cat base_output
+        echo "--PR--"
+        cat pr_output
+
+
+
+  #   - name: Leave PR comment
+  #     uses: marocchino/sticky-pull-request-comment@v2
+  #     with:
+  #       header: bench
+  #       path: pr-comment
+  # check-changelog:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Check changelogs
+  #     run: ./.github/changelog.sh
