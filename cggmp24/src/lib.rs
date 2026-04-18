@@ -295,7 +295,7 @@
 //! they are all documented in [the spec].
 //!
 //! [CGGMP24]: https://ia.cr/2021/060
-//! [the spec]: https://lfdt-lockness.github.io/cggmp24/cggmp24-spec.pdf
+//! [the spec]: https://lfdt-lockness.github.io/cggmp21/cggmp21-spec.pdf
 //! [security guidelines]: #security-guidelines
 //! [slip10]: https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 //! [bip32]: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
