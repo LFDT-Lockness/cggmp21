@@ -21,7 +21,7 @@
 - [HD wallets support](#hd-wallets-support)
 - [SPOF code: Key Import and Export](#spof-code-key-import-and-export)
 - [Big integer implementation](#big-integer-implementation)
-- [no\_std compatability](#no_std-compatability)
+- [no\_std compatibility](#no_std-compatibility)
 - [Differences between the implementation and CGGMP24](#differences-between-the-implementation-and-cggmp24)
 - [Timing attacks](#timing-attacks)
 - [Join us in Discord!](#join-us-in-discord)
@@ -244,7 +244,7 @@ some applications by several times, but requires an LGPL dependency
 - To use num-bigint, select the feature `backend-num-bigint` (selected as
 **default** feature)
 
-## no\_std compatability
+## no\_std compatibility
 
 Every crate in this project is compatible with no\_std, provided that
 `num-bigint` backend is chosen. The presence of `alloc` is still required. This

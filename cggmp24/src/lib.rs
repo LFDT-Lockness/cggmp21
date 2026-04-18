@@ -267,7 +267,7 @@
 //! - To use num-bigint, select the feature `backend-num-bigint` (selected as
 //! **default** feature)
 //!
-//! ## no\_std compatability
+//! ## no\_std compatibility
 //!
 //! Every crate in this project is compatible with no\_std, provided that
 //! `num-bigint` backend is chosen. The presence of `alloc` is still required. This
