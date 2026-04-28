@@ -54,3 +54,19 @@ num-bigint.opt-level = 3
 num-traits.opt-level = 3
 num-integer.opt-level = 3
 glass_pumpkin.opt-level = 3
+
+# Enable debug assertions for workspace packages in release builds so that
+# debug_assert! calls in library code fire during `cargo test --release`.
+# Note: these overrides only apply within this workspace — binaries that
+# depend on these crates externally are not affected.
+[profile.release.package.cggmp24]
+debug-assertions = true
+
+[profile.release.package.cggmp24-keygen]
+debug-assertions = true
+
+[profile.release.package.key-share]
+debug-assertions = true
+
+[profile.release.package.paillier-zk]
+debug-assertions = true
