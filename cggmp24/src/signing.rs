@@ -1463,21 +1463,43 @@ where
     tracer.named_round_begins("Signature reconstruction");
 
     tracer.receive_msgs();
-    let partial_sigs = rounds
+    let round4_msgs = rounds
         .complete(round4)
         .await
         .map_err(IoError::receive_message)?;
     tracer.msgs_received();
 
-    let partial_sigs = partial_sigs
+    // Identify faulty partial signatures using the presignature commitments.
+    // Each σ_j must satisfy σ_j·Γ == m·Δ̃_j + r·S̃_j; any party that fails
+    // this linear check can be pinpointed without an extra broadcast round.
+    tracer.stage("Identify faulty partial signatures");
+    let r = commitments.Gamma.x().to_scalar();
+    if let Some(r) = NonZero::from_scalar(r) {
+        let m = message_to_sign.to_scalar();
+        let faulty_parties: Vec<utils::AbortBlame> = round4_msgs
+            .iter_indexed()
+            .filter_map(|(j, msg_id, msg)| {
+                let commitment = &commitments.commitments[usize::from(j)];
+                if msg.partial_sig.sigma * commitments.Gamma
+                    != m * commitment.tilde_Delta + r * commitment.tilde_S
+                {
+                    Some(utils::AbortBlame::new(j, msg_id, msg_id))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !faulty_parties.is_empty() {
+            return Err(SigningAborted::InvalidPartialSignature(faulty_parties).into());
+        }
+    }
+
+    let partial_sigs = round4_msgs
         .into_vec_including_me(MsgRound4 { partial_sig })
         .into_iter()
         .map(|m| m.partial_sig)
         .collect::<Vec<_>>();
 
-    // Following the protocol, party should broadcast additional proofs
-    // to convince others it didn't cheat. However, since identifiable
-    // abort is not implemented yet, this part of the protocol is missing
     let sig = PartialSignature::combine(&partial_sigs, &commitments, message_to_sign)
         .ok_or(SigningAborted::SignatureInvalid)?;
 
@@ -1702,7 +1724,10 @@ enum Reason {
 
 /// Error indicating that protocol was aborted by malicious party
 ///
-/// It _can be_ cryptographically proven, but we do not support it yet.
+/// Most variants carry a list of [`utils::AbortBlame`] that identifies the
+/// offending party indices and the message IDs that constitute the evidence.
+/// [`SigningAborted::MismatchedDelta`] is the remaining case that has not yet
+/// been given identifiable-abort support.
 #[allow(clippy::type_complexity)]
 #[derive(Debug, Error)]
 enum SigningAborted {
@@ -1723,6 +1748,8 @@ enum SigningAborted {
     InvalidPsiPrimePrime(Vec<(utils::AbortBlame, paillier_zk::InvalidProof)>),
     #[error("Delta != G * delta")]
     MismatchedDelta,
+    #[error("partial signature from {0:?} is invalid")]
+    InvalidPartialSignature(Vec<utils::AbortBlame>),
     #[error("resulting signature is not valid")]
     SignatureInvalid,
     #[error("other parties received different broadcast messages at round1a")]
