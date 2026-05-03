@@ -258,7 +258,7 @@ cargo file should look like this:
 ```toml
 cggmp24 = { version = "0.7", default-features = false, features = ["no_std", "backend-num-bigint"] }
 cggmp24-keygen = { version = "0.7", default-features = false }
-key-share = { version = "0.6", default-features = false }
+key-share = { version = "0.7", default-features = false }
 ```
 
 ## Differences between the implementation and CGGMP24
