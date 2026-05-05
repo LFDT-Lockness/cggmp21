@@ -31,8 +31,8 @@ impl SecurityParams {
     pub fn new<L: SecurityLevel>() -> Self {
         Self {
             pi_aff: pi_aff::SecurityParams {
-                l_x: L::ELL,
-                l_y: L::ELL_PRIME,
+                l: L::ELL,
+                l_prime: L::ELL_PRIME,
                 epsilon: L::EPSILON,
             },
             pi_enc_elg: pi_enc_elg::SecurityParams {
