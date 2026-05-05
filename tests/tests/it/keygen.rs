@@ -138,6 +138,62 @@ where
     validate_keygen_output::<E, Hd>(&mut rng, &key_shares);
 }
 
+#[test]
+fn non_threshold_keygen_rejects_invalid_params_before_networking() {
+    use cggmp24::supported_curves::Secp256k1;
+
+    type Msg = cggmp24::keygen::NonThresholdMsg<
+        Secp256k1,
+        cggmp24::security_level::SecurityLevel128,
+        sha2::Sha256,
+    >;
+
+    for (i, n) in [(0, 1), (2, 2)] {
+        let eid = ExecutionId::new(b"invalid non-threshold keygen params");
+        let mut rng = DevRng::new();
+        let incoming = futures::stream::pending::<
+            Result<round_based::Incoming<Msg>, std::convert::Infallible>,
+        >();
+        let outgoing = futures::sink::drain::<round_based::Outgoing<Msg>>();
+        let party = round_based::MpcParty::connected((incoming, outgoing));
+
+        let result = futures::executor::block_on(
+            cggmp24::keygen::<Secp256k1>(eid, i, n).start(&mut rng, party),
+        );
+
+        assert!(result.is_err());
+    }
+}
+
+#[test]
+fn threshold_keygen_rejects_invalid_params_before_networking() {
+    use cggmp24::supported_curves::Secp256k1;
+
+    type Msg = cggmp24::keygen::ThresholdMsg<
+        Secp256k1,
+        cggmp24::security_level::SecurityLevel128,
+        sha2::Sha256,
+    >;
+
+    for (i, t, n) in [(0, 1, 1), (0, 1, 3), (0, 4, 3), (3, 2, 3)] {
+        let eid = ExecutionId::new(b"invalid threshold keygen params");
+        let mut rng = DevRng::new();
+        let incoming = futures::stream::pending::<
+            Result<round_based::Incoming<Msg>, std::convert::Infallible>,
+        >();
+        let outgoing = futures::sink::drain::<round_based::Outgoing<Msg>>();
+        let party = round_based::MpcParty::connected((incoming, outgoing));
+
+        let result = futures::executor::block_on(
+            cggmp24::keygen::<Secp256k1>(eid, i, n)
+                .set_threshold(t)
+                .start(&mut rng, party),
+        );
+
+        assert!(result.is_err());
+    }
+}
+
 fn validate_keygen_output<E: generic_ec::Curve, Hd: cggmp24_tests::OptionalHd<E>>(
     rng: &mut impl rand::RngCore,
     key_shares: &[cggmp24::IncompleteKeyShare<E>],

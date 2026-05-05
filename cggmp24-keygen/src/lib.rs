@@ -218,6 +218,8 @@ where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = non_threshold::Msg<E, L, D>>,
     {
+        validate_keygen_params(self.i, self.n)?;
+
         non_threshold::run_keygen(
             self.tracer,
             self.i,
@@ -262,6 +264,8 @@ where
         R: RngCore + CryptoRng,
         M: Mpc<ProtocolMessage = threshold::Msg<E, L, D>>,
     {
+        validate_threshold_keygen_params(self.i, self.optional_t.0, self.n)?;
+
         threshold::run_threshold_keygen(
             self.tracer,
             self.i,
@@ -354,6 +358,14 @@ enum KeygenAborted {
 enum Bug {
     #[displaydoc("resulting key share is not valid")]
     InvalidKeyShare(#[cfg_attr(feature = "std", source)] InvalidCoreShare),
+    #[displaydoc("number of parties is too small: n={n}")]
+    TooFewParties { n: u16 },
+    #[displaydoc("party index is out of range: i={i}, n={n}")]
+    PartyIndexOutOfRange { i: u16, n: u16 },
+    #[displaydoc("threshold is too small: t={t}")]
+    ThresholdTooSmall { t: u16 },
+    #[displaydoc("threshold is larger than number of parties: t={t}, n={n}")]
+    ThresholdTooLarge { t: u16, n: u16 },
     #[displaydoc("unexpected zero value")]
     NonZeroScalar,
     #[cfg(feature = "hd-wallet")]
@@ -363,6 +375,27 @@ enum Bug {
     ZeroShare,
     #[displaydoc("shared public key is zero - probability of that is negligible")]
     ZeroPk,
+}
+
+fn validate_keygen_params(i: u16, n: u16) -> Result<(), KeygenError> {
+    if n < 2 {
+        return Err(Bug::TooFewParties { n }.into());
+    }
+    if i >= n {
+        return Err(Bug::PartyIndexOutOfRange { i, n }.into());
+    }
+    Ok(())
+}
+
+fn validate_threshold_keygen_params(i: u16, t: u16, n: u16) -> Result<(), KeygenError> {
+    validate_keygen_params(i, n)?;
+    if t < 2 {
+        return Err(Bug::ThresholdTooSmall { t }.into());
+    }
+    if t > n {
+        return Err(Bug::ThresholdTooLarge { t, n }.into());
+    }
+    Ok(())
 }
 
 /// Distributed key generation protocol
