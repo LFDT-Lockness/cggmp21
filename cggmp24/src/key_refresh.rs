@@ -228,12 +228,36 @@ enum Reason {
     IoError(#[source] IoError),
     #[error("internal error")]
     InternalError(#[from] Bug),
+    #[error("invalid arguments")]
+    InvalidArgs(#[source] InvalidArgs),
+}
+
+/// Invalid input parameters passed to the aux-gen protocol
+#[derive(Debug, Error)]
+pub enum InvalidArgs {
+    /// Number of parties `n` must be at least 2
+    #[error("number of parties n must be at least 2, got n={0}")]
+    TooFewParties(u16),
+    /// Party index `i` must satisfy `i < n`
+    #[error("party index i={i} is out of range for n={n} parties")]
+    PartyIndexOutOfRange {
+        /// Party index
+        i: u16,
+        /// Number of parties
+        n: u16,
+    },
+}
+
+impl From<InvalidArgs> for KeyRefreshError {
+    fn from(e: InvalidArgs) -> Self {
+        KeyRefreshError(Reason::InvalidArgs(e))
+    }
 }
 
 /// Unexpected error in operation not caused by other parties
 #[derive(Debug, Error)]
 enum Bug {
-    #[error("Invalid key share geenrated")]
+    #[error("invalid key share generated")]
     InvalidShareGenerated(#[source] crate::key_share::InvalidKeyShare),
     #[error("couldn't prove a pi mod statement")]
     PiMod(#[source] paillier_zk::Error),

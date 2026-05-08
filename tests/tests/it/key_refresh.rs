@@ -101,3 +101,51 @@ where
     sig.verify(&key_shares[0].core.shared_public_key, &message_to_sign)
         .expect("signature is not valid");
 }
+
+#[test]
+fn aux_gen_rejects_n_too_small() {
+    let mut rng = rand_dev::DevRng::new();
+    let eid: [u8; 32] = rand::Rng::gen(&mut rng);
+    let eid = cggmp24::ExecutionId::new(&eid);
+
+    type L = cggmp24::security_level::SecurityLevel128;
+    type D = sha2::Sha256;
+    type Msg = cggmp24::key_refresh::msg::Msg<D, L>;
+
+    let primes = cggmp24_tests::cached::PRIMES.iter::<L>().next().unwrap();
+    let incoming = futures::stream::pending::<
+        Result<round_based::Incoming<Msg>, std::convert::Infallible>,
+    >();
+    let outgoing = futures::sink::drain::<round_based::Outgoing<Msg>>();
+    let party = round_based::MpcParty::connected((incoming, outgoing));
+
+    let result = futures::executor::block_on(
+        cggmp24::aux_info_gen(eid, 0, 1, primes).start(&mut rng, party),
+    );
+
+    assert!(result.is_err(), "aux_gen with n=1 must fail before networking");
+}
+
+#[test]
+fn aux_gen_rejects_i_out_of_range() {
+    let mut rng = rand_dev::DevRng::new();
+    let eid: [u8; 32] = rand::Rng::gen(&mut rng);
+    let eid = cggmp24::ExecutionId::new(&eid);
+
+    type L = cggmp24::security_level::SecurityLevel128;
+    type D = sha2::Sha256;
+    type Msg = cggmp24::key_refresh::msg::Msg<D, L>;
+
+    let primes = cggmp24_tests::cached::PRIMES.iter::<L>().next().unwrap();
+    let incoming = futures::stream::pending::<
+        Result<round_based::Incoming<Msg>, std::convert::Infallible>,
+    >();
+    let outgoing = futures::sink::drain::<round_based::Outgoing<Msg>>();
+    let party = round_based::MpcParty::connected((incoming, outgoing));
+
+    let result = futures::executor::block_on(
+        cggmp24::aux_info_gen(eid, 3, 3, primes).start(&mut rng, party),
+    );
+
+    assert!(result.is_err(), "aux_gen with i >= n must fail before networking");
+}

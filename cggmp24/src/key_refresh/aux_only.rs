@@ -165,6 +165,13 @@ where
     L: SecurityLevel,
     D: Digest + Clone + 'static,
 {
+    if n < 2 {
+        return Err(super::InvalidArgs::TooFewParties(n).into());
+    }
+    if i >= n {
+        return Err(super::InvalidArgs::PartyIndexOutOfRange { i, n }.into());
+    }
+
     tracer.protocol_begins();
 
     tracer.stage("Retrieve auxiliary data");
