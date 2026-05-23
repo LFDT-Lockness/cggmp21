@@ -406,6 +406,15 @@ pub mod interactive {
             aux.is_in_mult_group(&commitment.t),
         )?;
 
+        fail_if(
+            InvalidProofReason::RangeCheck(17),
+            proof.w.in_mult_group_of(data.key_j.n()),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(18),
+            proof.w_y.in_mult_group_of(data.key_i.n()),
+        )?;
+
         // Verify statement
         {
             let lhs = {

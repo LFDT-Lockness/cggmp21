@@ -282,6 +282,10 @@ pub mod interactive {
                 &(&aux.rsa_modulo * (Integer::one() << (security.l + security.epsilon + 1))),
             ),
         )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(7),
+            proof.z2.in_mult_group_of(data.key.n()),
+        )?;
 
         {
             let lhs = data

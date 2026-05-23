@@ -295,6 +295,10 @@ pub mod interactive {
             InvalidProofReason::RangeCheck(4),
             commitment.d.in_mult_group_of(data.key.nn()),
         )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(5),
+            proof.z2.in_mult_group_of(data.key.n()),
+        )?;
 
         // Verify statement
         {
