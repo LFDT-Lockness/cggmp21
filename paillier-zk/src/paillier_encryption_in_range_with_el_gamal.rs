@@ -296,6 +296,23 @@ pub mod interactive {
             commitment.d.in_mult_group_of(data.key.nn()),
         )?;
 
+        fail_if(
+            InvalidProofReason::RangeCheck(9),
+            proof
+                .z1
+                .is_in_half_pm(&(Integer::one() << (security.l + security.epsilon))),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(10),
+            proof.z2.in_mult_group_of(data.key.n()),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(11),
+            proof.z3.is_in_half_pm(
+                &(&aux.rsa_modulo * (Integer::one() << (security.l + security.epsilon + 1))),
+            ),
+        )?;
+
         // Verify statement
         {
             let lhs = data
@@ -331,13 +348,6 @@ pub mod interactive {
             };
             fail_if_ne(InvalidProofReason::EqualityCheck(8), lhs, rhs)?;
         }
-
-        fail_if(
-            InvalidProofReason::RangeCheck(9),
-            proof
-                .z1
-                .is_in_half_pm(&(Integer::one() << (security.l + security.epsilon))),
-        )?;
 
         Ok(())
     }
@@ -426,10 +436,11 @@ mod test {
 
     use crate::common::{IntegerExt, InvalidProofReason};
 
-    fn run_with<E: Curve, D: Digest>(
+    fn run_with_proof_mutation<E: Curve, D: Digest>(
         mut rng: &mut impl rand_core::CryptoRngCore,
         security: super::SecurityParams,
         plaintext: Integer,
+        mutate: impl FnOnce(&mut super::NiProof<E>),
     ) -> Result<(), crate::common::InvalidProof> {
         let aux = crate::common::test::aux(&mut rng);
 
@@ -452,10 +463,19 @@ mod test {
         };
 
         let shared_state = "shared state";
-        let proof =
+        let mut proof =
             super::non_interactive::prove::<E, D>(&shared_state, &aux, data, pdata, &security, rng)
                 .unwrap();
+        mutate(&mut proof);
         super::non_interactive::verify::<E, D>(&shared_state, &aux, data, &proof, &security)
+    }
+
+    fn run_with<E: Curve, D: Digest>(
+        rng: &mut impl rand_core::CryptoRngCore,
+        security: super::SecurityParams,
+        plaintext: Integer,
+    ) -> Result<(), crate::common::InvalidProof> {
+        run_with_proof_mutation::<E, D>(rng, security, plaintext, |_| {})
     }
 
     fn passing_test<C: Curve, D: Digest>() {
@@ -482,6 +502,23 @@ mod test {
         }
     }
 
+    fn failing_oversized_aux_response<C: Curve, D: Digest>() {
+        let mut rng = rand_dev::DevRng::new();
+        let security = super::SecurityParams {
+            l: 256,
+            epsilon: 512,
+        };
+        let plaintext = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l));
+        let r = run_with_proof_mutation::<C, D>(&mut rng, security, plaintext, |proof| {
+            proof.proof.z3 = Integer::one() << 10_000;
+        })
+        .expect_err("proof should not pass");
+        match r.reason() {
+            InvalidProofReason::RangeCheck(11) => (),
+            e => panic!("proof should not fail with: {e:?}"),
+        }
+    }
+
     #[test]
     fn passing_p256() {
         passing_test::<generic_ec::curves::Secp256r1, sha2::Sha256>()
@@ -489,6 +526,10 @@ mod test {
     #[test]
     fn failing_p256_add() {
         failing_test::<generic_ec::curves::Secp256r1, sha2::Sha256>()
+    }
+    #[test]
+    fn failing_p256_oversized_aux_response() {
+        failing_oversized_aux_response::<generic_ec::curves::Secp256r1, sha2::Sha256>()
     }
 
     #[test]

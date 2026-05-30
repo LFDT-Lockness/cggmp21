@@ -289,6 +289,33 @@ pub mod interactive {
                 .map_err(|_| InvalidProofReason::Conversion)?;
             fail_if(InvalidProofReason::RangeCheck(5), n_bits >= 4 * security.l)?;
         }
+
+        let range = (Integer::from(1) << (security.l + security.epsilon)) * data.n_root;
+        fail_if(
+            InvalidProofReason::RangeCheck(12),
+            proof.z1.is_in_half_pm(&range),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(13),
+            proof.z2.is_in_half_pm(&range),
+        )?;
+
+        let aux_range = (Integer::from(1) << (security.l + security.epsilon + 1)) * &aux.rsa_modulo;
+        fail_if(
+            InvalidProofReason::RangeCheck(14),
+            proof.w1.is_in_half_pm(&aux_range),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(15),
+            proof.w2.is_in_half_pm(&aux_range),
+        )?;
+
+        let n_at_aux_range = aux_range * data.n;
+        fail_if(
+            InvalidProofReason::RangeCheck(16),
+            proof.v.is_in_half_pm(&n_at_aux_range),
+        )?;
+
         {
             let lhs = aux.combine(&proof.z1, &proof.w1)?;
             let p_to_e = aux.pow_mod(&commitment.p, challenge)?;
@@ -321,17 +348,6 @@ pub mod interactive {
                 aux.is_in_mult_group(&lhs),
             )?;
         }
-        let range = (Integer::from(1) << (security.l + security.epsilon)) * data.n_root;
-        // range check for z1
-        fail_if(
-            InvalidProofReason::RangeCheck(12),
-            proof.z1.is_in_half_pm(&range),
-        )?;
-        // range check for z2
-        fail_if(
-            InvalidProofReason::RangeCheck(13),
-            proof.z2.is_in_half_pm(&range),
-        )?;
 
         Ok(())
     }
@@ -405,6 +421,8 @@ pub mod non_interactive {
 
 #[cfg(test)]
 mod test {
+    use fast_paillier::backend::Integer;
+
     use crate::common::test::generate_blum_prime;
     use crate::common::InvalidProofReason;
 
@@ -485,6 +503,48 @@ mod test {
             .expect_err("proof should not pass");
         match r.reason() {
             InvalidProofReason::RangeCheck(12) => (),
+            e => panic!("Proof should not fail with {e:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_oversized_response() {
+        type D = sha2::Sha256;
+
+        let n_bitlen = 3072;
+        let security = super::SecurityParams {
+            l: 256,
+            epsilon: 512,
+        };
+
+        let mut rng = rand_dev::DevRng::new();
+        let p = generate_blum_prime(&mut rng, n_bitlen / 2);
+        let q = generate_blum_prime(&mut rng, n_bitlen / 2);
+        let n = &p * &q;
+        let n_root = n.sqrt_ref().unwrap();
+        let data = super::Data {
+            n: &n,
+            n_root: &n_root,
+        };
+
+        let aux = crate::common::test::aux(&mut rng);
+        let shared_state = "shared state";
+        let mut proof = super::non_interactive::prove::<D>(
+            &shared_state,
+            &aux,
+            data,
+            super::PrivateData { p: &p, q: &q },
+            &security,
+            &mut rng,
+        )
+        .unwrap();
+
+        proof.proof.w1 = Integer::one() << 10_000;
+
+        let r = super::non_interactive::verify::<D>(&shared_state, &aux, data, &security, &proof)
+            .expect_err("proof should not pass");
+        match r.reason() {
+            InvalidProofReason::RangeCheck(14) => (),
             e => panic!("Proof should not fail with {e:?}"),
         }
     }

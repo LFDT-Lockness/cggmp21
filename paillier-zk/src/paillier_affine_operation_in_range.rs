@@ -406,6 +406,36 @@ pub mod interactive {
             aux.is_in_mult_group(&commitment.t),
         )?;
 
+        fail_if(
+            InvalidProofReason::RangeCheck(15),
+            proof
+                .z1
+                .is_in_half_pm(&(Integer::one() << (security.l_x + security.epsilon))),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(16),
+            proof
+                .z2
+                .is_in_half_pm(&(Integer::one() << (security.l_y + security.epsilon))),
+        )?;
+        let aux_range = &aux.rsa_modulo * (Integer::one() << (security.l_x + security.epsilon + 1));
+        fail_if(
+            InvalidProofReason::RangeCheck(17),
+            proof.z3.is_in_half_pm(&aux_range),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(18),
+            proof.z4.is_in_half_pm(&aux_range),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(19),
+            proof.w.in_mult_group_of(data.key_j.n()),
+        )?;
+        fail_if(
+            InvalidProofReason::RangeCheck(20),
+            proof.w_y.in_mult_group_of(data.key_i.n()),
+        )?;
+
         // Verify statement
         {
             let lhs = {
@@ -465,18 +495,6 @@ pub mod interactive {
             let rhs = (&commitment.f * t_to_e).modulo(&aux.rsa_modulo);
             fail_if_ne(InvalidProofReason::EqualityCheck(14), lhs, rhs)?;
         }
-        fail_if(
-            InvalidProofReason::RangeCheck(15),
-            proof
-                .z1
-                .is_in_half_pm(&(Integer::one() << (security.l_x + security.epsilon))),
-        )?;
-        fail_if(
-            InvalidProofReason::RangeCheck(16),
-            proof
-                .z2
-                .is_in_half_pm(&(Integer::one() << (security.l_y + security.epsilon))),
-        )?;
         Ok(())
     }
 
@@ -565,11 +583,16 @@ mod test {
     use crate::common::test::random_key;
     use crate::common::{IntegerExt, InvalidProofReason};
 
-    fn run<R: rand_core::RngCore + rand_core::CryptoRng, C: Curve, D: Digest>(
+    fn run_with_proof_mutation<
+        R: rand_core::RngCore + rand_core::CryptoRng,
+        C: Curve,
+        D: Digest,
+    >(
         rng: &mut R,
         security: super::SecurityParams,
         x: Integer,
         y: Integer,
+        mutate: impl FnOnce(&mut super::NiProof<C>),
     ) -> Result<(), crate::common::InvalidProof> {
         let dk0 = random_key(rng).unwrap();
         let dk1 = random_key(rng).unwrap();
@@ -606,10 +629,20 @@ mod test {
 
         let shared_state = "shared state";
 
-        let proof =
+        let mut proof =
             super::non_interactive::prove::<C, D>(&shared_state, &aux, data, pdata, &security, rng)
                 .unwrap();
+        mutate(&mut proof);
         super::non_interactive::verify::<C, D>(&shared_state, &aux, data, &security, &proof)
+    }
+
+    fn run<R: rand_core::RngCore + rand_core::CryptoRng, C: Curve, D: Digest>(
+        rng: &mut R,
+        security: super::SecurityParams,
+        x: Integer,
+        y: Integer,
+    ) -> Result<(), crate::common::InvalidProof> {
+        run_with_proof_mutation::<R, C, D>(rng, security, x, y, |_| {})
     }
 
     fn passing_test<C: Curve, D: Digest>() {
@@ -656,6 +689,25 @@ mod test {
         }
     }
 
+    fn failing_on_oversized_aux_response<C: Curve, D: Digest>() {
+        let mut rng = rand_dev::DevRng::new();
+        let security = super::SecurityParams {
+            l_x: 256,
+            l_y: 1280,
+            epsilon: 512,
+        };
+        let x = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_x));
+        let y = Integer::from_rng_half_pm(&mut rng, &(Integer::one() << security.l_y));
+        let r = run_with_proof_mutation::<_, C, D>(&mut rng, security, x, y, |proof| {
+            proof.proof.z3 = Integer::one() << 10_000;
+        })
+        .expect_err("proof should not pass");
+        match r.reason() {
+            InvalidProofReason::RangeCheck(17) => (),
+            e => panic!("proof should not fail with: {e:?}"),
+        }
+    }
+
     #[test]
     fn passing_p256() {
         passing_test::<generic_ec::curves::Secp256r1, sha2::Sha256>()
@@ -667,6 +719,10 @@ mod test {
     #[test]
     fn failing_p256_mul() {
         failing_on_multiplicative::<generic_ec::curves::Secp256r1, sha2::Sha256>()
+    }
+    #[test]
+    fn failing_p256_oversized_aux_response() {
+        failing_on_oversized_aux_response::<generic_ec::curves::Secp256r1, sha2::Sha256>()
     }
 
     #[test]
