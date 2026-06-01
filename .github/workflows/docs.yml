@@ -30,7 +30,7 @@ jobs:
       run: mv spec/main.pdf spec/cggmp24-spec.pdf
     - name: Upload artifacts
       id: upload-pdf
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 #v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
       with:
         name: spec-pdf
         path: spec/cggmp24-spec.pdf
@@ -51,7 +51,7 @@ jobs:
     - name: Build docs
       run: make docs && cp docs/redirect.html target/doc/index.html
     - name: Upload docs
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 #v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
       with:
         name: docs
         path: target/doc
