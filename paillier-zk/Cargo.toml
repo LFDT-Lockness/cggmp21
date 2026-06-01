@@ -28,7 +28,7 @@ rand_hash = "0.1"
 generic-ec = { workspace = true, features = ["udigest", "all-curves"] }
 rand = { workspace = true }
 rand_dev = { version = "0.1", default-features = false }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false }
 
 subtle = { version = "2.4", default-features = false }
 zeroize = { version = "1.5", default-features = false }
