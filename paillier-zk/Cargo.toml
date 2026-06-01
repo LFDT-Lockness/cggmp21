@@ -21,7 +21,7 @@ thiserror = "1"
 serde = { version = "1", features = ["derive"], optional = true }
 serde_with = { workspace = true, default-features = false, features = ["macros"], optional = true }
 
-udigest = { version = "0.2.1", default-features = false, features = ["inline-struct", "derive"] }
+udigest = { version = "0.4.0", default-features = false, features = ["inline-struct", "derive"] }
 rand_hash = "0.1"
 
 [dev-dependencies]

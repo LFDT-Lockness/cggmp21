@@ -319,7 +319,7 @@ dependencies = [
  "serde_with",
  "sha2",
  "thiserror 1.0.48",
- "udigest",
+ "udigest 0.4.0",
 ]
 
 [[package]]
@@ -340,7 +340,7 @@ dependencies = [
  "serde_with",
  "sha2",
  "thiserror 1.0.48",
- "udigest",
+ "udigest 0.4.0",
 ]
 
 [[package]]
@@ -1083,7 +1083,7 @@ dependencies = [
  "serde",
  "serde_with",
  "subtle",
- "udigest",
+ "udigest 0.2.4",
  "zeroize",
 ]
 
@@ -1132,7 +1132,7 @@ dependencies = [
  "rand_core",
  "serde",
  "subtle",
- "udigest",
+ "udigest 0.2.4",
 ]
 
 [[package]]
@@ -1550,7 +1550,7 @@ dependencies = [
  "serde",
  "serde_with",
  "thiserror 1.0.48",
- "udigest",
+ "udigest 0.4.0",
 ]
 
 [[package]]
@@ -1713,7 +1713,7 @@ dependencies = [
  "sha2",
  "subtle",
  "thiserror 1.0.48",
- "udigest",
+ "udigest 0.4.0",
  "zeroize",
 ]
 
@@ -1989,7 +1989,7 @@ checksum = "257d7a1ad5533c1faca40f34d4a1ead75b414f16611c0ec210b7fd23e440475f"
 dependencies = [
  "digest",
  "rand_core",
- "udigest",
+ "udigest 0.2.4",
 ]
 
 [[package]]
@@ -2815,19 +2815,39 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "udigest"
-version = "0.2.1"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f8c862324ffd970533e7fde91b00bf06cd973e2023bfa6c7df5f96a1c959a9d"
+checksum = "19ff079a60bd5dc98b364ce7b5a633a8937bf558f5d19c9a390f5ae1973cf07e"
 dependencies = [
  "digest",
- "udigest-derive",
+ "udigest-derive 0.3.2",
+]
+
+[[package]]
+name = "udigest"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "445f57595f3695388dfe4809d30c5525a9a3f083fe7d02adf7b3ad1171f0a637"
+dependencies = [
+ "udigest-derive 0.5.0",
 ]
 
 [[package]]
 name = "udigest-derive"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6132fb8382b1bdec1cd01062dbe1e88074610e8fe37c2d504043a45f6400108"
+checksum = "25fd5248861b973cd5d1da5604b0ce22a35fa77f015d9f7ed9ab57078205bb86"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+]
+
+[[package]]
+name = "udigest-derive"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01fef4db52ebb9b5c6c77dc28aa93efa020a51bf0300a42de26d60794354f091"
 dependencies = [
  "proc-macro2",
  "quote",
