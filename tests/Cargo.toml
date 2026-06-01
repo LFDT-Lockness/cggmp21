@@ -33,7 +33,7 @@ ciborium = "0.2"
 futures = "0.3"
 pin-project = "1"
 
-lazy_static = "1.4"
+lazy_static = "1.5"
 
 # external verifiers
 secp256k1 = { version = "0.26", features = ["global-context", "bitcoin-hashes"] }
