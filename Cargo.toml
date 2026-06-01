@@ -36,7 +36,7 @@ futures = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false }
 
 anyhow = "1"
-thiserror = "1"
+thiserror = "2"
 displaydoc = { version = "0.2", default-features = false }
 
 serde = { version = "1", default-features = false }

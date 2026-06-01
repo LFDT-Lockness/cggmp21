@@ -16,7 +16,7 @@ rand_core = { version = "0.6", default-features = false }
 digest = "0.10"
 fast-paillier = { workspace = true }
 
-thiserror = "1"
+thiserror = "2"
 
 serde = { version = "1", features = ["derive"], optional = true }
 serde_with = { workspace = true, default-features = false, features = ["macros"], optional = true }

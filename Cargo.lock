@@ -318,7 +318,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sha2",
- "thiserror 1.0.48",
+ "thiserror 2.0.4",
  "udigest",
 ]
 
@@ -339,7 +339,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sha2",
- "thiserror 1.0.48",
+ "thiserror 2.0.4",
  "udigest",
 ]
 
@@ -838,7 +838,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sha3",
- "thiserror 1.0.48",
+ "thiserror 1.0.69",
  "uuid",
 ]
 
@@ -1549,7 +1549,7 @@ dependencies = [
  "rand_core",
  "serde",
  "serde_with",
- "thiserror 1.0.48",
+ "thiserror 2.0.4",
  "udigest",
 ]
 
@@ -1712,7 +1712,7 @@ dependencies = [
  "serde_with",
  "sha2",
  "subtle",
- "thiserror 1.0.48",
+ "thiserror 2.0.4",
  "udigest",
  "zeroize",
 ]
@@ -2439,7 +2439,7 @@ dependencies = [
  "starknet-core",
  "starknet-providers",
  "starknet-signers",
- "thiserror 1.0.48",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2530,7 +2530,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "starknet-core",
- "thiserror 1.0.48",
+ "thiserror 1.0.69",
  "url",
 ]
 
@@ -2547,7 +2547,7 @@ dependencies = [
  "rand",
  "starknet-core",
  "starknet-crypto",
- "thiserror 1.0.48",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2619,11 +2619,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.48"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d6d7a740b8a666a7e828dd00da9c0dc290dff53154ea77ac109281de90589b7"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl 1.0.48",
+ "thiserror-impl 1.0.69",
 ]
 
 [[package]]
@@ -2637,9 +2637,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.48"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49922ecae66cc8a249b77e68d1d0623c1b2c514f0060c27cdc68bd62a1219d35"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
