@@ -36,7 +36,7 @@ pin-project = "1"
 lazy_static = "1.4"
 
 # external verifiers
-secp256k1 = { version = "0.26", features = ["global-context", "bitcoin-hashes"] }
+secp256k1 = { version = "0.27", features = ["global-context", "bitcoin-hashes"] }
 starknet-crypto = { version = "0.6" }
 starknet-core = { version = "0.6" }
 starknet-accounts = { version = "0.5" }
