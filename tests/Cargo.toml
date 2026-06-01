@@ -41,7 +41,7 @@ starknet-crypto = { version = "0.6" }
 starknet-core = { version = "0.6" }
 starknet-accounts = { version = "0.5" }
 starknet-providers = { version = "0.6" }
-starknet-signers = { version = "0.4" }
+starknet-signers = { version = "0.10" }
 url = "2.4"
 
 [dev-dependencies]
