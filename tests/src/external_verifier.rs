@@ -25,7 +25,7 @@ impl<E: Curve> ExternalVerifier<E> for Noop {
 
 pub mod blockchains {
     use anyhow::Context;
-    use cggmp24::supported_curves::{Secp256k1, Stark};
+    use cggmp24::supported_curves::{Secp256k1, Secp384r1, Stark};
 
     use crate::{convert_stark_scalar, external_verifier::ExternalVerifier};
 
@@ -51,6 +51,29 @@ pub mod blockchains {
             signature
                 .verify(&message, &public_key)
                 .context("invalid siganture")
+        }
+    }
+
+    /// Verifies ECDSA/P-384 signature using the RustCrypto `p384` crate
+    pub struct NistP384;
+
+    impl ExternalVerifier<Secp384r1> for NistP384 {
+        fn verify(
+            public_key: &generic_ec::Point<Secp384r1>,
+            signature: &cggmp24::signing::Signature<Secp384r1>,
+            message: &[u8],
+        ) -> anyhow::Result<()> {
+            use p384::ecdsa::signature::Verifier as _;
+
+            let vk = p384::ecdsa::VerifyingKey::from_sec1_bytes(&public_key.to_bytes(true))
+                .context("invalid public key")?;
+
+            let mut sig_bytes = [0u8; 96];
+            signature.write_to_slice(&mut sig_bytes);
+            let sig = p384::ecdsa::Signature::try_from(sig_bytes.as_slice())
+                .context("malformed signature")?;
+
+            vk.verify(message, &sig).context("invalid signature")
         }
     }
 
