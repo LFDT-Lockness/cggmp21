@@ -535,6 +535,25 @@ where
         Ok(self)
     }
 
+    /// Specifies a raw additive key shift `IL`, so signing is performed under the
+    /// shifted key `sk + IL` and the resulting signature verifies against the
+    /// shifted public key `pk + IL * G`.
+    ///
+    /// This is the same additive-shift mechanism [`set_derivation_path`] uses, but
+    /// the shift scalar is supplied directly instead of being derived from an HD
+    /// path. It lets a caller that computes the BIP32/SLIP10 child tweak itself
+    /// (e.g. from an externally maintained chain code) apply it without the key
+    /// share carrying an embedded chain code. Passing `IL = 0` is equivalent to no
+    /// shift (signs under the original key). The two methods are mutually
+    /// exclusive — calling both keeps the shift set last.
+    ///
+    /// [`set_derivation_path`]: Self::set_derivation_path
+    #[cfg(feature = "hd-wallet")]
+    pub fn set_additive_shift(mut self, shift: Scalar<E>) -> Self {
+        self.additive_shift = Some(shift);
+        self
+    }
+
     /// Starts presignature generation protocol
     pub async fn generate_presignature<R, M>(
         self,
