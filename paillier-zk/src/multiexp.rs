@@ -40,14 +40,20 @@ impl MultiexpTable {
         let mut s_table = Vec::with_capacity(k_x.try_into().ok()?);
         let mut t_table = Vec::with_capacity(k_y.try_into().ok()?);
 
-        let B: u32 = 256;
+        let radix = Integer::from(256u32);
+        let mut s_power = s.pow_mod_ref(&Integer::one(), &N)?;
         for i in 0..k_x {
-            let B_to_i = Integer::u_pow_u(B, i);
-            s_table.push(s.pow_mod_ref(&B_to_i, &N)?);
+            s_table.push(s_power.clone());
+            if i + 1 < k_x {
+                s_power = s_power.pow_mod_ref(&radix, &N)?;
+            }
         }
+        let mut t_power = t.pow_mod_ref(&Integer::one(), &N)?;
         for i in 0..k_y {
-            let B_to_i = Integer::u_pow_u(B, i);
-            t_table.push(t.pow_mod_ref(&B_to_i, &N)?);
+            t_table.push(t_power.clone());
+            if i + 1 < k_y {
+                t_power = t_power.pow_mod_ref(&radix, &N)?;
+            }
         }
 
         // smallest negative value possible for `x`
