@@ -5,6 +5,12 @@
 
 #![allow(non_snake_case)]
 
+use std::sync::OnceLock;
+
+use crypto_bigint::{
+    modular::{BoxedMontyForm, BoxedMontyParams},
+    BoxedUint, Odd,
+};
 use fast_paillier::backend::Integer;
 
 /// Precomputed table for performing faster multiexponentiation
@@ -18,6 +24,17 @@ pub struct MultiexpTable {
     ell_y: Integer,
     t_to_ell_y: Integer,
     N: Integer,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    monty: OnceLock<Option<MontyTable>>,
+}
+
+#[derive(Debug, Clone)]
+struct MontyTable {
+    params: BoxedMontyParams,
+    s: Vec<BoxedMontyForm>,
+    s_to_ell_x: BoxedMontyForm,
+    t: Vec<BoxedMontyForm>,
+    t_to_ell_y: BoxedMontyForm,
 }
 
 impl MultiexpTable {
@@ -63,7 +80,7 @@ impl MultiexpTable {
         let ell_y = -(Integer::one() << (k_y * 8)) + 1;
         let t_to_ell_y = t.pow_mod_ref(&ell_y, &N)?;
 
-        Some(Self {
+        let table = Self {
             s: s_table,
             ell_x,
             s_to_ell_x,
@@ -71,7 +88,10 @@ impl MultiexpTable {
             ell_y,
             t_to_ell_y,
             N,
-        })
+            monty: OnceLock::new(),
+        };
+        let _ = table.monty.set(MontyTable::build(&table));
+        Some(table)
     }
 
     /// Calculates `s^x t^y mod N`
@@ -109,9 +129,22 @@ impl MultiexpTable {
             return None;
         }
 
+        match self.monty.get_or_init(|| MontyTable::build(self)) {
+            Some(table) => Some(table.prod_exp(&x_digits, &y_digits, x_is_neg, y_is_neg)),
+            None => Some(self.prod_exp_standard(&x_digits, &y_digits, x_is_neg, y_is_neg)),
+        }
+    }
+
+    fn prod_exp_standard(
+        &self,
+        x_digits: &[u8],
+        y_digits: &[u8],
+        x_is_neg: bool,
+        y_is_neg: bool,
+    ) -> Integer {
         let mut digits_table = [(); 255].map(|_| None);
-        build_digits_table(&mut digits_table, &self.s, &x_digits, &self.N);
-        build_digits_table(&mut digits_table, &self.t, &y_digits, &self.N);
+        build_integer_digits_table(&mut digits_table, &self.s, x_digits, &self.N);
+        build_integer_digits_table(&mut digits_table, &self.t, y_digits, &self.N);
 
         let mut res = Integer::one();
         let mut acc = Integer::one();
@@ -128,8 +161,7 @@ impl MultiexpTable {
         if y_is_neg {
             res = (res * &self.t_to_ell_y) % &self.N;
         }
-
-        Some(res)
+        res
     }
 
     /// Returns max size of exponents (in bits) that can be computed
@@ -150,6 +182,7 @@ impl MultiexpTable {
             ell_y,
             t_to_ell_y,
             N,
+            monty: _,
         } = self;
 
         // A few bytes to encode length of Vec `s` and `t`
@@ -168,11 +201,18 @@ impl MultiexpTable {
         let limbs_bytes =
             (u32::BITS as usize / 8) * (s + ell_x + s_to_ell_x + t + ell_y + t_to_ell_y + N);
 
-        vec_len + int_len + limbs_bytes
+        let monty = self
+            .monty
+            .get()
+            .and_then(Option::as_ref)
+            .map(MontyTable::size_in_bytes)
+            .unwrap_or(0);
+
+        vec_len + int_len + limbs_bytes + monty
     }
 }
 
-fn build_digits_table(
+fn build_integer_digits_table(
     table: &mut [Option<Integer>; 255],
     base: &[Integer],
     digits: &[u8],
@@ -191,6 +231,84 @@ fn build_digits_table(
     }
 }
 
+impl MontyTable {
+    fn build(table: &MultiexpTable) -> Option<Self> {
+        if table.N.is_even() {
+            return None;
+        }
+
+        let modulus = BoxedUint::from_be_slice_vartime(&table.N.to_bytes_msf());
+        let modulus = Option::<Odd<BoxedUint>>::from(Odd::new(modulus))?;
+        let params = BoxedMontyParams::new_vartime(modulus);
+        let convert = |value: &Integer| {
+            BoxedUint::from_be_slice(&value.to_bytes_msf(), params.bits_precision())
+                .ok()
+                .map(|value| BoxedMontyForm::new(value, &params))
+        };
+
+        Some(Self {
+            s: table.s.iter().map(convert).collect::<Option<_>>()?,
+            s_to_ell_x: convert(&table.s_to_ell_x)?,
+            t: table.t.iter().map(convert).collect::<Option<_>>()?,
+            t_to_ell_y: convert(&table.t_to_ell_y)?,
+            params,
+        })
+    }
+
+    fn prod_exp(
+        &self,
+        x_digits: &[u8],
+        y_digits: &[u8],
+        x_is_neg: bool,
+        y_is_neg: bool,
+    ) -> Integer {
+        let mut digits_table = [(); 255].map(|_| None);
+        build_monty_digits_table(&mut digits_table, &self.s, x_digits);
+        build_monty_digits_table(&mut digits_table, &self.t, y_digits);
+
+        let mut res = BoxedMontyForm::one(&self.params);
+        let mut acc = BoxedMontyForm::one(&self.params);
+        for d in digits_table.iter().rev() {
+            if let Some(d) = d {
+                acc *= d;
+            }
+            res *= &acc;
+        }
+
+        if x_is_neg {
+            res *= &self.s_to_ell_x;
+        }
+        if y_is_neg {
+            res *= &self.t_to_ell_y;
+        }
+
+        Integer::from_bytes_msf(&res.retrieve().to_be_bytes())
+    }
+
+    fn size_in_bytes(&self) -> usize {
+        let values = self.s.len() + self.t.len() + 2;
+        // Include cached residues and the modulus parameters retained by the shared Arc.
+        (values + 4) * usize::try_from(self.params.bits_precision() / 8).unwrap_or(usize::MAX)
+    }
+}
+
+fn build_monty_digits_table(
+    table: &mut [Option<BoxedMontyForm>; 255],
+    base: &[BoxedMontyForm],
+    digits: &[u8],
+) {
+    for (i, digit) in digits.iter().copied().enumerate() {
+        if digit != 0 {
+            match &mut table[usize::from(digit - 1)] {
+                Some(out) => {
+                    *out *= &base[i];
+                }
+                out @ None => *out = Some(base[i].clone()),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use fast_paillier::backend::Integer;
@@ -199,7 +317,37 @@ mod test {
 
     #[test]
     fn multiexp_works() {
-        let N = Integer::from(100000);
+        check_multiexp(Integer::from(100003));
+        check_multiexp(Integer::from(100000));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialized_table_rebuilds_monty_cache() {
+        let table = MultiexpTable::build(
+            &Integer::from(3),
+            &Integer::from(7),
+            48,
+            32,
+            Integer::from(100003),
+        )
+        .unwrap();
+        let encoded = serde_json::to_vec(&table).unwrap();
+        let restored: MultiexpTable = serde_json::from_slice(&encoded).unwrap();
+
+        assert!(restored.monty.get().is_none());
+        assert_eq!(
+            restored
+                .prod_exp(&Integer::from(-12345), &Integer::from(6789))
+                .unwrap(),
+            table
+                .prod_exp(&Integer::from(-12345), &Integer::from(6789))
+                .unwrap()
+        );
+        assert!(restored.monty.get().is_some_and(Option::is_some));
+    }
+
+    fn check_multiexp(N: Integer) {
         let s = Integer::from(3);
         let t = Integer::from(7);
 

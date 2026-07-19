@@ -17,7 +17,7 @@ cggmp24-keygen = { version = "0.7.0-alpha.4", path = "cggmp24-keygen" }
 key-share = { version = "0.7", path = "key-share", default-features = false }
 paillier-zk = { version = "0.7.0-alpha.4", path = "paillier-zk", default-features = false }
 
-fast-paillier = { version = "0.3.2", default-features = false }
+fast-paillier = { git = "https://github.com/noah-dfns/fast-paillier", rev = "f88dc22c7956785330440c535f474d9a23b85d39", default-features = false }
 generic-ec = { version = "0.5", default-features = false }
 generic-ec-zkp = { version = "0.5", default-features = false }
 round-based = { version = "0.4.1", default-features = false }
