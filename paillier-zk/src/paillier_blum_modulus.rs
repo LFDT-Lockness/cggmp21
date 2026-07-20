@@ -16,6 +16,7 @@
 //! let p = Integer::generate_safe_prime(&mut rng, 256);
 //! let q = Integer::generate_safe_prime(&mut rng, 256);
 //! let n = &p * &q;
+//! let crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q).ok_or("crt build error")?;
 //!
 //! // 1. P computes a non-interactive proof that `n` is a Paillier-Blum modulus:
 //! use paillier_zk::paillier_blum_modulus as p;
@@ -26,7 +27,7 @@
 //! let shared_state = "some shared state";
 //!
 //! let data = p::Data { n: &n };
-//! let pdata = p::PrivateData { p: &p, q: &q };
+//! let pdata = p::PrivateData { p: &p, q: &q, crt: &crt };
 //!
 //! let proof =
 //!     p::non_interactive::prove::<{SECURITY}, sha2::Sha256>(
