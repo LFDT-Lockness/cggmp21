@@ -73,6 +73,8 @@ pub struct Data<'a> {
 pub struct PrivateData<'a> {
     pub p: &'a Integer,
     pub q: &'a Integer,
+    /// CRT built for `N=p*q`
+    pub crt: &'a fast_paillier::utils::CrtExp,
 }
 
 /// Prover's first message, obtained by [`interactive::commit`]
@@ -149,22 +151,21 @@ pub mod interactive {
     /// Compute proof for given data and prior protocol values
     pub fn prove<const M: usize>(
         Data { n }: Data,
-        PrivateData { p, q }: PrivateData,
+        PrivateData { p, q, crt }: PrivateData,
         Commitment { ref w }: &Commitment,
         challenge: &Challenge<M>,
     ) -> Result<Proof<M>, Error> {
         let blum_sqrt = |x| blum_sqrt(&x, p, q, n);
         let phi = (p - 1) * (q - 1);
         let n_inverse = n.invert_ref(&phi).ok_or(ErrorReason::Invert)?;
+        let n_inverse = crt.prepare_exponent(&n_inverse);
 
         // We do an extra allocation as workaround while `array::try_map` is not stable
         let points = challenge
             .ys
             .iter()
             .map(|y| {
-                let z = y
-                    .pow_mod_ref(&n_inverse, n)
-                    .ok_or(BadExponent::undefined())?;
+                let z = crt.exp(y, &n_inverse).ok_or(BadExponent::undefined())?;
                 let (a, b, y_) = find_residue(y, w, p, q, n).ok_or(ErrorReason::FindResidue)?;
                 let x = blum_sqrt(blum_sqrt(y_));
                 Ok(ProofPoint { x, a, b, z })
@@ -309,8 +310,13 @@ mod test {
         let p = generate_blum_prime(&mut rng, 256);
         let q = generate_blum_prime(&mut rng, 256);
         let n = &p * &q;
+        let crt = fast_paillier::utils::CrtExp::build_n(&p, &q).unwrap();
         let data = super::Data { n: &n };
-        let pdata = super::PrivateData { p: &p, q: &q };
+        let pdata = super::PrivateData {
+            p: &p,
+            q: &q,
+            crt: &crt,
+        };
         let shared_state = "shared state";
         let proof =
             super::non_interactive::prove::<65, D>(&shared_state, data, pdata, &mut rng).unwrap();
@@ -332,9 +338,14 @@ mod test {
                 break q;
             }
         };
+        let crt = fast_paillier::utils::CrtExp::build_n(&p, &q).unwrap();
         let n = &p * &q;
         let data = super::Data { n: &n };
-        let pdata = super::PrivateData { p: &p, q: &q };
+        let pdata = super::PrivateData {
+            p: &p,
+            q: &q,
+            crt: &crt,
+        };
         let shared_state = "shared state";
         let proof =
             super::non_interactive::prove::<65, D>(&shared_state, data, pdata, &mut rng).unwrap();

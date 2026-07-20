@@ -209,10 +209,7 @@ pub mod interactive {
         let q = aux.combine(pdata.q, &nu)?;
         let a = aux.combine(&alpha, &x)?;
         let b = aux.combine(&beta, &y)?;
-        let t = aux
-            .rsa_modulo
-            .combine(&q, &alpha, &aux.t, &r)
-            .ok_or_else(crate::BadExponent::undefined)?;
+        let t = (aux.pow_mod(&q, &alpha)? * aux.pow_mod(&aux.t, &r)?).modulo(&aux.rsa_modulo);
 
         let commitment = Commitment { p, q, a, b, t };
         let private_commitment = PrivateCommitment {
