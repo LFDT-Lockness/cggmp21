@@ -129,7 +129,6 @@ pub struct NiProof<const M: usize> {
 /// prover gives proof with commitment and challenge.
 pub mod interactive {
     use fast_paillier::backend::Integer;
-    use fast_paillier::utils::CrtExp;
     use rand_core::RngCore;
 
     use crate::common::{
@@ -157,15 +156,15 @@ pub mod interactive {
         let blum_sqrt = |x| blum_sqrt(&x, p, q, n);
         let phi = (p - 1) * (q - 1);
         let n_inverse = n.invert_ref(&phi).ok_or(ErrorReason::Invert)?;
-        let crt = CrtExp::build_n(p, q).ok_or(ErrorReason::Invert)?;
-        let n_inverse = crt.prepare_exponent(&n_inverse);
 
         // We do an extra allocation as workaround while `array::try_map` is not stable
         let points = challenge
             .ys
             .iter()
             .map(|y| {
-                let z = crt.exp(y, &n_inverse).ok_or(BadExponent::undefined())?;
+                let z = y
+                    .pow_mod_ref(&n_inverse, n)
+                    .ok_or(BadExponent::undefined())?;
                 let (a, b, y_) = find_residue(y, w, p, q, n).ok_or(ErrorReason::FindResidue)?;
                 let x = blum_sqrt(blum_sqrt(y_));
                 Ok(ProofPoint { x, a, b, z })
