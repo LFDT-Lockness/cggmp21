@@ -39,6 +39,8 @@ impl MultiexpTable {
         let k_y = y_bits / 8 + 1;
 
         let radix = Integer::from(256u32);
+        // We construct a table s_table[i] = s^(radix^i) mod N. To optimize the perf, we do that in
+        // a sequence of successive computations:
         // s_table[0] = s mod N
         // s_table[i+1] = s_table[i]^radix mod N
         let s_table_len = k_x.try_into().ok()?;
@@ -48,7 +50,8 @@ impl MultiexpTable {
         .take(s_table_len)
         .collect::<Vec<_>>();
 
-        // Similarly:
+        // We construct a table t_table[i] = t^(radix^i) mod N. To optimize the perf, we do that in
+        // a sequence of successive computations:
         // t_table[0] = t mod N
         // t_table[i+1] = t_table[i]^radix mod N
         let t_table_len = k_y.try_into().ok()?;
