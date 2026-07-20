@@ -37,23 +37,32 @@ impl MultiexpTable {
         }
         let k_x = x_bits / 8 + 1;
         let k_y = y_bits / 8 + 1;
-        let mut s_table = Vec::with_capacity(k_x.try_into().ok()?);
-        let mut t_table = Vec::with_capacity(k_y.try_into().ok()?);
 
         let radix = Integer::from(256u32);
-        let mut s_power = s.pow_mod_ref(&Integer::one(), &N)?;
-        for i in 0..k_x {
-            s_table.push(s_power.clone());
-            if i + 1 < k_x {
-                s_power = s_power.pow_mod_ref(&radix, &N)?;
-            }
-        }
-        let mut t_power = t.pow_mod_ref(&Integer::one(), &N)?;
-        for i in 0..k_y {
-            t_table.push(t_power.clone());
-            if i + 1 < k_y {
-                t_power = t_power.pow_mod_ref(&radix, &N)?;
-            }
+        // s_table[0] = s mod N
+        // s_table[i+1] = s_table[i]^radix mod N
+        let s_table_len = k_x.try_into().ok()?;
+        let s_table = core::iter::successors(Some(s.modulo_ref(&N)), |s_prev| {
+            s_prev.pow_mod_ref(&radix, &N)
+        })
+        .take(s_table_len)
+        .collect::<Vec<_>>();
+
+        // Similarly:
+        // t_table[0] = t mod N
+        // t_table[i+1] = t_table[i]^radix mod N
+        let t_table_len = k_y.try_into().ok()?;
+        let t_table = core::iter::successors(Some(t.modulo_ref(&N)), |t_prev| {
+            t_prev.pow_mod_ref(&radix, &N)
+        })
+        .take(t_table_len)
+        .collect::<Vec<_>>();
+
+        if s_table.len() != s_table_len || t_table.len() != t_table_len {
+            // s_table and t_table are constructed by calling a `pow_mod_ref` which might fail (with
+            // negligible probability). If that happens, table will have less elements than it's
+            // supposed to, we catch it there.
+            return None;
         }
 
         // smallest negative value possible for `x`
