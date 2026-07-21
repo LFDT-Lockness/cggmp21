@@ -171,6 +171,7 @@ fn do_becnhmarks<L: SecurityLevel>(args: Args) {
                     async move {
                         let aux_data = cggmp24::aux_info_gen(eid, i, n, pregen)
                             .set_progress_tracer(&mut profiler)
+                            .precompute_multiexp_tables(true)
                             .start(&mut party_rng, party)
                             .await
                             .context("aux data gen failed")?;

@@ -988,7 +988,7 @@ where
         tracer.msgs_received();
         tracer.stage("Assert other parties hashed messages (reliability check)");
         let parties_have_different_hashes =
-            utils::collect_simple_blame(&round1a_hashes, |hash| hash.0 != h_i);
+            utils::collect_simple_blame(&round1a_hashes, |_j, hash| hash.0 != h_i);
         if !parties_have_different_hashes.is_empty() {
             return Err(SigningAborted::Round1aNotReliable(parties_have_different_hashes).into());
         }

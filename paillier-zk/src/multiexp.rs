@@ -37,17 +37,35 @@ impl MultiexpTable {
         }
         let k_x = x_bits / 8 + 1;
         let k_y = y_bits / 8 + 1;
-        let mut s_table = Vec::with_capacity(k_x.try_into().ok()?);
-        let mut t_table = Vec::with_capacity(k_y.try_into().ok()?);
 
-        let B: u32 = 256;
-        for i in 0..k_x {
-            let B_to_i = Integer::u_pow_u(B, i);
-            s_table.push(s.pow_mod_ref(&B_to_i, &N)?);
-        }
-        for i in 0..k_y {
-            let B_to_i = Integer::u_pow_u(B, i);
-            t_table.push(t.pow_mod_ref(&B_to_i, &N)?);
+        let radix = Integer::from(256u32);
+        // We construct a table s_table[i] = s^(radix^i) mod N. To optimize the perf, we do that in
+        // a sequence of successive computations:
+        // s_table[0] = s mod N
+        // s_table[i+1] = s_table[i]^radix mod N
+        let s_table_len = k_x.try_into().ok()?;
+        let s_table = core::iter::successors(Some(s.modulo_ref(&N)), |s_prev| {
+            s_prev.pow_mod_ref(&radix, &N)
+        })
+        .take(s_table_len)
+        .collect::<Vec<_>>();
+
+        // We construct a table t_table[i] = t^(radix^i) mod N. To optimize the perf, we do that in
+        // a sequence of successive computations:
+        // t_table[0] = t mod N
+        // t_table[i+1] = t_table[i]^radix mod N
+        let t_table_len = k_y.try_into().ok()?;
+        let t_table = core::iter::successors(Some(t.modulo_ref(&N)), |t_prev| {
+            t_prev.pow_mod_ref(&radix, &N)
+        })
+        .take(t_table_len)
+        .collect::<Vec<_>>();
+
+        if s_table.len() != s_table_len || t_table.len() != t_table_len {
+            // s_table and t_table are constructed by calling a `pow_mod_ref` which might fail (with
+            // negligible probability). If that happens, table will have less elements than it's
+            // supposed to, we catch it there.
+            return None;
         }
 
         // smallest negative value possible for `x`

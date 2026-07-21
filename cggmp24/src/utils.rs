@@ -126,12 +126,12 @@ where
 /// to the same message.
 pub fn collect_simple_blame<D, F>(messages: &RoundMsgs<D>, mut filter: F) -> Vec<AbortBlame>
 where
-    F: FnMut(&D) -> bool,
+    F: FnMut(u16, &D) -> bool,
 {
     messages
         .iter_indexed()
         .filter_map(|(j, msg_id, data)| {
-            if filter(data) {
+            if filter(j, data) {
                 Some(AbortBlame::new(j, msg_id, msg_id))
             } else {
                 None

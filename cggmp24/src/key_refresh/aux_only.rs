@@ -13,8 +13,7 @@ use crate::{
     key_share::{AuxInfo, DirtyAuxInfo, PedersenParams, Validate},
     progress::Tracer,
     security_level::SecurityLevel,
-    utils,
-    utils::{collect_blame, AbortBlame},
+    utils::{self, collect_blame, AbortBlame},
     zk::ring_pedersen_parameters as π_prm,
     ExecutionId,
 };
@@ -187,19 +186,17 @@ where
 
     tracer.stage("Build Paillier key");
     let N = &p * &q;
+    let N_crt = paillier_zk::fast_paillier::utils::CrtExp::build_n(&p, &q).ok_or(Bug::BuildNCrt)?;
 
     tracer.stage("Build Pedersen params");
-    let (pedersen_params, phi_hat_N, lambda) = utils::generate_pedersen_params(rng, hat_p, hat_q)?;
+    let (my_pedersen_params, phi_hat_N, lambda) =
+        utils::generate_pedersen_params(rng, hat_p, hat_q)?;
 
     tracer.stage("Prove Πprm (ψˆ_i)");
     let hat_psi = π_prm::prove::<{ crate::security_level::M }, D>(
         &unambiguous::ProofPrm { sid, prover: i },
         &mut rng,
-        π_prm::Data {
-            N: &pedersen_params.hat_N,
-            s: &pedersen_params.s,
-            t: &pedersen_params.t,
-        },
+        &my_pedersen_params,
         &phi_hat_N,
         &lambda,
     )
@@ -214,9 +211,9 @@ where
     // V_i and u_i in paper
     let decommitment = MsgRound2 {
         N: N.clone(),
-        hat_N: pedersen_params.hat_N.clone(),
-        s: pedersen_params.s.clone(),
-        t: pedersen_params.t.clone(),
+        hat_N: my_pedersen_params.hat_N.clone(),
+        s: my_pedersen_params.s.clone(),
+        t: my_pedersen_params.t.clone(),
         params_proof: hat_psi,
         rho_bytes: rho_bytes.clone(),
         decommit: {
@@ -320,28 +317,58 @@ where
         return Err(ProtocolAborted::invalid_decommitment(blame).into());
     }
     // validate parameters and param_proofs
-    tracer.stage("Validate bit length and П_prm (ψˆ_i)");
-    let blame = collect_blame(&decommitments, &decommitments, |j, d, _| {
+    tracer.stage("Validate pedersen params consistency");
+    let blame = utils::collect_simple_blame(&decommitments, |_, d| {
         if [&d.N, &d.hat_N]
             .iter()
             .any(|biprime| !crate::security_level::validate_public_paillier_key_size::<L>(biprime))
         {
-            true
-        } else {
-            π_prm::verify::<{ crate::security_level::M }, D>(
-                &unambiguous::ProofPrm { sid, prover: j },
-                π_prm::Data {
-                    N: &d.hat_N,
-                    s: &d.s,
-                    t: &d.t,
-                },
-                &d.params_proof,
-            )
-            .is_err()
+            return true;
         }
+        !d.t.in_mult_group_of(&d.hat_N) || !d.s.in_mult_group_of(&d.hat_N)
     });
     if !blame.is_empty() {
         return Err(ProtocolAborted::invalid_ring_pedersen_parameters(blame).into());
+    }
+    tracer.stage("Construct aux info");
+    let mut pedersen_params = decommitments
+        .iter()
+        .map(|d| PedersenParams {
+            hat_N: d.hat_N.clone(),
+            s: d.s.clone(),
+            t: d.t.clone(),
+            multiexp: None,
+            crt: None,
+        })
+        .collect::<Vec<_>>();
+    pedersen_params.insert(i.into(), my_pedersen_params);
+    let mut aux = DirtyAuxInfo {
+        p,
+        q,
+        N: decommitments
+            .iter_including_me(&decommitment)
+            .map(|d| d.N.clone())
+            .collect::<Vec<_>>(),
+        pedersen_params,
+        security_level: std::marker::PhantomData,
+    };
+    if compute_multiexp_table {
+        tracer.stage("Precompute multiexp tables");
+        aux.precompute_multiexp_tables()
+            .map_err(Bug::BuildMultiexpTables)?;
+    }
+
+    tracer.stage("Validate П_prm (ψˆ_i)");
+    let blame = utils::collect_simple_blame(&decommitments, |j, d| {
+        π_prm::verify::<{ crate::security_level::M }, D>(
+            &unambiguous::ProofPrm { sid, prover: j },
+            &aux.pedersen_params[usize::from(j)],
+            &d.params_proof,
+        )
+        .is_err()
+    });
+    if !blame.is_empty() {
+        return Err(ProtocolAborted::invalid_prm_proof(blame).into());
     }
 
     tracer.stage("Add together shared random bytes");
@@ -360,7 +387,11 @@ where
             prover: i,
         },
         π_mod::Data { n: &N },
-        π_mod::PrivateData { p: &p, q: &q },
+        π_mod::PrivateData {
+            p: &aux.p,
+            q: &aux.q,
+            crt: &N_crt,
+        },
         &mut rng,
     )
     .map_err(Bug::PiMod)?;
@@ -372,7 +403,7 @@ where
     let n_sqrt = N.sqrt_ref().ok_or(Bug::NegativeModulus)?;
 
     // message to each party
-    for (j, _, d) in decommitments.iter_indexed() {
+    for j in utils::iter_peers(i, n) {
         tracer.send_msg();
 
         tracer.stage("Compute П_fac (ψ'_i,j)");
@@ -382,18 +413,15 @@ where
                 rho: rho_bytes.as_ref(),
                 prover: i,
             },
-            &π_fac::Aux {
-                s: d.s.clone(),
-                t: d.t.clone(),
-                rsa_modulo: d.hat_N.clone(),
-                multiexp: None,
-                crt: None,
-            },
+            &(&aux.pedersen_params[usize::from(j)]).into(),
             π_fac::Data {
                 n: &N,
                 n_root: &n_sqrt,
             },
-            π_fac::PrivateData { p: &p, q: &q },
+            π_fac::PrivateData {
+                p: &aux.p,
+                q: &aux.q,
+            },
             &π_fac_security,
             &mut rng,
         )
@@ -449,9 +477,9 @@ where
     }
 
     tracer.stage("Validate ψ'_j,i (П_fac)");
-    // verify fac proofs
 
-    let phi_common_aux: π_fac::Aux = (&pedersen_params).into();
+    // verify fac proofs
+    let phi_common_aux: π_fac::Aux = (&aux.pedersen_params[usize::from(i)]).into();
     let blame = collect_blame(
         &decommitments,
         &shares_msg_b,
@@ -483,38 +511,7 @@ where
 
     // verifications passed, compute final key shares
 
-    tracer.stage("Assemble auxiliary info");
-    let mut parties_pedersen = decommitments
-        .iter()
-        .map(|d| PedersenParams {
-            hat_N: d.hat_N.clone(),
-            s: d.s.clone(),
-            t: d.t.clone(),
-            multiexp: None,
-            crt: None,
-        })
-        .collect::<Vec<_>>();
-    parties_pedersen.insert(i.into(), pedersen_params);
-
-    let N = decommitments
-        .into_iter_including_me(decommitment)
-        .map(|d| d.N)
-        .collect::<Vec<_>>();
-    let mut aux = DirtyAuxInfo {
-        p,
-        q,
-        N,
-        pedersen_params: parties_pedersen,
-        security_level: std::marker::PhantomData,
-    };
-
-    if compute_multiexp_table {
-        tracer.stage("Precompute multiexp tables");
-
-        aux.precompute_multiexp_tables()
-            .map_err(Bug::BuildMultiexpTables)?;
-    }
-
+    tracer.stage("Verify consistency of auxiliary info");
     let aux = aux
         .validate()
         .map_err(|err| Bug::InvalidShareGenerated(err.into_error()))?;

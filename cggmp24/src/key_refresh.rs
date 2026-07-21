@@ -247,6 +247,8 @@ enum Bug {
     GenPedersen(#[source] utils::GenPedersenError),
     #[error("own modulus N is not positive")]
     NegativeModulus,
+    #[error("build CRT for N=p*q")]
+    BuildNCrt,
 }
 
 /// Error indicating that protocol was aborted by malicious party
@@ -270,6 +272,8 @@ enum ProtocolAbortReason {
     InvalidFacProof,
     #[error("N, s and t parameters are invalid")]
     InvalidRingPedersenParameters,
+    #[error("provided invalid proof for Prm")]
+    InvalidPrmProof,
     #[error("round 1 was not reliable")]
     Round1NotReliable,
 }
@@ -292,5 +296,6 @@ impl ProtocolAborted {
         invalid_ring_pedersen_parameters,
         InvalidRingPedersenParameters
     );
+    make_factory!(invalid_prm_proof, InvalidPrmProof);
     make_factory!(round1_not_reliable, Round1NotReliable);
 }
