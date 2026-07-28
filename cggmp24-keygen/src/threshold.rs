@@ -150,6 +150,19 @@ where
     R: RngCore + CryptoRng,
     M: Mpc<ProtocolMessage = Msg<E, L, D>>,
 {
+    if n < 2 {
+        return Err(Bug::TooFewParties.into());
+    }
+    if t < 2 {
+        return Err(Bug::ThresholdTooSmall.into());
+    }
+    if t > n {
+        return Err(Bug::ThresholdTooLarge.into());
+    }
+    if i >= n {
+        return Err(Bug::PartyIndexOutOfRange.into());
+    }
+
     tracer.protocol_begins();
 
     tracer.stage("Setup networking");

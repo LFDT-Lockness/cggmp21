@@ -138,6 +138,72 @@ where
     validate_keygen_output::<E, Hd>(&mut rng, &key_shares);
 }
 
+cggmp24_tests::test_suite! {
+    test: threshold_keygen_rejects_invalid_params,
+    generics: all_curves,
+    suites: {
+        t_greater_than_n: (5, 3),
+        t_too_small: (1, 3),
+        n_too_small: (2, 1),
+    }
+}
+fn threshold_keygen_rejects_invalid_params<E>(t: u16, n: u16)
+where
+    E: Curve + cggmp24_tests::CurveParams,
+{
+    let mut rng = DevRng::new();
+
+    let eid: [u8; 32] = rng.gen();
+    let eid = ExecutionId::new(&eid);
+
+    let sim_n = n.max(1);
+    let results = round_based::sim::run(sim_n, |i, party| {
+        let party = cggmp24_tests::buffer_outgoing(party);
+        let mut party_rng = rng.fork();
+
+        async move {
+            cggmp24::keygen::<E>(eid, i, n)
+                .set_security_level::<E::SecurityLevel>()
+                .set_digest::<E::Digest>()
+                .set_threshold(t)
+                .start(&mut party_rng, party)
+                .await
+        }
+    })
+    .unwrap()
+    .into_vec();
+
+    for result in &results {
+        assert!(result.is_err(), "expected error for t={t}, n={n}, got Ok");
+    }
+}
+
+#[test]
+fn threshold_keygen_rejects_i_out_of_range() {
+    let mut rng = DevRng::new();
+
+    let eid: [u8; 32] = rng.gen();
+    let eid = ExecutionId::new(&eid);
+
+    let (t, n) = (2, 3);
+    let bad_i = n;
+    let result = round_based::sim::run(1, |_sim_i, party| {
+        let party = cggmp24_tests::buffer_outgoing(party);
+        let mut party_rng = rng.fork();
+
+        async move {
+            cggmp24::keygen::<cggmp24::supported_curves::Secp256k1>(eid, bad_i, n)
+                .set_threshold(t)
+                .start(&mut party_rng, party)
+                .await
+        }
+    })
+    .unwrap()
+    .into_vec();
+
+    assert!(result[0].is_err(), "expected error for i >= n, got Ok");
+}
+
 fn validate_keygen_output<E: generic_ec::Curve, Hd: cggmp24_tests::OptionalHd<E>>(
     rng: &mut impl rand::RngCore,
     key_shares: &[cggmp24::IncompleteKeyShare<E>],
