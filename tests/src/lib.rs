@@ -242,9 +242,7 @@ impl PrecomputedKeyShares {
                         crt: None,
                     };
                     params.precompute_crt(&aux.hat_p, &aux.hat_q).unwrap();
-                    params
-                        .precompute_multiexp_table::<cggmp24::security_level::SecurityLevel128>()
-                        .unwrap();
+                    params.precompute_multiexp_table::<L>().unwrap();
                     params
                 })
                 .collect::<Vec<_>>();
