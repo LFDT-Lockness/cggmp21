@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 cggmp24 = { workspace = true, default-features = false, features = ["all-curves", "spof", "state-machine"] }
+cggmp24-key-refresh = { workspace = true }
 
 hd-wallet = { workspace = true, optional = true }
 

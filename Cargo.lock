@@ -323,6 +323,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "cggmp24-key-refresh"
+version = "0.7.0-alpha.4"
+dependencies = [
+ "cggmp24-keygen",
+ "digest",
+ "displaydoc",
+ "futures-util",
+ "generic-ec",
+ "generic-ec-zkp",
+ "hd-wallet",
+ "hex",
+ "key-share",
+ "rand_core",
+ "round-based",
+ "serde",
+ "serde_with",
+ "sha2",
+ "thiserror 1.0.48",
+ "udigest",
+]
+
+[[package]]
 name = "cggmp24-keygen"
 version = "0.7.0-alpha.4"
 dependencies = [
@@ -350,6 +372,7 @@ dependencies = [
  "anyhow",
  "bpaf",
  "cggmp24",
+ "cggmp24-key-refresh",
  "ciborium",
  "criterion",
  "digest",

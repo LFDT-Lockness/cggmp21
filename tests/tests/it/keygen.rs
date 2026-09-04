@@ -138,7 +138,7 @@ where
     validate_keygen_output::<E, Hd>(&mut rng, &key_shares);
 }
 
-fn validate_keygen_output<E: generic_ec::Curve, Hd: cggmp24_tests::OptionalHd<E>>(
+pub(crate) fn validate_keygen_output<E: generic_ec::Curve, Hd: cggmp24_tests::OptionalHd<E>>(
     rng: &mut impl rand::RngCore,
     key_shares: &[cggmp24::IncompleteKeyShare<E>],
 ) {
