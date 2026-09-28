@@ -170,17 +170,12 @@ pub struct KeyRefreshOutput<E: Curve, L: SecurityLevel> {
 /// Refreshes additive secret shares without changing the joint public key.
 /// Fails if `share` is a threshold key share.
 ///
-/// `i` is this party's index in **this protocol run** (`0 <= i < n`), used for
-/// `RoundsRouter` and message addressing. It need not equal `share.i` (indexes)
-/// can be rotated between invocations). This n-out-of-n implementation still
-/// requires all `share.n()` parties and treats `i` as the index into protocol
-/// vectors of length `n` (and into `public_shares`). Callers should pass the
-/// index this share occupies in `public_shares` (normally `share.i`).
+/// The party index is `share.i`. It is the key-share slot and the seat in
+/// this run (`0 <= share.i < n`). We can assume that the indexes are always the same in key refresh and in keygen.
 pub async fn run_key_refresh<E, R, M, L, D>(
     rng: &mut R,
     party: M,
     sid: ExecutionId<'_>,
-    i: u16,
     share: &IncompleteKeyShare<E>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
@@ -196,6 +191,7 @@ where
         return Err(Reason::NotThreshold.into());
     }
     let n = share.n();
+    let i = share.i;
     if i >= n {
         return Err(InvalidArgs::PartyIndexOutOfBounds.into());
     }

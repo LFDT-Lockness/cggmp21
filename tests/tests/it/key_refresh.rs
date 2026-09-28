@@ -65,15 +65,7 @@ where
                 _,
                 E::SecurityLevel,
                 E::Digest,
-            >(
-                &mut party_rng,
-                party,
-                eid,
-                i,
-                share,
-                None,
-                reliable_broadcast,
-            )
+            >(&mut party_rng, party, eid, share, None, reliable_broadcast)
             .await
         }
     })
