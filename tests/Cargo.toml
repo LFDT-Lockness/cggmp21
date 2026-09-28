@@ -51,7 +51,7 @@ criterion = "0.5"
 [features]
 default = ["backend-num-bigint"]
 
-hd-wallet = ["dep:hd-wallet", "cggmp24/hd-wallet", "cggmp24/hd-slip10", "cggmp24/hd-stark"]
+hd-wallet = ["dep:hd-wallet", "cggmp24/hd-wallet", "cggmp24/hd-slip10", "cggmp24/hd-stark", "cggmp24-key-refresh/hd-wallet"]
 
 backend-rug = ["cggmp24/backend-rug"]
 backend-num-bigint = ["cggmp24/backend-num-bigint"]

@@ -216,7 +216,6 @@ where
     let y = (0..n)
         .map(|_| SecretScalar::random(rng))
         .collect::<Vec<_>>();
-    // $\vec Y_i = (Y_{i,j} = y_{i,j} \cdot G)_{j \in [n]}$
     let Y = y
         .iter()
         .map(|y_ij| Point::generator() * y_ij)
@@ -232,10 +231,9 @@ where
         .map(|x| Point::generator() * x)
         .collect::<Vec<_>>();
 
-    let (tau, A) =
-        core::iter::repeat_with(|| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
-            .take(usize::from(n))
-            .unzip::<_, _, Vec<_>, Vec<_>>();
+    let (tau, A): (Vec<_>, Vec<_>) = (0..n)
+        .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
+        .unzip();
 
     let mut rid_i = L::KappaBytes::default();
     rng.fill_bytes(rid_i.as_mut());
@@ -438,7 +436,7 @@ where
         .iter_indexed()
         .zip(Y_col)
         .zip(utils::skip_ith(usize::from(i), &y))
-        .map(|(((j, msg_id, msg), Y_ji), y_ij)| {
+        .map(|(((j, _msg_id, msg), Y_ji), y_ij)| {
             // specsheet: $\rho_{j,i}$ from $y_{j,i} \cdot Y_{i,j}$.
             // Same DH point as $y_{i,j} \cdot Y_{j,i}$ ($Y$ subscripts swapped vs the specsheet).
             let dh = Y_ji * y_ij;
@@ -449,14 +447,15 @@ where
                 recipient: i,
                 dh_shared: &dh,
             });
-            (j, msg_id, msg.c - rho)
+            msg.c - rho
         })
         .collect::<Vec<_>>();
 
     let masked_blame = peer_contribs
         .iter()
         .zip(X_prime_col)
-        .filter_map(|(&(j, msg_id, x_ji_prime), X_prime_ji)| {
+        .zip(masked.iter_indexed())
+        .filter_map(|((&x_ji_prime, X_prime_ji), (j, msg_id, _msg))| {
             (Point::generator() * x_ji_prime != X_prime_ji)
                 .then_some(AbortBlame::new(j, msg_id, msg_id))
         })
@@ -464,10 +463,6 @@ where
     if !masked_blame.is_empty() {
         return Err(ProtocolAborted::invalid_masked_share(masked_blame).into());
     }
-    let peer_contribs = peer_contribs
-        .into_iter()
-        .map(|(_, _, x_ji_prime)| x_ji_prime)
-        .collect::<Vec<_>>();
 
     tracer.stage("Validate schnorr proofs");
     let blame = utils::collect_blame(&decommitments, &sch_proofs_r, |j, decom, msg| {
