@@ -170,8 +170,10 @@ pub struct KeyRefreshOutput<E: Curve, L: SecurityLevel> {
 /// Refreshes additive secret shares without changing the joint public key.
 /// Fails if `share` is a threshold key share.
 ///
-/// The party index is `share.i`. It is the key-share slot and the seat in
-/// this run (`0 <= share.i < n`). We can assume that the indexes are always the same in key refresh and in keygen.
+/// Indexes of all participants of the protocol should match exactly their indexes from
+/// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
+/// it must have the same index `j` in key refresh execution. In particular, the local
+/// party has index [`share.i`](DirtyIncompleteKeyShare::i).
 pub async fn run_key_refresh<E, R, M, L, D>(
     rng: &mut R,
     party: M,
