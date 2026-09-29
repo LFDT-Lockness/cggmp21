@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cggmp24::{backend::Integer, key_share::Validate as _};
+use cggmp24::{backend::Integer, key_share::Validate as _, security_level::SecurityLevel};
 use generic_ec::Curve;
 use rand::RngCore;
 use serde_json::Value;
@@ -242,9 +242,15 @@ impl PrecomputedKeyShares {
                         crt: None,
                     };
                     params.precompute_crt(&aux.hat_p, &aux.hat_q).unwrap();
-                    params
-                        .precompute_multiexp_table::<cggmp24::security_level::SecurityLevel128>()
-                        .unwrap();
+                    // A 192-bit table covers ~9k-bit exponents modulo an ~8k-bit N, for every
+                    // cached party. That precomputation dominates the suite. Without a table,
+                    // proofs use naive exponentiation. A 128-bit table built for a 192-bit
+                    // proof is rejected in debug (`BadExponent`).
+                    if L::RSA_PRIME_BITLEN
+                        == cggmp24::security_level::SecurityLevel128::RSA_PRIME_BITLEN
+                    {
+                        params.precompute_multiexp_table::<L>().unwrap();
+                    }
                     params
                 })
                 .collect::<Vec<_>>();

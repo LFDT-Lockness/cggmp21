@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "cggmp24",
     "cggmp24-keygen",
+    "cggmp24-key-refresh",
     "key-share",
     "paillier-zk",
     "tests",
@@ -14,6 +15,7 @@ exclude = [
 [workspace.dependencies]
 cggmp24 = { version = "0.7.0-alpha.4", default-features = false, path = "cggmp24" }
 cggmp24-keygen = { version = "0.7.0-alpha.4", path = "cggmp24-keygen" }
+cggmp24-key-refresh = { version = "0.7.0-alpha.4", path = "cggmp24-key-refresh" }
 key-share = { version = "0.7", path = "key-share", default-features = false }
 paillier-zk = { version = "0.7.0-alpha.4", path = "paillier-zk", default-features = false }
 
