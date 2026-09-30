@@ -65,15 +65,7 @@ where
                 _,
                 E::SecurityLevel,
                 E::Digest,
-            >(
-                &mut party_rng,
-                party,
-                eid,
-                i,
-                share,
-                None,
-                reliable_broadcast,
-            )
+            >(&mut party_rng, party, eid, share, None, reliable_broadcast)
             .await
         }
     })
@@ -114,13 +106,17 @@ where
         let party = cggmp24_tests::buffer_outgoing(party);
         let mut party_rng = rng.fork();
         async move {
-            cggmp24::keygen::<E>(eid, i, n)
+            let keygen = cggmp24::keygen::<E>(eid, i, n)
                 .set_security_level::<E::SecurityLevel>()
                 .set_digest::<E::Digest>()
                 .enforce_reliable_broadcast(reliable_broadcast)
-                .set_threshold(t)
-                .start(&mut party_rng, party)
-                .await
+                .set_threshold(t);
+
+            // Keygen turns HD on unless told otherwise. These suites are the non-HD case.
+            #[cfg(feature = "hd-wallet")]
+            let keygen = keygen.hd_wallet(false);
+
+            keygen.start(&mut party_rng, party).await
         }
     })
     .unwrap()
@@ -135,13 +131,11 @@ where
 
     let eid: [u8; 32] = rng.gen();
     let eid = ExecutionId::new(&eid);
-    let parties_indexes_at_keygen: Vec<u16> = (0..n).collect();
 
     let refreshed = round_based::sim::run(n, |i, party| {
         let party = cggmp24_tests::buffer_outgoing(party);
         let mut party_rng = rng.fork();
         let share = &incomplete_shares[usize::from(i)];
-        let parties_indexes_at_keygen = &parties_indexes_at_keygen;
         async move {
             cggmp24_key_refresh::threshold::run_threshold_key_refresh::<
                 E,
@@ -149,16 +143,7 @@ where
                 _,
                 E::SecurityLevel,
                 E::Digest,
-            >(
-                &mut party_rng,
-                party,
-                eid,
-                i,
-                parties_indexes_at_keygen,
-                share,
-                None,
-                reliable_broadcast,
-            )
+            >(&mut party_rng, party, eid, share, None, reliable_broadcast)
             .await
         }
     })

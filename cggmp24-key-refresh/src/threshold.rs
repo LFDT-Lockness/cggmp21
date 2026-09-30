@@ -162,21 +162,15 @@ pub struct MsgRound3Unicast<E: Curve> {
 /// Refreshes Shamir secret shares without changing the joint public key. Fails if `share`
 /// is an additive (`n`-out-of-`n`) key share. Always uses §4.5.2, including when `t = n`.
 ///
-/// `i` is this party's index in **this protocol run** and `parties_indexes_at_keygen[j]` is
-/// the key share index of the party sitting at protocol index `j`. The two index spaces need
-/// not coincide: shareholders may be dropped between invocations, and indexes derived from
-/// public identities may be rotated. All parties must pass the same
-/// `parties_indexes_at_keygen`, and `parties_indexes_at_keygen[i]` must equal `share.i`.
-///
-/// Only the listed parties get refreshed shares. Shareholders left out keep shares of the
-/// old polynomial and can no longer sign with the refreshed set, so at least `min_signers`
-/// parties must take part. The returned share is re-indexed into protocol index space.
+/// Indexes of all participants of the protocol should match exactly their indexes from
+/// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
+/// it must have the same index `j` in key refresh execution. In particular, the local
+/// party has index [`share.i`](DirtyIncompleteKeyShare::i). Evaluation points and
+/// public shares stay in keygen order. The returned share keeps that same index.
 pub async fn run_threshold_key_refresh<E, R, M, L, D>(
     rng: &mut R,
     party: M,
     sid: ExecutionId<'_>,
-    i: u16,
-    parties_indexes_at_keygen: &[u16],
     share: &IncompleteKeyShare<E>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
@@ -196,36 +190,14 @@ where
     let t = vss.min_signers;
     let t_usize = usize::from(t);
 
-    // Validate arguments
-    let n: u16 = parties_indexes_at_keygen
-        .len()
-        .try_into()
-        .map_err(|_| InvalidArgs::PartiesNumberExceedsU16)?;
-    if n < t {
-        return Err(InvalidArgs::NotEnoughParties.into());
-    }
+    let n = share.n();
+    let i = share.i;
     if i >= n {
         return Err(InvalidArgs::PartyIndexOutOfBounds.into());
     }
-    if parties_indexes_at_keygen.iter().any(|&j| j >= share.n()) {
-        return Err(InvalidArgs::InvalidPartiesIndexesAtKeygen.into());
-    }
-    // Two protocol seats claiming the same key share index would put two parties on the same
-    // Shamir evaluation point
-    let mut sorted_indexes = parties_indexes_at_keygen.to_vec();
-    sorted_indexes.sort_unstable();
-    if sorted_indexes.windows(2).any(|w| w[0] == w[1]) {
-        return Err(InvalidArgs::InvalidPartiesIndexesAtKeygen.into());
-    }
-    if parties_indexes_at_keygen[usize::from(i)] != share.i {
-        return Err(InvalidArgs::MismatchedOwnIndex.into());
-    }
 
-    // Everything below indexes by protocol index, so the share-indexed lists are reordered
-    // once here: `I[j]` is the Shamir evaluation point and `X[j]` the public share of the
-    // party at protocol index `j`.
-    let I = utils::subset(parties_indexes_at_keygen, &vss.I).ok_or(Bug::Subset)?;
-    let X = utils::subset(parties_indexes_at_keygen, &share.public_shares).ok_or(Bug::Subset)?;
+    let I = &vss.I;
+    let X = &share.public_shares;
     let n_usize = usize::from(n);
     let sch_len = t_usize.saturating_sub(1);
 
@@ -261,10 +233,9 @@ where
         .map(|s_k| Point::generator() * s_k)
         .collect::<Vec<_>>();
 
-    let (tau, A) =
-        core::iter::repeat_with(|| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
-            .take(sch_len)
-            .unzip::<_, _, Vec<_>, Vec<_>>();
+    let (tau, A): (Vec<_>, Vec<_>) = (0..sch_len)
+        .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
+        .unzip();
 
     let mut rid_i = L::KappaBytes::default();
     rng.fill_bytes(rid_i.as_mut());
@@ -432,25 +403,20 @@ where
         .collect::<Vec<_>>();
 
     tracer.send_msg();
+    let messages = core::iter::once(Outgoing::broadcast(Msg::Round3Broadcast(
+        MsgRound3Broadcast {
+            sch_proofs: psi_hat.clone(),
+        },
+    )))
+    .chain(
+        utils::iter_peers(i, n)
+            .zip(Cs)
+            .map(|(j, c_ij)| Outgoing::p2p(j, Msg::Round3Unicast(MsgRound3Unicast { c: c_ij }))),
+    );
     outgoings
-        .send(Outgoing::broadcast(Msg::Round3Broadcast(
-            MsgRound3Broadcast {
-                sch_proofs: psi_hat.clone(),
-            },
-        )))
+        .send_all(&mut futures_util::stream::iter(messages.map(Ok)))
         .await
         .map_err(IoError::send_message)?;
-
-    for (j, c_ij) in utils::iter_peers(i, n).zip(Cs) {
-        outgoings
-            .send(Outgoing::p2p(
-                j,
-                Msg::Round3Unicast(MsgRound3Unicast { c: c_ij }),
-            ))
-            .await
-            .map_err(IoError::send_message)?;
-    }
-    outgoings.flush().await.map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     tracer.round_begins();
@@ -469,14 +435,13 @@ where
     let Y_col = decommitments.iter().map(|d| d.y_points[usize::from(i)]);
     let I_i = I[usize::from(i)];
 
-    let mut masked_blame = Vec::new();
     // $z_{j,i}$ in the spec: peer $j$'s contribution to our share, recovered by stripping
-    // the DH mask and checked against $\Phi_j(I_i)$
+    // the DH mask. Checked afterwards against $\Phi_j(I_i)$.
     let peer_contribs = masked
         .iter_indexed()
         .zip(Y_col)
         .zip(utils::skip_ith(usize::from(i), &y))
-        .filter_map(|(((j, msg_id, msg), Y_ji), y_ij)| {
+        .map(|(((j, _msg_id, msg), Y_ji), y_ij)| {
             let dh = Y_ji * y_ij;
             let rho_ji = Scalar::from_hash::<D>(&unambiguous::RefreshMask {
                 sid,
@@ -485,14 +450,17 @@ where
                 recipient: i,
                 dh_shared: &dh,
             });
-            let z_ji = msg.c - rho_ji;
-            if Point::generator() * z_ji
-                != S_polys[usize::from(j)].value::<_, Point<E>>(I_i.as_ref())
-            {
-                masked_blame.push(AbortBlame::new(j, msg_id, msg_id));
-                return None;
-            }
-            Some(z_ji)
+            msg.c - rho_ji
+        })
+        .collect::<Vec<_>>();
+
+    let masked_blame = peer_contribs
+        .iter()
+        .zip(masked.iter_indexed())
+        .filter_map(|(&z_ji, (j, msg_id, _msg))| {
+            (Point::generator() * z_ji
+                != S_polys[usize::from(j)].value::<_, Point<E>>(I_i.as_ref()))
+            .then_some(AbortBlame::new(j, msg_id, msg_id))
         })
         .collect::<Vec<_>>();
     if !masked_blame.is_empty() {
@@ -501,10 +469,7 @@ where
 
     tracer.stage("Validate schnorr proofs");
     let blame = utils::collect_blame(&decommitments, &sch_proofs_r, |j, decom, msg| {
-        if msg.sch_proofs.len() != sch_len
-            || decom.s_points.len() != t_usize
-            || decom.sch_commits.len() != sch_len
-        {
+        if msg.sch_proofs.len() != sch_len {
             return true;
         }
         decom
@@ -540,7 +505,7 @@ where
 
     let public_shares = I
         .iter()
-        .zip(&X)
+        .zip(X.iter())
         .map(|(I_j, X_j)| {
             let delta = S_polys
                 .iter()
@@ -557,8 +522,10 @@ where
             curve: Default::default(),
             shared_public_key: share.shared_public_key,
             public_shares,
-            // Re-indexed into protocol index space, so the refreshed shares agree on `I`
-            vss_setup: Some(VssSetup { min_signers: t, I }),
+            vss_setup: Some(VssSetup {
+                min_signers: t,
+                I: vss.I.clone(),
+            }),
             #[cfg(feature = "hd-wallet")]
             chain_code: share.chain_code,
         },

@@ -79,13 +79,3 @@ where
         .enumerate()
         .filter_map(move |(j, x)| (i != j).then_some(x))
 }
-
-/// Picks elements of `list` at `indexes`, preserving the order of `indexes`
-///
-/// Returns `None` if any index is out of bounds.
-pub fn subset<T: Clone, I: Into<usize> + Copy>(indexes: &[I], list: &[T]) -> Option<Vec<T>> {
-    indexes
-        .iter()
-        .map(|&i| list.get(i.into()).cloned())
-        .collect()
-}

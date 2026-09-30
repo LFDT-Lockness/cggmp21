@@ -214,6 +214,7 @@ where
     let y = (0..n)
         .map(|_| SecretScalar::random(rng))
         .collect::<Vec<_>>();
+    // $\vec Y_i = (Y_{i,j} = y_{i,j} \cdot G)_{j \in [n]}$
     let Y = y
         .iter()
         .map(|y_ij| Point::generator() * y_ij)

@@ -121,23 +121,7 @@ enum Reason {
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum InvalidArgs {
-    #[displaydoc("at least `min_signers` parties must take part in threshold key refresh")]
-    NotEnoughParties,
     #[displaydoc("party index `i` is out of bounds (must be < amount of refreshing parties)")]
-    PartyIndexOutOfBounds,
-    #[displaydoc("`parties_indexes_at_keygen` must list distinct key share indexes, each < n")]
-    InvalidPartiesIndexesAtKeygen,
-    #[displaydoc("`parties_indexes_at_keygen[i]` doesn't match index of the provided key share")]
-    MismatchedOwnIndex,
-    #[displaydoc("amount of refreshing parties exceeds u16")]
-    PartiesNumberExceedsU16,
-}
-
-/// Error indicating that caller supplied invalid arguments
-#[derive(Debug, displaydoc::Display)]
-#[cfg_attr(feature = "std", derive(thiserror::Error))]
-enum InvalidArgs {
-    #[displaydoc("party index `i` is out of bounds (must be < n)")]
     PartyIndexOutOfBounds,
 }
 
@@ -170,8 +154,6 @@ enum Bug {
     ZeroSecret,
     #[displaydoc("unexpected zero public share")]
     ZeroPublic,
-    #[displaydoc("couldn't take a subset of key share indexes")]
-    Subset,
 }
 
 macro_rules! make_factory {
