@@ -28,12 +28,17 @@ where
         let party = cggmp24_tests::buffer_outgoing(party);
         let mut party_rng = rng.fork();
         async move {
-            cggmp24::keygen::<E>(eid, i, n)
+            let keygen = cggmp24::keygen::<E>(eid, i, n)
                 .set_security_level::<E::SecurityLevel>()
                 .set_digest::<E::Digest>()
-                .enforce_reliable_broadcast(reliable_broadcast)
-                .start(&mut party_rng, party)
-                .await
+                .enforce_reliable_broadcast(reliable_broadcast);
+
+            // Keygen turns HD on unless told otherwise. These suites are the
+            // non-HD case, same as `keygen_works` with `HdDisabled`.
+            #[cfg(feature = "hd-wallet")]
+            let keygen = keygen.hd_wallet(false);
+
+            keygen.start(&mut party_rng, party).await
         }
     })
     .unwrap()

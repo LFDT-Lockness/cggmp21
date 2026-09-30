@@ -2333,7 +2333,7 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
             \State Compute $e_{i,j} \in \Z_q = \challengeni{sch}(\sid, i, \rid, X'_{i,j}, A_{i,j})$
                    and $\hat\psi_{i,j} = \prove{sch}(e_{i,j}; \tau_{i,j}, x'_{i,j})$
         \EndFor
-        \State Send $(\hat\psi_{i,0}, \dots, \hat\psi_{i,n-1})$,
+        \State Send $(\hat\psi_{i,0}, \dots, \hat\psi_{i,n-1})$ to all parties,
                and for each $j \neq i$ send $C_{j,i}$ to $P_j$
     \end{algorithmic}
 
@@ -2343,13 +2343,17 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
                and $C_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
-                   \Comment{\parbox[t]{.3\linewidth}{$j$ is sender, $i$ is recipient}}
+                   \Statex \Comment{\parbox[t]{.3\linewidth}{$j$ is sender, $i$ is recipient}}
             \State Compute $x'_{j,i} = C_{i,j} - \rho_{j,i} \bmod q$
+        \EndFor
+        \For{$j \in [n] \setminus \{i\}$}
             \State Assert $x'_{j,i} \cdot G \? = X'_{j,i}$
         \EndFor
-        \For{$j \in [n] \setminus \{i\}$ and $k \in [n]$}
-            \State Set $e_{j,k} \in \Z_q = \challengeni{sch}(\sid, j, \rid, X'_{j,k}, A_{j,k})$
-            \State Assert $\verify{sch}(X'_{j,k}, A_{j,k}, e_{j,k}, \hat\psi_{j,k})$
+        \For{$j \in [n] \setminus \{i\}$}
+            \For{$k \in [n]$}
+                \State Set $e_{j,k} \in \Z_q = \challengeni{sch}(\sid, j, \rid, X'_{j,k}, A_{j,k})$
+                \State Assert $\verify{sch}(X'_{j,k}, A_{j,k}, e_{j,k}, \hat\psi_{j,k})$
+            \EndFor
         \EndFor
         \State Set $x^*_i = x_i + \sum_{j \in [n]} x'_{j,i} \bmod q$
                \Comment{\parbox[t]{.35\linewidth}{the $j = i$ term $x'_{i,i}$ is known locally}}

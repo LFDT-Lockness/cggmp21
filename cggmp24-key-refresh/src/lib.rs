@@ -133,6 +133,14 @@ enum InvalidArgs {
     PartiesNumberExceedsU16,
 }
 
+/// Error indicating that caller supplied invalid arguments
+#[derive(Debug, displaydoc::Display)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+enum InvalidArgs {
+    #[displaydoc("party index `i` is out of bounds (must be < n)")]
+    PartyIndexOutOfBounds,
+}
+
 impl From<ProtocolAborted> for Reason {
     fn from(err: ProtocolAborted) -> Self {
         Reason::Aborted(err)

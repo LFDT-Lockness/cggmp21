@@ -22,7 +22,7 @@ use crate::utils::{self, AbortBlame};
 use crate::ExecutionId;
 use crate::{DirtyIncompleteKeyShare, DirtyKeyInfo, IncompleteKeyShare, Validate};
 
-use super::{Bug, KeyRefreshError, ProtocolAborted, Reason};
+use super::{Bug, InvalidArgs, KeyRefreshError, ProtocolAborted, Reason};
 
 macro_rules! prefixed {
     ($name:tt) => {
@@ -170,17 +170,14 @@ pub struct KeyRefreshOutput<E: Curve, L: SecurityLevel> {
 /// Refreshes additive secret shares without changing the joint public key.
 /// Fails if `share` is a threshold key share.
 ///
-/// `i` is this party's index in **this protocol run** (`0 <= i < n`), used for
-/// `RoundsRouter` and message addressing. It need not equal `share.i` (indexes)
-/// can be rotated between invocations). This n-out-of-n implementation still
-/// requires all `share.n()` parties and treats `i` as the index into protocol
-/// vectors of length `n` (and into `public_shares`). Callers should pass the
-/// index this share occupies in `public_shares` (normally `share.i`).
+/// Indexes of all participants of the protocol should match exactly their indexes from
+/// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
+/// it must have the same index `j` in key refresh execution. In particular, the local
+/// party has index [`share.i`](DirtyIncompleteKeyShare::i).
 pub async fn run_key_refresh<E, R, M, L, D>(
     rng: &mut R,
     party: M,
     sid: ExecutionId<'_>,
-    i: u16,
     share: &IncompleteKeyShare<E>,
     mut tracer: Option<&mut dyn Tracer>,
     reliable_broadcast_enforced: bool,
@@ -196,7 +193,10 @@ where
         return Err(Reason::NotThreshold.into());
     }
     let n = share.n();
-    debug_assert!(i < n);
+    let i = share.i;
+    if i >= n {
+        return Err(InvalidArgs::PartyIndexOutOfBounds.into());
+    }
 
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
@@ -211,8 +211,9 @@ where
 
     // Round 1
     tracer.round_begins();
-    let y = (0..n).map(|_| SecretScalar::random(rng)).collect::<Vec<_>>();
-    // $\vec Y_i = (Y_{i,j} = y_{i,j} \cdot G)_{j \in [n]}$
+    let y = (0..n)
+        .map(|_| SecretScalar::random(rng))
+        .collect::<Vec<_>>();
     let Y = y
         .iter()
         .map(|y_ij| Point::generator() * y_ij)
@@ -228,10 +229,9 @@ where
         .map(|x| Point::generator() * x)
         .collect::<Vec<_>>();
 
-    let (tau, A) =
-        core::iter::repeat_with(|| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
-            .take(usize::from(n))
-            .unzip::<_, _, Vec<_>, Vec<_>>();
+    let (tau, A): (Vec<_>, Vec<_>) = (0..n)
+        .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
+        .unzip();
 
     let mut rid_i = L::KappaBytes::default();
     rng.fill_bytes(rid_i.as_mut());
@@ -377,7 +377,7 @@ where
         .zip(&A)
         .zip(&tau)
         .zip(&x_prime)
-        .map(|(((X_ij_prime, A_ij), tau_ij), x_ij)| {
+        .map(|(((X_ij_prime, A_ij), tau_ij), x_ij_prime)| {
             let e = Scalar::from_hash::<D>(&unambiguous::SchnorrPok {
                 sid,
                 prover: i,
@@ -386,30 +386,25 @@ where
                 sch_commit: A_ij,
             });
             let challenge = schnorr_pok::Challenge { nonce: e };
-            schnorr_pok::prove(tau_ij, &challenge, *x_ij)
+            schnorr_pok::prove(tau_ij, &challenge, *x_ij_prime)
         })
         .collect::<Vec<_>>();
 
     tracer.send_msg();
+    let messages = core::iter::once(Outgoing::broadcast(Msg::Round3Broadcast(
+        MsgRound3Broadcast {
+            sch_proofs: psi_hat.clone(),
+        },
+    )))
+    .chain(
+        utils::iter_peers(i, n)
+            .zip(Cs)
+            .map(|(j, C_j)| Outgoing::p2p(j, Msg::Round3Unicast(MsgRound3Unicast { c: C_j }))),
+    );
     outgoings
-        .send(Outgoing::broadcast(Msg::Round3Broadcast(
-            MsgRound3Broadcast {
-                sch_proofs: psi_hat.clone(),
-            },
-        )))
+        .send_all(&mut futures_util::stream::iter(messages.map(Ok)))
         .await
         .map_err(IoError::send_message)?;
-
-    for (j, C_j) in utils::iter_peers(i, n).zip(Cs) {
-        outgoings
-            .send(Outgoing::p2p(
-                j,
-                Msg::Round3Unicast(MsgRound3Unicast { c: C_j }),
-            ))
-            .await
-            .map_err(IoError::send_message)?;
-    }
-    outgoings.flush().await.map_err(IoError::send_message)?;
     tracer.msg_sent();
 
     // Output
@@ -434,14 +429,12 @@ where
         .iter()
         .map(|d| d.x_prime_points[usize::from(i)]);
 
-    let mut masked_blame = Vec::new();
     // $x'_{j,i}$ in the specsheet (unmasked contribution from each peer $j$ to us)
     let peer_contribs = masked
         .iter_indexed()
         .zip(Y_col)
-        .zip(X_prime_col)
         .zip(utils::skip_ith(usize::from(i), &y))
-        .filter_map(|((((j, msg_id, msg), Y_ji), X_prime_ji), y_ij)| {
+        .map(|(((j, _msg_id, msg), Y_ji), y_ij)| {
             // specsheet: $\rho_{j,i}$ from $y_{j,i} \cdot Y_{i,j}$.
             // Same DH point as $y_{i,j} \cdot Y_{j,i}$ ($Y$ subscripts swapped vs the specsheet).
             let dh = Y_ji * y_ij;
@@ -452,12 +445,17 @@ where
                 recipient: i,
                 dh_shared: &dh,
             });
-            let x_ji_prime = msg.c - rho;
-            if Point::generator() * x_ji_prime != X_prime_ji {
-                masked_blame.push(AbortBlame::new(j, msg_id, msg_id));
-                return None;
-            }
-            Some(x_ji_prime)
+            msg.c - rho
+        })
+        .collect::<Vec<_>>();
+
+    let masked_blame = peer_contribs
+        .iter()
+        .zip(X_prime_col)
+        .zip(masked.iter_indexed())
+        .filter_map(|((&x_ji_prime, X_prime_ji), (j, msg_id, _msg))| {
+            (Point::generator() * x_ji_prime != X_prime_ji)
+                .then_some(AbortBlame::new(j, msg_id, msg_id))
         })
         .collect::<Vec<_>>();
     if !masked_blame.is_empty() {
@@ -466,10 +464,7 @@ where
 
     tracer.stage("Validate schnorr proofs");
     let blame = utils::collect_blame(&decommitments, &sch_proofs_r, |j, decom, msg| {
-        if msg.sch_proofs.len() != usize::from(n)
-            || decom.x_prime_points.len() != usize::from(n)
-            || decom.sch_commits.len() != usize::from(n)
-        {
+        if msg.sch_proofs.len() != usize::from(n) {
             return true;
         }
         decom
