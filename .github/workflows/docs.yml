@@ -20,7 +20,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
     - name: Compile LaTeX document
       uses: xu-cheng/latex-action@6549dc21effb2730855a1281407ecfcececc6c1b #v4.1.0
       with:
@@ -36,14 +36,14 @@ jobs:
         path: spec/cggmp24-spec.pdf
     - name: Leave PR comment
       continue-on-error: true
-      uses: marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0 #v2
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 #v2
       with:
         header: spec_is_built
         message: The spec was successfully compiled. PDF is available [here](${{ steps.upload-pdf.outputs.artifact-url }}).
   build_docs:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 #v7.0.0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
     - uses: dtolnay/rust-toolchain@5b842231ba77f5c045dba54ac5560fed2db780e2 #nightly on 2026-05-29
     - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 #v2
       with:
@@ -82,4 +82,4 @@ jobs:
         path: 'website'
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 #v5.0.0
+      uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 #v5.0.1
