@@ -2364,6 +2364,121 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
 \end{description}
 
+\subsubsection{Threshold ($t$-out-of-$n$) Key Refresh}
+\label{sec:t-of-n-refresh}
+
+Generalizes Section~\ref{sec:n-of-n-refresh}: additive zero-sharing $\sum_{k \in [n]} x'_{j,k} = 0$ becomes Shamir zero-polynomial $\varphi_j(0) = 0$ (coefficient $s_{j,0} = 0$); Diffie--Hellman masking and round structure are unchanged.
+All $n$ parties must participate.
+Paillier/Pedersen auxiliary data from Section~\ref{section:aux_data_gen} are not regenerated.
+
+\begin{description}
+    \item[\bf Input.] \
+    \begin{itemize}[noitemsep,topsep=0pt]
+    \item party index $i$, $0 \le i < n$,
+    \item threshold parameter $t$, $2 \le t \le n$,
+    \item number of signers $n \ge 2$,
+    \item context separation string $\sid \in \Byte^*$,
+    \item security level $L$ (see Section~\ref{sec:security-params}),
+    \item flag $\var{echo\_enabled} \in \Bit$ indicating whether reliability check is enabled,
+    \item curve $\E$ with generator $G$ of prime order $q$,
+    \end{itemize}
+    \textbf{From key share (Section~\ref{sec:t-of-n-dkg}, optionally updated by prior Section~\ref{sec:t-of-n-refresh} runs).}
+    \begin{itemize}[noitemsep,topsep=0pt]
+    \item Shamir secret share $x_i \in \Z_q$,
+    \item list of signers' public key shares $\vec X = (X_k)_{k\in[n]} \in \E^n$,
+    \item joint public key $Y \in \E$,
+    \item an injective map $I : [n] \to \Z_q \setminus \{0\}$,
+    \item if HD wallets are enabled, chain code $c \in \Byte^{32}$,
+    \end{itemize}
+    Paillier/Pedersen auxiliary data from Section~\ref{section:aux_data_gen} are \emph{not} inputs; they remain unchanged.
+
+    \item[\bf Outputs.] \
+    \begin{itemize}[noitemsep,topsep=0pt]
+    \item epoch identifier $\rid \in \Bit^\kappa$,
+    \item updated Shamir secret share $x^*_i \in \Z_q$,
+    \item updated public key shares $\vec X^* = (X^*_k)_{k\in[n]} \in \E^n$
+    \end{itemize}
+    The joint public key $Y$, threshold $t$, number of parties $n$, injective map $I$, HD chain code $c$ (if enabled), context string $\sid$, and auxiliary data remain unchanged.
+
+    \item[\textbf{Round 1.}] \
+    \begin{algorithmic}[1]
+        \State Sample ephemeral Diffie--Hellman keys $y_{i,0}, \dots, y_{i,n-1} \gets \Z_q^n$,
+               and set $\vec Y_i = (Y_{i,j} = y_{i,j} \cdot G)_{j \in [n]}$
+        \State Sample $s_{i,1}, \ldots, s_{i,t-1} \gets \Z_q^{t-1}$
+        \State Set $s_{i,0} = 0$
+               \Comment{implements $\varphi_i(0) = 0$}
+        \State Set $S_{i,k} = s_{i,k} \cdot G$ for every $k \in [t]$,
+               and let $\vec S_i = (S_{i,k})_{k \in [t]}$
+        \State Let $\varphi_i(x) = \sum_{k \in [t]} s_{i,k} \cdot x^k$
+        \State For each $k \in \{1, \ldots, t-1\}$, compute $(A_{i,k}; \tau_{i,k}) \gets \commit{sch}()$;
+               let $\vec A_i = (A_{i,k})_{k \in \{1, \ldots, t-1\}}$
+        \State Sample $\rid_i, u_i \gets \Bit^\kappa \times \Bit^\kappa$,
+               and compute $V_i = H(\Encode[hash\_refresh\_com](\sid, i, \rid_i, \vec S_i, \vec Y_i, \vec A_i, u_i))$
+        \State Send $V_i$ to all parties
+    \end{algorithmic}
+
+    \item[\textbf{Round 2.}] \
+    \begin{algorithmic}[1]
+        \State Receive $V_j \in \Bit^\kappa$ from all parties
+        \If{$\var{echo\_enabled}$} \Comment{Reliability check}
+            \State Compute $h_i = H(\Encode[echo](\sid, V_0, \dots, V_{n-1}))$ and send $h_i$ to all parties
+            \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
+        \EndIf
+        \State Send $(\rid_i, \vec S_i, \vec Y_i, \vec A_i, u_i)$ to all parties
+    \end{algorithmic}
+
+    \item[\textbf{Round 3.}] \
+    \begin{algorithmic}[1]
+        \State Receive $(\rid_j, \vec S_j, \vec Y_j, \vec A_j, u_j)$ from all parties
+        \For{$j \in [n] \setminus \{i\}$}
+            \State \parbox[t]{.58\linewidth}{\raggedright Assert $(\rid_j, \vec S_j, \vec Y_j, \vec A_j, u_j) \? \in (\Bit^\kappa, \E^t, \E^n, \E^{t-1}, \Bit^\kappa)$}%
+                   \Comment{\parbox[t]{.28\linewidth}{make sure that $\vec S_j$ has length $t$ and $\vec A_j$ has length $t-1$}}
+            \State Assert $V_j \? = H(\Encode[hash\_refresh\_com](\sid, j, \rid_j, \vec S_j, \vec Y_j, \vec A_j, u_j))$
+            \State Assert $S_{j,0} \? = \mathcal{O}$
+                   \Comment{\parbox[t]{.35\linewidth}{$\mathcal{O}$ is the identity of $\E$; checks $\varphi_j(0) = 0$}}
+        \EndFor
+        \State Compute $\rid = \bigoplus_{j \in [n]} \rid_j$
+        \For{$j \in [n] \setminus \{i\}$}
+            \State Compute $\rho_{i,j} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, i, j, y_{i,j} \cdot Y_{j,i})\bigr)$
+            \State Compute $z_{i,j} = \varphi_i(I(j)) = \sum_{k \in [t]} s_{i,k} \cdot I(j)^k \bmod q$
+            \State Compute $C_{j,i} = z_{i,j} + \rho_{i,j} \bmod q$
+        \EndFor
+        \For{$k \in \{1, \ldots, t-1\}$}
+            \State Compute $e_{i,k} \in \Z_q = \challengeni{sch}(\sid, i, \rid, S_{i,k}, A_{i,k})$
+                   and $\hat\psi_{i,k} = \prove{sch}(e_{i,k}; \tau_{i,k}, s_{i,k})$
+        \EndFor
+        \State Send $(\hat\psi_{i,1}, \dots, \hat\psi_{i,t-1})$,
+               and for each $j \neq i$ send $C_{j,i}$ to $P_j$
+    \end{algorithmic}
+
+    \item[\textbf{Output.}] \
+    \begin{algorithmic}[1]
+        \State Receive $(\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ from all parties,
+               and $C_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \For{$j \in [n] \setminus \{i\}$}
+            \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
+            \State Compute $z_{j,i} = C_{i,j} - \rho_{j,i} \bmod q$
+            \State Assert $z_{j,i} \cdot G \? = \sum_{k \in [t]} I(i)^k \cdot S_{j,k}$
+                   \Comment{\parbox[t]{.35\linewidth}{Implementations can use \href{https://docs.rs/generic-ec/0.5.0/generic_ec/multiscalar/}{\texttt{multiscalar\_mul}}}}
+        \EndFor
+        \For{$j \in [n] \setminus \{i\}$ and $k \in \{1, \ldots, t-1\}$}
+            \State Set $e_{j,k} \in \Z_q = \challengeni{sch}(\sid, j, \rid, S_{j,k}, A_{j,k})$
+            \State Assert $\verify{sch}(S_{j,k}, A_{j,k}, e_{j,k}, \hat\psi_{j,k})$
+        \EndFor
+        \State Compute $z_{i,i} = \varphi_i(I(i)) = \sum_{k \in [t]} s_{i,k} \cdot I(i)^k \bmod q$
+               \Comment{\parbox[t]{.3\linewidth}{known locally, not received over the wire}}
+        \State Set $x^*_i = x_i + \sum_{j \in [n]} z_{j,i} \bmod q$
+        \State For each $j \in [n]$, let $\Phi_j(x) = \sum_{\ell \in [t]} S_{j,\ell} \cdot x^\ell$
+        \For{$k \in [n]$}
+            \State Set $X^*_k = X_k + \sum_{j \in [n]} \Phi_j(I(k))$
+        \EndFor
+        \State Let $\vec X^* = (X^*_k)_{k \in [n]}$
+               \Comment{\parbox[t]{.35\linewidth}{$\varphi_j(0) = 0$ for all $j$ implies the joint public key $Y$ is unchanged}}
+        \State \Return $(\rid, x^*_i, \vec X^*)$
+    \end{algorithmic}
+
+\end{description}
+
 \ignore{
 \section{Further Optimizations}
 
