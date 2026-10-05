@@ -281,7 +281,10 @@ impl<E: Curve, L: SecurityLevel> DirtyKeyShare<E, L> {
             return Err(InvalidKeyShareReason::AuxLen.into());
         }
 
-        let N_i = &aux.N[usize::from(core.i)];
+        let N_i = aux
+            .N
+            .get(usize::from(core.i))
+            .ok_or(InvalidKeyShareReason::PartyIndexOutOfBounds)?;
         if *N_i != &aux.p * &aux.q {
             return Err(InvalidKeyShareReason::PrimesMul.into());
         }
@@ -404,6 +407,8 @@ enum InvalidKeyShareReason {
     PrimesMul,
     #[error("gcd(s_j, N_j) != 1 or gcd(t_j, N_j) != 1")]
     StGcdN,
+    #[error("signer index `i` is out of bounds of the auxiliary data")]
+    PartyIndexOutOfBounds,
     #[error("paillier secret key doesn't match security level (primes are too small)")]
     PaillierSkTooSmall,
     #[error("paillier public key of one of the signers doesn't match security level: required bit length = {required}, actual = {actual}")]
@@ -462,5 +467,74 @@ pub mod cggmp21_compat {
         pub core: super::IncompleteKeyShare<E>,
         #[serde(rename = "aux")]
         _aux: serde::de::IgnoredAny,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use generic_ec::{NonZero, Point, SecretScalar};
+
+    use super::*;
+    use crate::security_level::SecurityLevel128;
+
+    #[test]
+    fn validate_consistency_rejects_out_of_range_signer_index_secp256k1() {
+        validate_consistency_rejects_out_of_range_signer_index::<crate::supported_curves::Secp256k1>(
+        )
+    }
+
+    /// `validate_consistency` used to index `aux.N` with `core.i` directly (`aux.N[core.i]`),
+    /// which would panic if `core.i` were ever out of range. It's currently unreachable through
+    /// the public API (both callers only ever pass an already-`is_valid`-checked `core`), but
+    /// the function shouldn't rely on that external invariant to avoid panicking — it should
+    /// report an error instead, regardless of how it's called.
+    fn validate_consistency_rejects_out_of_range_signer_index<E: generic_ec::Curve>() {
+        let mut rng = rand_dev::DevRng::new();
+
+        let public_share = Point::generator().to_nonzero_point();
+        let core = DirtyIncompleteKeyShare::<E> {
+            // Only 2 public shares exist below (indices 0 and 1) — 5 is out of range.
+            i: 5,
+            key_info: cggmp24_keygen::key_share::DirtyKeyInfo {
+                curve: generic_ec::serde::CurveName::new(),
+                shared_public_key: public_share,
+                public_shares: vec![public_share, public_share],
+                vss_setup: None,
+                #[cfg(feature = "hd-wallet")]
+                chain_code: None,
+            },
+            x: NonZero::<SecretScalar<E>>::random(&mut rng),
+        };
+
+        let aux = DirtyAuxInfo::<SecurityLevel128> {
+            p: Integer::from(2),
+            q: Integer::from(2),
+            N: vec![Integer::from(4), Integer::from(4)],
+            pedersen_params: vec![
+                PedersenParams {
+                    hat_N: Integer::from(4),
+                    s: Integer::from(1),
+                    t: Integer::from(1),
+                    multiexp: None,
+                    crt: None,
+                },
+                PedersenParams {
+                    hat_N: Integer::from(4),
+                    s: Integer::from(1),
+                    t: Integer::from(1),
+                    multiexp: None,
+                    crt: None,
+                },
+            ],
+            security_level: std::marker::PhantomData,
+        };
+
+        let err = DirtyKeyShare::validate_consistency(&core, &aux).expect_err(
+            "core.i is out of range of aux data, this must be reported as an error, not panic",
+        );
+        assert!(matches!(
+            err.0,
+            InvalidKeyShareReason::PartyIndexOutOfBounds
+        ));
     }
 }
