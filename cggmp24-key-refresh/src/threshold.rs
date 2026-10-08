@@ -119,9 +119,13 @@ pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     #[serde_as(as = "utils::HexOrBin")]
     #[udigest(as_bytes)]
     pub rid: L::KappaBytes,
-    /// $S_{i,k}$ for $k \in \[t\]$
+    /// $S_{i,k}$ for $k \in \{1, \ldots, t-1\}$
+    ///
+    /// The constant term $S_{i,0}$ is the identity and is not sent.
     pub s_points: Vec<Point<E>>,
-    /// $Y_{i,j}$ for $j \in \[n\]$
+    /// $Y_{i,j}$ for $j \in \[n\] \setminus \{i\}$, in increasing $j$
+    ///
+    /// $Y_{i,i}$ is unused and is not sent.
     pub y_points: Vec<Point<E>>,
     /// $A_{i,k}$ for $k \in \{1, \ldots, t-1\}$
     pub sch_commits: Vec<schnorr_pok::Commit<E>>,
@@ -199,7 +203,7 @@ where
     let I = &vss.I;
     let X = &share.public_shares;
     let n_usize = usize::from(n);
-    let sch_len = t_usize.saturating_sub(1);
+    let sch_len = t_usize.checked_sub(1).ok_or(Bug::MinSignersUnderflow)?;
 
     let MpcParty { delivery, .. } = party.into_party();
     let (incomings, mut outgoings) = delivery.split();
@@ -214,7 +218,8 @@ where
 
     // Round 1
     tracer.round_begins();
-    let y = (0..n)
+    // $y_{i,j}$ for $j \neq i$. The self key $y_{i,i}$ is unused.
+    let y = utils::iter_peers(i, n)
         .map(|_| SecretScalar::random(rng))
         .collect::<Vec<_>>();
     let Y = y
@@ -222,43 +227,43 @@ where
         .map(|y_ij| Point::generator() * y_ij)
         .collect::<Vec<_>>();
 
-    // φ_i(x) = ∑_{k ∈ [t]} s_{i,k} x^k with s_{i,0} = 0, so that φ_i(0) = 0 and the refresh
-    // leaves the shared secret untouched
-    let s = core::iter::once(Scalar::zero())
-        .chain((1..t_usize).map(|_| Scalar::random(rng)))
+    let mut s = (1..t_usize)
+        .map(|_| Scalar::random(rng))
         .collect::<Vec<_>>();
-    let phi = Polynomial::from_coefs(s.clone());
+    s.insert(0, Scalar::zero());
+    // $S_{i,0}$ is the identity, so only $k \in \{1, \ldots, t-1\}$ is sent.
     let S = s
         .iter()
+        .skip(1)
         .map(|s_k| Point::generator() * s_k)
         .collect::<Vec<_>>();
+
+    let phi = Polynomial::from_coefs(s.clone());
 
     let (tau, A): (Vec<_>, Vec<_>) = (0..sch_len)
         .map(|_| schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng))
         .unzip();
 
-    let mut rid_i = L::KappaBytes::default();
-    rng.fill_bytes(rid_i.as_mut());
-    let mut u_i = L::KappaBytes::default();
-    rng.fill_bytes(u_i.as_mut());
+    let mut rid = L::KappaBytes::default();
+    rng.fill_bytes(rid.as_mut());
+    let mut u = L::KappaBytes::default();
+    rng.fill_bytes(u.as_mut());
 
     let my_decommitment: MsgRound2<E, L> = MsgRound2 {
-        rid: rid_i,
+        rid,
         s_points: S.clone(),
         y_points: Y.clone(),
         sch_commits: A.clone(),
-        decommit: u_i,
+        decommit: u,
     };
-    // $V_i$ in the spec
-    let hash_commit = udigest::hash::<D>(&unambiguous::HashRefreshCom {
+
+    let V = udigest::hash::<D>(&unambiguous::HashRefreshCom {
         sid,
         prover: i,
         decommitment: &my_decommitment,
     });
 
-    let my_commitment = MsgRound1 {
-        commitment: hash_commit,
-    };
+    let my_commitment = MsgRound1 { commitment: V };
     tracer.send_msg();
     outgoings
         .send(Outgoing::broadcast(Msg::Round1(my_commitment.clone())))
@@ -277,7 +282,7 @@ where
 
     if reliable_broadcast_enforced {
         tracer.stage("Hash received msgs (reliability check)");
-        let h_i = udigest::hash_iter::<D>(
+        let h = udigest::hash_iter::<D>(
             commitments
                 .iter_including_me(&my_commitment)
                 .map(|commitment| unambiguous::Echo { sid, commitment }),
@@ -286,7 +291,7 @@ where
         tracer.send_msg();
         outgoings
             .send(Outgoing::broadcast(Msg::ReliabilityCheck(
-                MsgReliabilityCheck { hash: h_i.clone() },
+                MsgReliabilityCheck { hash: h.clone() },
             )))
             .await
             .map_err(IoError::send_message)?;
@@ -303,7 +308,7 @@ where
         tracer.stage("Assert other parties hashed messages (reliability check)");
         let parties_have_different_hashes = round1_hashes
             .into_iter_indexed()
-            .filter(|(_j, _msg_id, hash_j)| hash_j.hash != h_i)
+            .filter(|(_j, _msg_id, hash_j)| hash_j.hash != h)
             .map(|(j, msg_id, _)| AbortBlame::new(j, msg_id, msg_id))
             .collect::<Vec<_>>();
         if !parties_have_different_hashes.is_empty() {
@@ -329,8 +334,8 @@ where
 
     tracer.stage("Validate decommitments");
     let blame = utils::collect_blame(&commitments, &decommitments, |j, com, decom| {
-        let bad_len = decom.s_points.len() != t_usize
-            || decom.y_points.len() != n_usize
+        let bad_len = decom.s_points.len() != sch_len
+            || decom.y_points.len() != n_usize - 1
             || decom.sch_commits.len() != sch_len;
         let expected = udigest::hash::<D>(&unambiguous::HashRefreshCom {
             sid,
@@ -338,8 +343,7 @@ where
             decommitment: decom,
         });
         let bad_com = com.commitment != expected;
-        let bad_zero = decom.s_points.first() != Some(&Point::zero());
-        bad_len || bad_com || bad_zero
+        bad_len || bad_com
     });
     if !blame.is_empty() {
         return Err(ProtocolAborted::invalid_decommitment(blame).into());
@@ -351,23 +355,29 @@ where
         .map(|d| &d.rid)
         .fold(L::KappaBytes::default(), utils::xor_array);
 
-    // Every party's committed polynomial $\Phi_j(x) = \sum_k S_{j,k} x^k$ in the exponent.
-    // `iter_including_me` inserts our own message at position `i`, so `S_polys[j]` belongs to
-    // the party at protocol index `j`. Built once here because both the unmasking check and
-    // the public share update evaluate all `n` of them.
+    // Per-party $\Phi_j$ in the exponent. $S_{j,0}$ is the identity, so only
+    // $k \in \{1, \ldots, t-1\}$ is sent. `iter_including_me` inserts our own
+    // message at position `i`, so `S_polys[j]` belongs to the party at protocol
+    // index `j`. The blame check evaluates each one; the public-share update
+    // evaluates their sum.
     let S_polys = decommitments
         .iter_including_me(&my_decommitment)
-        .map(|d| Polynomial::from_coefs(d.s_points.clone()))
+        .map(|d| {
+            let coefs = core::iter::once(Point::zero())
+                .chain(d.s_points.iter().copied())
+                .collect::<Vec<_>>();
+            Polynomial::from_coefs(coefs)
+        })
         .collect::<Vec<_>>();
 
     tracer.stage("Mask refresh shares");
-    // Peer $j$ published $Y_{j,i}$ for us in slot `i` of its `y_points`; pairing it with our
-    // own $y_{i,j}$ gives the shared DH secret that masks $z_{i,j}$
-    let Y_col = decommitments.iter().map(|d| d.y_points[usize::from(i)]);
+    // $\vec Y_j$ lists $Y_{j,k}$ for $k \neq j$. Pair $Y_{j,i}$ with our $y_{i,j}$.
     let Cs = utils::iter_peers(i, n)
-        .zip(Y_col)
-        .zip(utils::skip_ith(usize::from(i), &y))
-        .map(|((j, Y_ji), y_ij)| {
+        .zip(decommitments.iter())
+        .zip(y.iter())
+        .zip(utils::skip_ith(usize::from(i), I))
+        .map(|(((j, d), y_ij), I_j)| {
+            let Y_ji = d.y_points[utils::y_point_index(i, j)];
             let dh = Y_ji * y_ij;
             let rho_ij = Scalar::from_hash::<D>(&unambiguous::RefreshMask {
                 sid,
@@ -376,16 +386,15 @@ where
                 recipient: j,
                 dh_shared: &dh,
             });
-            let z_ij = phi.value::<_, Scalar<E>>(I[usize::from(j)].as_ref());
+            let z_ij = phi.value::<_, Scalar<E>>(I_j.as_ref());
             z_ij + rho_ij
         })
         .collect::<Vec<_>>();
 
     tracer.stage("Prove knowledge of polynomial coefficients");
-    // The $k = 0$ coefficient is fixed to zero and needs no proof, hence the `skip(1)`
+    // $s_{i,0}$ is fixed to zero and is not in `S`, so each entry lines up with $k \ge 1$.
     let psi_hat = S
         .iter()
-        .skip(1)
         .zip(&A)
         .zip(&tau)
         .zip(s.iter().skip(1))
@@ -419,6 +428,7 @@ where
         .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
+    // Output round
     tracer.round_begins();
     tracer.receive_msgs();
     let sch_proofs_r = rounds
@@ -432,16 +442,16 @@ where
     tracer.msgs_received();
 
     tracer.stage("Unmask refresh contributions");
-    let Y_col = decommitments.iter().map(|d| d.y_points[usize::from(i)]);
     let I_i = I[usize::from(i)];
 
     // $z_{j,i}$ in the spec: peer $j$'s contribution to our share, recovered by stripping
     // the DH mask. Checked afterwards against $\Phi_j(I_i)$.
     let peer_contribs = masked
         .iter_indexed()
-        .zip(Y_col)
-        .zip(utils::skip_ith(usize::from(i), &y))
-        .map(|(((j, _msg_id, msg), Y_ji), y_ij)| {
+        .zip(decommitments.iter())
+        .zip(y.iter())
+        .map(|(((j, _msg_id, msg), decom), y_ij)| {
+            let Y_ji = decom.y_points[utils::y_point_index(i, j)];
             let dh = Y_ji * y_ij;
             let rho_ji = Scalar::from_hash::<D>(&unambiguous::RefreshMask {
                 sid,
@@ -457,10 +467,10 @@ where
     let masked_blame = peer_contribs
         .iter()
         .zip(masked.iter_indexed())
-        .filter_map(|(&z_ji, (j, msg_id, _msg))| {
-            (Point::generator() * z_ji
-                != S_polys[usize::from(j)].value::<_, Point<E>>(I_i.as_ref()))
-            .then_some(AbortBlame::new(j, msg_id, msg_id))
+        .zip(utils::skip_ith(usize::from(i), &S_polys))
+        .filter_map(|((&z_ji, (j, msg_id, _msg)), S_j)| {
+            (Point::generator() * z_ji != S_j.value::<_, Point<E>>(I_i.as_ref()))
+                .then_some(AbortBlame::new(j, msg_id, msg_id))
         })
         .collect::<Vec<_>>();
     if !masked_blame.is_empty() {
@@ -475,7 +485,6 @@ where
         decom
             .s_points
             .iter()
-            .skip(1)
             .zip(&decom.sch_commits)
             .zip(&msg.sch_proofs)
             .any(|((S_k, A_k), proof)| {
@@ -503,14 +512,20 @@ where
     let x_star = NonZero::from_secret_scalar(SecretScalar::new(&mut x_star_scalar))
         .ok_or(Bug::ZeroSecret)?;
 
+    let mut summed_coefs = Vec::with_capacity(sch_len + 1);
+    summed_coefs.resize(sch_len + 1, Point::<E>::zero());
+    for poly in &S_polys {
+        for (acc, coef) in summed_coefs.iter_mut().zip(poly.coefs()) {
+            *acc += *coef;
+        }
+    }
+    let phi_sum = Polynomial::from_coefs(summed_coefs);
+
     let public_shares = I
         .iter()
         .zip(X.iter())
         .map(|(I_j, X_j)| {
-            let delta = S_polys
-                .iter()
-                .map(|Phi_k| Phi_k.value::<_, Point<E>>(I_j.as_ref()))
-                .sum::<Point<E>>();
+            let delta = phi_sum.value::<_, Point<E>>(I_j.as_ref());
             NonZero::from_point(*X_j + delta).ok_or(Bug::ZeroPublic)
         })
         .collect::<Result<Vec<_>, _>>()?;

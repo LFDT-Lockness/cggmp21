@@ -121,7 +121,7 @@ enum Reason {
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum InvalidArgs {
-    #[displaydoc("party index `i` is out of bounds (must be < amount of refreshing parties)")]
+    #[displaydoc("party index `i` is out of bounds (must be < n)")]
     PartyIndexOutOfBounds,
 }
 
@@ -154,6 +154,8 @@ enum Bug {
     ZeroSecret,
     #[displaydoc("unexpected zero public share")]
     ZeroPublic,
+    #[displaydoc("min_signers underflowed")]
+    MinSignersUnderflow,
 }
 
 macro_rules! make_factory {

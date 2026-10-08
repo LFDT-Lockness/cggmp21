@@ -22,7 +22,7 @@ use crate::utils::{self, AbortBlame};
 use crate::ExecutionId;
 use crate::{DirtyIncompleteKeyShare, DirtyKeyInfo, IncompleteKeyShare, Validate};
 
-use super::{Bug, InvalidArgs, KeyRefreshError, ProtocolAborted, Reason};
+use super::{Bug, InvalidArgs, KeyRefreshError, KeyRefreshOutput, ProtocolAborted, Reason};
 
 macro_rules! prefixed {
     ($name:tt) => {
@@ -121,7 +121,9 @@ pub struct MsgRound2<E: Curve, L: SecurityLevel> {
     pub rid: L::KappaBytes,
     /// $X'_{i,k}$
     pub x_prime_points: Vec<Point<E>>,
-    /// $Y_{i,k}$
+    /// $Y_{i,j}$ for $j \in \[n\] \setminus \{i\}$, in increasing $j$
+    ///
+    /// $Y_{i,i}$ is unused and is not sent.
     pub y_points: Vec<Point<E>>,
     /// $A_{i,k}$
     pub sch_commits: Vec<schnorr_pok::Commit<E>>,
@@ -155,14 +157,6 @@ pub struct MsgRound3Broadcast<E: Curve> {
 pub struct MsgRound3Unicast<E: Curve> {
     /// $C_{i,j}$
     pub c: Scalar<E>,
-}
-
-/// Output of the non-threshold key refresh protocol
-pub struct KeyRefreshOutput<E: Curve, L: SecurityLevel> {
-    /// Refreshed key share
-    pub share: IncompleteKeyShare<E>,
-    /// Ephemeral session identifier XOR'd from all parties' contributions
-    pub rid: L::KappaBytes,
 }
 
 /// Carries out non-threshold key share refresh.
@@ -211,10 +205,10 @@ where
 
     // Round 1
     tracer.round_begins();
-    let y = (0..n)
+    // $y_{i,j}$ for $j \neq i$. The self key $y_{i,i}$ is unused.
+    let y = utils::iter_peers(i, n)
         .map(|_| SecretScalar::random(rng))
         .collect::<Vec<_>>();
-    // $\vec Y_i = (Y_{i,j} = y_{i,j} \cdot G)_{j \in [n]}$
     let Y = y
         .iter()
         .map(|y_ij| Point::generator() * y_ij)
@@ -327,7 +321,7 @@ where
     tracer.stage("Validate decommitments");
     let blame = utils::collect_blame(&commitments, &decommitments, |j, com, decom| {
         let bad_len = decom.x_prime_points.len() != usize::from(n)
-            || decom.y_points.len() != usize::from(n)
+            || decom.y_points.len() != usize::from(n) - 1
             || decom.sch_commits.len() != usize::from(n);
         let expected = udigest::hash::<D>(&unambiguous::HashRefreshCom {
             sid,
@@ -350,14 +344,12 @@ where
         .fold(L::KappaBytes::default(), utils::xor_array);
 
     tracer.stage("Mask refresh shares");
-    // Column over peers $j \neq i$ of $Y_{j,i}$: entry $i$ of each peer's $\vec Y_j$
-    // (their DH public intended for us). Zipped with $y_{i,j}$, this matches the
-    // writeup Round-3 formula $y_{i,j} \cdot Y_{j,i}$.
-    let Y_col = decommitments.iter().map(|d| d.y_points[usize::from(i)]);
+    // $\vec Y_j$ lists $Y_{j,k}$ for $k \neq j$. Pair $Y_{j,i}$ with our $y_{i,j}$.
     let rhos = utils::iter_peers(i, n)
-        .zip(Y_col)
-        .zip(utils::skip_ith(usize::from(i), &y))
-        .map(|((j, Y_ji), y_ij)| {
+        .zip(decommitments.iter())
+        .zip(y.iter())
+        .map(|((j, d), y_ij)| {
+            let Y_ji = d.y_points[utils::y_point_index(i, j)];
             let dh = Y_ji * y_ij;
             Scalar::from_hash::<D>(&unambiguous::RefreshMask {
                 sid,
@@ -422,9 +414,6 @@ where
     tracer.msgs_received();
 
     tracer.stage("Unmask refresh contributions");
-    // Column over peers $j \neq i$ of $Y_{j,i}$: entry $i$ of each peer's $\vec Y_j$
-    // basically their DH public intended for us
-    let Y_col = decommitments.iter().map(|d| d.y_points[usize::from(i)]);
     // Column over peers $j \neq i$ of $X'_{j,i}$: entry $i$ of each peer's $\vec X'_j$
     let X_prime_col = decommitments
         .iter()
@@ -433,9 +422,10 @@ where
     // $x'_{j,i}$ in the specsheet (unmasked contribution from each peer $j$ to us)
     let peer_contribs = masked
         .iter_indexed()
-        .zip(Y_col)
-        .zip(utils::skip_ith(usize::from(i), &y))
-        .map(|(((j, _msg_id, msg), Y_ji), y_ij)| {
+        .zip(decommitments.iter())
+        .zip(y.iter())
+        .map(|(((j, _msg_id, msg), decom), y_ij)| {
+            let Y_ji = decom.y_points[utils::y_point_index(i, j)];
             // specsheet: $\rho_{j,i}$ from $y_{j,i} \cdot Y_{i,j}$.
             // Same DH point as $y_{i,j} \cdot Y_{j,i}$ ($Y$ subscripts swapped vs the specsheet).
             let dh = Y_ji * y_ij;
