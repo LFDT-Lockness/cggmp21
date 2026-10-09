@@ -460,6 +460,8 @@ mod tests {
 
         crate::signing::msg::Msg<E, D>,
         crate::signing::Presignature<E>,
+        crate::signing::PresignaturePublicData<E>,
+        crate::signing::PresignatureCommitment<E>,
         crate::signing::PartialSignature<E>,
         crate::signing::Signature<E>,
     }
