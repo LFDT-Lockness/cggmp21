@@ -1,7 +1,8 @@
 //! CGGMP24 key share refresh
 //!
 //! This crate implements share refresh from [CGGMP24] Figure 7 without Paillier/Pedersen
-//! regeneration. Non-threshold (`n`-out-of-`n`) refresh is supported
+//! regeneration. Both non-threshold (`n`-out-of-`n`) and threshold (`t`-out-of-`n`) refresh
+//! are supported
 //!
 //! [CGGMP24]: https://ia.cr/2021/060
 
@@ -16,6 +17,8 @@ extern crate std;
 mod errors;
 /// Non-threshold (`n`-out-of-`n`) key share refresh
 pub mod non_threshold;
+/// Threshold (`t`-out-of-`n`) key share refresh
+pub mod threshold;
 mod utils;
 
 /// Protocol progress tracing
@@ -39,18 +42,19 @@ use alloc::vec::Vec;
 #[doc(inline)]
 pub use key_share::{
     CoreKeyShare as IncompleteKeyShare, DirtyCoreKeyShare as DirtyIncompleteKeyShare, DirtyKeyInfo,
-    InvalidCoreShare, Validate,
+    InvalidCoreShare, Validate, VssSetup,
 };
 
 use crate::errors::IoError;
 use crate::security_level::SecurityLevel;
 
-pub use self::non_threshold::KeyRefreshOutput;
 #[doc(no_inline)]
 pub use self::non_threshold::Msg as NonThresholdMsg;
+#[doc(no_inline)]
+pub use self::threshold::Msg as ThresholdMsg;
 pub use cggmp24_keygen::ExecutionId;
 
-/// Message types for the non-threshold key refresh protocol
+/// Message types for the key refresh protocols
 pub mod msg {
     /// Messages for non-threshold (`n`-out-of-`n`) key refresh
     pub mod non_threshold {
@@ -58,6 +62,21 @@ pub mod msg {
             Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast, MsgRound3Unicast,
         };
     }
+
+    /// Messages for threshold (`t`-out-of-`n`) key refresh
+    pub mod threshold {
+        pub use crate::threshold::{
+            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast, MsgRound3Unicast,
+        };
+    }
+}
+
+/// Output of a key refresh protocol
+pub struct KeyRefreshOutput<E: generic_ec::Curve, L: SecurityLevel> {
+    /// Refreshed key share
+    pub share: IncompleteKeyShare<E>,
+    /// Ephemeral session identifier XOR'd from all parties' contributions
+    pub rid: L::KappaBytes,
 }
 
 /// Key refresh protocol error
@@ -93,13 +112,16 @@ enum Reason {
     /// Threshold key share passed to non-threshold refresh
     #[displaydoc("threshold key share is not supported by non-threshold key refresh")]
     NotThreshold,
+    /// Additive key share passed to threshold refresh
+    #[displaydoc("additive key share is not supported by threshold key refresh")]
+    ExpectedThresholdShare,
 }
 
 /// Error indicating that caller supplied invalid arguments
 #[derive(Debug, displaydoc::Display)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 enum InvalidArgs {
-    #[displaydoc("party index `i` is out of bounds (must be < n)")]
+    #[displaydoc("party index `i` is out of bounds (must be < amount of refreshing parties)")]
     PartyIndexOutOfBounds,
 }
 
