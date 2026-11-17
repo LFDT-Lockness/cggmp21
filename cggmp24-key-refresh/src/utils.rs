@@ -70,6 +70,18 @@ pub fn iter_peers(i: u16, n: u16) -> impl Iterator<Item = u16> {
     (0..n).filter(move |x| *x != i)
 }
 
+/// Index of $Y_{\mathrm{sender}, \mathrm{recipient}}$ in a vector ordered by
+/// recipient, omitting the sender's own unused entry.
+pub fn y_point_index(recipient: u16, sender: u16) -> usize {
+    debug_assert_ne!(recipient, sender);
+    let recipient = usize::from(recipient);
+    if recipient < usize::from(sender) {
+        recipient
+    } else {
+        recipient - 1
+    }
+}
+
 /// Returns iterator over all elements except the i-th one
 pub fn skip_ith<I>(i: usize, iter: I) -> impl Iterator<Item = I::Item>
 where

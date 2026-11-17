@@ -82,3 +82,82 @@ where
         assert_ne!(share.public_shares, original_public_shares[i]);
     }
 }
+
+cggmp24_tests::test_suite! {
+    test: threshold_key_refresh_works,
+    generics: all_curves,
+    suites: {
+        t2n3: (2, 3, false),
+        t3n5: (3, 5, false),
+        t3n5_reliable: (3, 5, true),
+    }
+}
+fn threshold_key_refresh_works<E>(t: u16, n: u16, reliable_broadcast: bool)
+where
+    E: generic_ec::Curve + cggmp24_tests::CurveParams,
+    Point<E>: generic_ec::coords::HasAffineX<E>,
+{
+    let mut rng = rand_dev::DevRng::new();
+
+    let eid: [u8; 32] = rng.gen();
+    let eid = ExecutionId::new(&eid);
+
+    let incomplete_shares = round_based::sim::run(n, |i, party| {
+        let party = cggmp24_tests::buffer_outgoing(party);
+        let mut party_rng = rng.fork();
+        async move {
+            let keygen = cggmp24::keygen::<E>(eid, i, n)
+                .set_security_level::<E::SecurityLevel>()
+                .set_digest::<E::Digest>()
+                .enforce_reliable_broadcast(reliable_broadcast)
+                .set_threshold(t);
+
+            // Keygen turns HD on unless told otherwise. These suites are the non-HD case.
+            #[cfg(feature = "hd-wallet")]
+            let keygen = keygen.hd_wallet(false);
+
+            keygen.start(&mut party_rng, party).await
+        }
+    })
+    .unwrap()
+    .expect_ok()
+    .into_vec();
+
+    let original_pk = incomplete_shares[0].shared_public_key;
+    let original_public_shares: Vec<_> = incomplete_shares
+        .iter()
+        .map(|s| s.public_shares.clone())
+        .collect();
+
+    let eid: [u8; 32] = rng.gen();
+    let eid = ExecutionId::new(&eid);
+
+    let refreshed = round_based::sim::run(n, |i, party| {
+        let party = cggmp24_tests::buffer_outgoing(party);
+        let mut party_rng = rng.fork();
+        let share = &incomplete_shares[usize::from(i)];
+        async move {
+            cggmp24_key_refresh::threshold::run_threshold_key_refresh::<
+                E,
+                _,
+                _,
+                E::SecurityLevel,
+                E::Digest,
+            >(&mut party_rng, party, eid, share, None, reliable_broadcast)
+            .await
+        }
+    })
+    .unwrap()
+    .expect_ok()
+    .into_vec();
+
+    let shares: Vec<_> = refreshed.into_iter().map(|o| o.share).collect();
+    validate_keygen_output::<E, cggmp24_tests::HdDisabled>(&mut rng, &shares);
+
+    for (i, share) in shares.iter().enumerate() {
+        assert_eq!(share.shared_public_key, original_pk);
+        assert!(share.vss_setup.is_some());
+        assert_eq!(share.min_signers(), t);
+        assert_ne!(share.public_shares, original_public_shares[i]);
+    }
+}
