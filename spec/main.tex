@@ -2342,6 +2342,11 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
     \begin{algorithmic}[1]
         \State Receive $(\hat\psi_{j,k})_{k \in [n]} \in \Z_q^n$ from all parties,
                and $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \State Let $\hat\psi_j = (\hat\psi_{j,k})_{k \in [n]}$ for every $j \in [n]$, including $j = i$
+        \If{$\var{echo\_enabled}$} \Comment{Reliability check}
+            \State Compute $h_i = H(\Encode[echo3](\sid, \hat\psi_0, \dots, \hat\psi_{n-1}))$ and send $h_i$ to all parties
+            \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
+        \EndIf
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
                    \Statex \Comment{\parbox[t]{.3\linewidth}{$j$ is sender, $i$ is recipient}}
@@ -2360,8 +2365,30 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
                \Comment{\parbox[t]{.35\linewidth}{the $j = i$ term $x'_{i,i}$ is known locally}}
         \State Set $X^*_k = X_k + \sum_{j \in [n]} X'_{j,k}$ for every $k \in [n]$;
                let $\vec X^* = (X^*_k)_{k \in [n]}$
+    \end{algorithmic}
+
+    \item[\textbf{ACK.}] \
+    \begin{algorithmic}[1]
+        \State Compute $(A_i; \tau_i) \gets \commit{sch}()$
+        \State Set $e_i \in \Z_q = \challengeni{sch}(\Encode[refresh\_ack](\sid, i, \rid, A_i, \vec X^*))$
+        \State Set $\psi_i = \prove{sch}(e_i; \tau_i, x^*_i)$
+        \State Send $(A_i, \psi_i)$ to all parties
+        \State The local $(A_i, \psi_i)$ is the ACK for index $i$
+        \State A direct $(A_j, \psi_j)$ from $P_j$ is a candidate only for index $j$
+        \State An entry $(A_k, \psi_k)$ of a relayed bundle is a candidate for index $k$
+        \State Keep the first valid candidate for each index
+        \State Ignore every other entry
+               \Comment{invalid and duplicate entries do not abort this round}
+        \State A candidate $(A_k, \psi_k)$ is valid when
+               $e_k = \challengeni{sch}(\Encode[refresh\_ack](\sid, k, \rid, A_k, \vec X^*))$
+               and $\verify{sch}(X^*_k, A_k, e_k, \psi_k)$
+        \State Wait until a valid ACK is held for every index $k \in [n]$
+        \State Send the bundle of these $n$ ACKs to all parties
         \State \Return $(\rid, x^*_i, \vec X^*)$
     \end{algorithmic}
+
+    A malformed $c_{j,i}$ makes its recipient abort before sending an ACK, so that ACK never exists.
+    Every party waits for an ACK for every index, and no honest party replaces its key share.
 
 \end{description}
 
@@ -2458,6 +2485,11 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
     \begin{algorithmic}[1]
         \State Receive $(\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ from all parties,
                and $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \State Let $\hat\psi_j = (\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ for every $j \in [n]$, including $j = i$
+        \If{$\var{echo\_enabled}$} \Comment{Reliability check}
+            \State Compute $h_i = H(\Encode[echo3](\sid, \hat\psi_0, \dots, \hat\psi_{n-1}))$ and send $h_i$ to all parties
+            \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
+        \EndIf
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
             \State Compute $z_{j,i} = c_{i,j} - \rho_{j,i} \bmod q$
@@ -2478,8 +2510,30 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
             \State Set $X^*_k = X_k + \Phi(I(k))$
         \EndFor
         \State Let $\vec X^* = (X^*_k)_{k \in [n]}$
+    \end{algorithmic}
+
+    \item[\textbf{ACK.}] \
+    \begin{algorithmic}[1]
+        \State Compute $(A_i; \tau_i) \gets \commit{sch}()$
+        \State Set $e_i \in \Z_q = \challengeni{sch}(\Encode[refresh\_ack](\sid, i, \rid, A_i, \vec X^*))$
+        \State Set $\psi_i = \prove{sch}(e_i; \tau_i, x^*_i)$
+        \State Send $(A_i, \psi_i)$ to all parties
+        \State The local $(A_i, \psi_i)$ is the ACK for index $i$
+        \State A direct $(A_j, \psi_j)$ from $P_j$ is a candidate only for index $j$
+        \State An entry $(A_k, \psi_k)$ of a relayed bundle is a candidate for index $k$
+        \State Keep the first valid candidate for each index
+        \State Ignore every other entry
+               \Comment{invalid and duplicate entries do not abort this round}
+        \State A candidate $(A_k, \psi_k)$ is valid when
+               $e_k = \challengeni{sch}(\Encode[refresh\_ack](\sid, k, \rid, A_k, \vec X^*))$
+               and $\verify{sch}(X^*_k, A_k, e_k, \psi_k)$
+        \State Wait until a valid ACK is held for every index $k \in [n]$
+        \State Send the bundle of these $n$ ACKs to all parties
         \State \Return $(\rid, x^*_i, \vec X^*)$
     \end{algorithmic}
+
+    A malformed $c_{j,i}$ makes its recipient abort before sending an ACK, so that ACK never exists.
+    Every party waits for an ACK for every index, and no honest party replaces its key share.
 
 \end{description}
 
