@@ -121,6 +121,7 @@ impl AckSlots {
         self.filled[usize::from(i)] = true;
     }
 
+    #[cfg(test)]
     pub(crate) fn is_filled(&self, index: u16) -> bool {
         self.filled
             .get(usize::from(index))
@@ -282,6 +283,8 @@ mod tests {
     use crate::ExecutionId;
 
     type E = Secp256k1;
+    type SecretShare = NonZero<SecretScalar<E>>;
+    type PublicShare = NonZero<Point<E>>;
 
     #[derive(udigest::Digestable)]
     #[udigest(tag = "dfns.cggmp24.key_refresh.test.refresh_ack")]
@@ -331,7 +334,7 @@ mod tests {
     fn sample_shares<R: RngCore + CryptoRng>(
         rng: &mut R,
         n: u16,
-    ) -> (Vec<NonZero<SecretScalar<E>>>, Vec<NonZero<Point<E>>>) {
+    ) -> (Vec<SecretShare>, Vec<PublicShare>) {
         let secrets = (0..n)
             .map(|_| NonZero::<SecretScalar<E>>::random(rng))
             .collect::<Vec<_>>();
