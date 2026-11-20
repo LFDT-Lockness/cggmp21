@@ -50,6 +50,12 @@ hd-wallet = { version = "0.7", default-features = false }
 
 generic-tests = "0.1"
 
+# Unreleased buffered-round API (https://github.com/LFDT-Lockness/round-based/pull/54).
+# That commit is crate version 0.4.2, which satisfies the 0.4.1 requirement above.
+# Drop this patch once the API is published.
+[patch.crates-io]
+round-based = { git = "https://github.com/LFDT-Lockness/round-based", rev = "0550c3f5b9ed13229b5b231d828388157ae8752b" }
+
 # Make the backend less slow in debug builds to speed up tests
 [profile.dev.package]
 num-bigint.opt-level = 3

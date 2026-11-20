@@ -336,6 +336,7 @@ dependencies = [
  "hex",
  "key-share",
  "rand_core",
+ "rand_dev",
  "round-based",
  "serde",
  "serde_with",
@@ -2140,9 +2141,8 @@ dependencies = [
 
 [[package]]
 name = "round-based"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da76edf50de0a9d6911fc79261bb04cc9f3f3a375e0201799f5edf58499af341"
+version = "0.4.2"
+source = "git+https://github.com/LFDT-Lockness/round-based?rev=0550c3f5b9ed13229b5b231d828388157ae8752b#0550c3f5b9ed13229b5b231d828388157ae8752b"
 dependencies = [
  "futures-util",
  "phantom-type 0.3.1",
@@ -2154,8 +2154,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4afa4d5b318bcafae8a7ebc57c1cb7d4b2db7358293e34d71bfd605fd327cc13"
+source = "git+https://github.com/LFDT-Lockness/round-based?rev=0550c3f5b9ed13229b5b231d828388157ae8752b#0550c3f5b9ed13229b5b231d828388157ae8752b"
 dependencies = [
  "proc-macro2",
  "quote",

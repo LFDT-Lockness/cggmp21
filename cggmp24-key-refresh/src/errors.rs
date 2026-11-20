@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::convert::Infallible;
 
 use round_based::rounds_router::{
-    errors::{self as router_error, CompleteRoundError},
+    errors::{self as router_error, CompleteRoundError, ReceiveMsgError},
     simple_store::RoundInputError,
 };
 
@@ -53,6 +53,19 @@ impl IoError {
                 Self::RouteReceivedError(CompleteRoundError::ProcessMessage(e))
             }
             CompleteRoundError::Other(e) => Self::RouteReceivedError(CompleteRoundError::Other(e)),
+        }
+    }
+
+    pub fn receive_buffered<E: StdError + Send + Sync + 'static>(
+        err: ReceiveMsgError<Infallible, E>,
+    ) -> Self {
+        match err {
+            ReceiveMsgError::Buffer(err) => match err {},
+            ReceiveMsgError::Io(router_error::IoError::Io(err)) => {
+                Self::ReceiveMessage(Box::new(err))
+            }
+            ReceiveMsgError::Io(router_error::IoError::UnexpectedEof) => Self::ReceiveMessageEof,
+            ReceiveMsgError::Other(err) => Self::ReceiveMessage(Box::new(err)),
         }
     }
 }

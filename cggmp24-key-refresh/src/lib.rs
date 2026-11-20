@@ -14,6 +14,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod ack;
 mod errors;
 /// Non-threshold (`n`-out-of-`n`) key share refresh
 pub mod non_threshold;
@@ -59,14 +60,16 @@ pub mod msg {
     /// Messages for non-threshold (`n`-out-of-`n`) key refresh
     pub mod non_threshold {
         pub use crate::non_threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast, MsgRound3Unicast,
+            Msg, MsgAck, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
+            MsgRound3ReliabilityCheck, MsgRound3Unicast,
         };
     }
 
     /// Messages for threshold (`t`-out-of-`n`) key refresh
     pub mod threshold {
         pub use crate::threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast, MsgRound3Unicast,
+            Msg, MsgAck, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
+            MsgRound3ReliabilityCheck, MsgRound3Unicast,
         };
     }
 }
@@ -143,6 +146,8 @@ enum ProtocolAborted {
     InvalidSchnorrProof(Vec<utils::AbortBlame>),
     #[displaydoc("round1 wasn't reliable")]
     Round1NotReliable(Vec<utils::AbortBlame>),
+    #[displaydoc("round3 wasn't reliable")]
+    Round3NotReliable(Vec<utils::AbortBlame>),
 }
 
 #[derive(Debug, displaydoc::Display)]
@@ -171,4 +176,5 @@ impl ProtocolAborted {
     make_factory!(invalid_masked_share, InvalidMaskedShare);
     make_factory!(invalid_schnorr_proof, InvalidSchnorrProof);
     make_factory!(round1_not_reliable, Round1NotReliable);
+    make_factory!(round3_not_reliable, Round3NotReliable);
 }

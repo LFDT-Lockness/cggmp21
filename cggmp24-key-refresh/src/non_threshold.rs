@@ -15,6 +15,8 @@ use round_based::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
+pub use crate::ack::MsgAck;
+use crate::ack::{self, PerSenderBuf};
 use crate::errors::IoError;
 use crate::progress::Tracer;
 use crate::security_level::SecurityLevel;
@@ -31,7 +33,7 @@ macro_rules! prefixed {
 }
 
 mod unambiguous {
-    use super::{MsgRound1, MsgRound2};
+    use super::{MsgRound1, MsgRound2, MsgRound3Broadcast};
     use crate::{ExecutionId, SecurityLevel};
     use digest::Digest;
     use generic_ec::{Curve, Point};
@@ -52,6 +54,14 @@ mod unambiguous {
     pub struct Echo<'a, D: Digest> {
         pub sid: ExecutionId<'a>,
         pub commitment: &'a MsgRound1<D>,
+    }
+
+    #[derive(udigest::Digestable)]
+    #[udigest(tag = prefixed!("echo_round3"))]
+    #[udigest(bound = "")]
+    pub struct EchoRound3<'a, E: Curve> {
+        pub sid: ExecutionId<'a>,
+        pub proofs: &'a MsgRound3Broadcast<E>,
     }
 
     #[derive(udigest::Digestable)]
@@ -77,6 +87,9 @@ mod unambiguous {
         pub X: &'a Point<E>,
         pub sch_commit: &'a schnorr_pok::Commit<E>,
     }
+
+    use crate::ack::define_refresh_ack;
+    define_refresh_ack!(prefixed!("refresh_ack"));
 }
 
 /// Message of key refresh protocol
@@ -93,6 +106,10 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round3Broadcast(MsgRound3Broadcast<E>),
     /// Round 3 unicast message
     Round3Unicast(MsgRound3Unicast<E>),
+    /// Reliability check of the round 3 broadcast proofs (optional additional round)
+    Round3ReliabilityCheck(MsgRound3ReliabilityCheck<D>),
+    /// Acknowledgement of the refreshed share
+    Ack(MsgAck<E>),
 }
 
 /// Message from round 1
@@ -144,11 +161,23 @@ pub struct MsgReliabilityCheck<D: Digest> {
 }
 
 /// Round 3 broadcast message
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, udigest::Digestable)]
 #[serde(bound = "")]
+#[udigest(bound = "")]
+#[udigest(tag = prefixed!("round3"))]
 pub struct MsgRound3Broadcast<E: Curve> {
     /// $\hat\psi_{i,k}$
     pub sch_proofs: Vec<schnorr_pok::Proof<E>>,
+}
+
+/// Echo hash of the round 3 broadcast proofs
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct MsgRound3ReliabilityCheck<D: Digest> {
+    /// Echo hash of $(\hat\psi_j)_{j \in \[n\]}$, including this party's own proofs
+    #[serde_as(as = "utils::HexOrBin")]
+    pub hash: digest::Output<D>,
 }
 
 /// Round 3 unicast message
@@ -162,7 +191,8 @@ pub struct MsgRound3Unicast<E: Curve> {
 /// Carries out non-threshold key share refresh.
 ///
 /// Refreshes additive secret shares without changing the joint public key.
-/// Fails if `share` is a threshold key share.
+/// Fails if `share` is a threshold key share. The new share is returned only after every
+/// party has acknowledged its refreshed share.
 ///
 /// Indexes of all participants of the protocol should match exactly their indexes from
 /// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
@@ -201,6 +231,9 @@ where
     let round2 = rounds.add_round(RoundInput::<MsgRound2<E, L>>::broadcast(i, n));
     let round3_bc = rounds.add_round(RoundInput::<MsgRound3Broadcast<E>>::broadcast(i, n));
     let round3_p2p = rounds.add_round(RoundInput::<MsgRound3Unicast<E>>::p2p(i, n));
+    let round3_sync = rounds.add_round(RoundInput::<MsgRound3ReliabilityCheck<D>>::broadcast(i, n));
+    // ACK messages that arrive during the earlier rounds stay queued until `x*` is known.
+    let mut ack_round = rounds.add_buffered_round(PerSenderBuf::<MsgAck<E>>::new(n));
     let mut rounds = rounds.listen(incomings);
 
     // Round 1
@@ -383,17 +416,16 @@ where
         })
         .collect::<Vec<_>>();
 
+    let my_proofs = MsgRound3Broadcast {
+        sch_proofs: psi_hat,
+    };
     tracer.send_msg();
-    let messages = core::iter::once(Outgoing::broadcast(Msg::Round3Broadcast(
-        MsgRound3Broadcast {
-            sch_proofs: psi_hat.clone(),
-        },
-    )))
-    .chain(
-        utils::iter_peers(i, n)
-            .zip(Cs)
-            .map(|(j, C_j)| Outgoing::p2p(j, Msg::Round3Unicast(MsgRound3Unicast { c: C_j }))),
-    );
+    let messages = core::iter::once(Outgoing::broadcast(Msg::Round3Broadcast(my_proofs.clone())))
+        .chain(
+            utils::iter_peers(i, n)
+                .zip(Cs)
+                .map(|(j, C_j)| Outgoing::p2p(j, Msg::Round3Unicast(MsgRound3Unicast { c: C_j }))),
+        );
     outgoings
         .send_all(&mut futures_util::stream::iter(messages.map(Ok)))
         .await
@@ -407,6 +439,45 @@ where
         .complete(round3_bc)
         .await
         .map_err(IoError::receive_message)?;
+    tracer.msgs_received();
+
+    if reliable_broadcast_enforced {
+        tracer.stage("Hash received msgs (reliability check)");
+        let h_i = udigest::hash_iter::<D>(
+            sch_proofs_r
+                .iter_including_me(&my_proofs)
+                .map(|proofs| unambiguous::EchoRound3 { sid, proofs }),
+        );
+
+        tracer.send_msg();
+        outgoings
+            .send(Outgoing::broadcast(Msg::Round3ReliabilityCheck(
+                MsgRound3ReliabilityCheck { hash: h_i.clone() },
+            )))
+            .await
+            .map_err(IoError::send_message)?;
+        tracer.msg_sent();
+
+        tracer.round_begins();
+        tracer.receive_msgs();
+        let round3_hashes = rounds
+            .complete(round3_sync)
+            .await
+            .map_err(IoError::receive_message)?;
+        tracer.msgs_received();
+
+        tracer.stage("Assert other parties hashed messages (reliability check)");
+        let parties_have_different_hashes = round3_hashes
+            .into_iter_indexed()
+            .filter(|(_j, _msg_id, hash_j)| hash_j.hash != h_i)
+            .map(|(j, msg_id, _)| AbortBlame::new(j, msg_id, msg_id))
+            .collect::<Vec<_>>();
+        if !parties_have_different_hashes.is_empty() {
+            return Err(ProtocolAborted::round3_not_reliable(parties_have_different_hashes).into());
+        }
+    }
+
+    tracer.receive_msgs();
     let masked = rounds
         .complete(round3_p2p)
         .await
@@ -510,6 +581,31 @@ where
     }
     .validate()
     .map_err(|err| Bug::Invalid(err.into_error()))?;
+
+    let x_star = &share_out.x;
+    let public_shares = &share_out.public_shares;
+    ack::collect_acks(
+        rng,
+        &mut outgoings,
+        &mut rounds,
+        &mut ack_round,
+        i,
+        n,
+        x_star,
+        public_shares,
+        &mut tracer,
+        |prover, sch_commit| {
+            Scalar::from_hash::<D>(&unambiguous::RefreshAck {
+                sid,
+                prover,
+                rid: rid.as_ref(),
+                sch_commit,
+                public_shares,
+            })
+        },
+        Msg::Ack,
+    )
+    .await?;
 
     tracer.protocol_ends();
 
