@@ -177,7 +177,7 @@ pub struct MsgRound3Broadcast<E: Curve> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct MsgRound3ReliabilityCheck<D: Digest> {
-    /// Echo hash of $(\hat\psi_j)_{j \in [n]}$, including this party's own proofs
+    /// Echo hash of $(\hat\psi_j)_{j \in \[n\]}$, including this party's own proofs
     #[serde_as(as = "utils::HexOrBin")]
     pub hash: digest::Output<D>,
 }
