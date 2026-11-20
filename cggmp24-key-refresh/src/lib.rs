@@ -14,6 +14,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod ack;
 mod errors;
 /// Non-threshold (`n`-out-of-`n`) key share refresh
 pub mod non_threshold;
@@ -59,7 +60,7 @@ pub mod msg {
     /// Messages for non-threshold (`n`-out-of-`n`) key refresh
     pub mod non_threshold {
         pub use crate::non_threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
+            Msg, MsgAck, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
             MsgRound3ReliabilityCheck, MsgRound3Unicast,
         };
     }
@@ -67,7 +68,7 @@ pub mod msg {
     /// Messages for threshold (`t`-out-of-`n`) key refresh
     pub mod threshold {
         pub use crate::threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
+            Msg, MsgAck, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
             MsgRound3ReliabilityCheck, MsgRound3Unicast,
         };
     }

@@ -15,6 +15,8 @@ use round_based::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
+pub use crate::ack::MsgAck;
+use crate::ack::{self, PerSenderBuf};
 use crate::errors::IoError;
 use crate::progress::Tracer;
 use crate::security_level::SecurityLevel;
@@ -85,6 +87,9 @@ mod unambiguous {
         pub X: &'a Point<E>,
         pub sch_commit: &'a schnorr_pok::Commit<E>,
     }
+
+    use crate::ack::define_refresh_ack;
+    define_refresh_ack!(prefixed!("refresh_ack"));
 }
 
 /// Message of key refresh protocol
@@ -103,6 +108,8 @@ pub enum Msg<E: Curve, L: SecurityLevel, D: Digest> {
     Round3Unicast(MsgRound3Unicast<E>),
     /// Reliability check of the round 3 broadcast proofs (optional additional round)
     Round3ReliabilityCheck(MsgRound3ReliabilityCheck<D>),
+    /// Acknowledgement of the refreshed share
+    Ack(MsgAck<E>),
 }
 
 /// Message from round 1
@@ -184,7 +191,8 @@ pub struct MsgRound3Unicast<E: Curve> {
 /// Carries out non-threshold key share refresh.
 ///
 /// Refreshes additive secret shares without changing the joint public key.
-/// Fails if `share` is a threshold key share.
+/// Fails if `share` is a threshold key share. The new share is returned only after every
+/// party has acknowledged its refreshed share.
 ///
 /// Indexes of all participants of the protocol should match exactly their indexes from
 /// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
@@ -224,6 +232,8 @@ where
     let round3_bc = rounds.add_round(RoundInput::<MsgRound3Broadcast<E>>::broadcast(i, n));
     let round3_p2p = rounds.add_round(RoundInput::<MsgRound3Unicast<E>>::p2p(i, n));
     let round3_sync = rounds.add_round(RoundInput::<MsgRound3ReliabilityCheck<D>>::broadcast(i, n));
+    // ACK messages that arrive during the earlier rounds stay queued until `x*` is known.
+    let mut ack_round = rounds.add_buffered_round(PerSenderBuf::<MsgAck<E>>::new(n));
     let mut rounds = rounds.listen(incomings);
 
     // Round 1
@@ -571,6 +581,31 @@ where
     }
     .validate()
     .map_err(|err| Bug::Invalid(err.into_error()))?;
+
+    let x_star = &share_out.x;
+    let public_shares = &share_out.public_shares;
+    ack::collect_acks(
+        rng,
+        &mut outgoings,
+        &mut rounds,
+        &mut ack_round,
+        i,
+        n,
+        x_star,
+        public_shares,
+        &mut tracer,
+        |prover, sch_commit| {
+            Scalar::from_hash::<D>(&unambiguous::RefreshAck {
+                sid,
+                prover,
+                rid: rid.as_ref(),
+                sch_commit,
+                public_shares,
+            })
+        },
+        Msg::Ack,
+    )
+    .await?;
 
     tracer.protocol_ends();
 
