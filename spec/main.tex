@@ -2340,13 +2340,14 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
     \item[\textbf{Output.}] \
     \begin{algorithmic}[1]
-        \State Receive $(\hat\psi_{j,k})_{k \in [n]} \in \Z_q^n$ from all parties,
-               and $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \State Receive $(\hat\psi_{j,k})_{k \in [n]} \in \Z_q^n$ from all parties
         \State Let $\hat\psi_j = (\hat\psi_{j,k})_{k \in [n]}$ for every $j \in [n]$, including $j = i$
         \If{$\var{echo\_enabled}$} \Comment{Reliability check}
-            \State Compute $h_i = H(\Encode[echo3](\sid, \hat\psi_0, \dots, \hat\psi_{n-1}))$ and send $h_i$ to all parties
+            \State Compute $h_i = H\bigl((\Encode[echo\_round3](\sid, \hat\psi_j))_{j \in [n]}\bigr)$ and send $h_i$ to all parties
+                   \Comment{\parbox[t]{.34\linewidth}{party order, including $j = i$. Each proof message is bound to $\sid$. The private $c_{i,j}$ are not included}}
             \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
         \EndIf
+        \State Receive $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
                    \Statex \Comment{\parbox[t]{.3\linewidth}{$j$ is sender, $i$ is recipient}}
@@ -2369,21 +2370,29 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
     \item[\textbf{ACK.}] \
     \begin{algorithmic}[1]
-        \State Compute $(A_i; \tau_i) \gets \commit{sch}()$
-        \State Set $e_i \in \Z_q = \challengeni{sch}(\Encode[refresh\_ack](\sid, i, \rid, A_i, \vec X^*))$
-        \State Set $\psi_i = \prove{sch}(e_i; \tau_i, x^*_i)$
-        \State Send $(A_i, \psi_i)$ to all parties
-        \State The local $(A_i, \psi_i)$ is the ACK for index $i$
-        \State A direct $(A_j, \psi_j)$ from $P_j$ is a candidate only for index $j$
-        \State An entry $(A_k, \psi_k)$ of a relayed bundle is a candidate for index $k$
-        \State Keep the first valid candidate for each index
-        \State Ignore every other entry
-               \Comment{invalid and duplicate entries do not abort this round}
-        \State A candidate $(A_k, \psi_k)$ is valid when
-               $e_k = \challengeni{sch}(\Encode[refresh\_ack](\sid, k, \rid, A_k, \vec X^*))$
-               and $\verify{sch}(X^*_k, A_k, e_k, \psi_k)$
-        \State Wait until a valid ACK is held for every index $k \in [n]$
-        \State Send the bundle of these $n$ ACKs to all parties
+        \State Compute $(A^*_i; \tau^*_i) \gets \commit{sch}()$
+        \State Set $e^*_i \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, i, \rid, A^*_i, \vec X^*)\bigr)$
+        \State Set $\psi^*_i = \prove{sch}(e^*_i; \tau^*_i, x^*_i)$
+        \State The local $(A^*_i, \psi^*_i)$ fills slot $i$
+        \State Send $(A^*_i, \psi^*_i)$ to all parties
+               \Comment{no relayed index}
+        \While{some slot in $[n]$ is empty} \Comment{an invalid or duplicate message does not abort}
+            \State Receive a message from $P_j$
+            \State A message $(A^*, \psi^*)$ with no relayed index is a candidate only for slot $j$
+            \State A message $(k, A^*, \psi^*)$ is a candidate only for slot $k$
+            \If{the candidate slot is outside $[n]$, or that slot is already filled}
+                \State Ignore the message
+            \Else
+                \State Let $k$ be the candidate slot
+                \State Set $e^*_k \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, k, \rid, A^*, \vec X^*)\bigr)$
+                \If{$\verify{sch}(X^*_k, A^*, e^*_k, \psi^*)$}
+                    \State Store $(A^*_k, \psi^*_k) = (A^*, \psi^*)$ in slot $k$
+                    \State Send $(k, A^*_k, \psi^*_k)$ to all parties
+                \Else
+                    \State Ignore the message
+                \EndIf
+            \EndIf
+        \EndWhile
         \State \Return $(\rid, x^*_i, \vec X^*)$
     \end{algorithmic}
 
@@ -2483,13 +2492,14 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
     \item[\textbf{Output.}] \
     \begin{algorithmic}[1]
-        \State Receive $(\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ from all parties,
-               and $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \State Receive $(\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ from all parties
         \State Let $\hat\psi_j = (\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ for every $j \in [n]$, including $j = i$
         \If{$\var{echo\_enabled}$} \Comment{Reliability check}
-            \State Compute $h_i = H(\Encode[echo3](\sid, \hat\psi_0, \dots, \hat\psi_{n-1}))$ and send $h_i$ to all parties
+            \State Compute $h_i = H\bigl((\Encode[echo\_round3](\sid, \hat\psi_j))_{j \in [n]}\bigr)$ and send $h_i$ to all parties
+                   \Comment{\parbox[t]{.34\linewidth}{party order, including $j = i$. Each proof message is bound to $\sid$. The private $c_{i,j}$ are not included}}
             \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
         \EndIf
+        \State Receive $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
             \State Compute $z_{j,i} = c_{i,j} - \rho_{j,i} \bmod q$
@@ -2514,21 +2524,29 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
     \item[\textbf{ACK.}] \
     \begin{algorithmic}[1]
-        \State Compute $(A_i; \tau_i) \gets \commit{sch}()$
-        \State Set $e_i \in \Z_q = \challengeni{sch}(\Encode[refresh\_ack](\sid, i, \rid, A_i, \vec X^*))$
-        \State Set $\psi_i = \prove{sch}(e_i; \tau_i, x^*_i)$
-        \State Send $(A_i, \psi_i)$ to all parties
-        \State The local $(A_i, \psi_i)$ is the ACK for index $i$
-        \State A direct $(A_j, \psi_j)$ from $P_j$ is a candidate only for index $j$
-        \State An entry $(A_k, \psi_k)$ of a relayed bundle is a candidate for index $k$
-        \State Keep the first valid candidate for each index
-        \State Ignore every other entry
-               \Comment{invalid and duplicate entries do not abort this round}
-        \State A candidate $(A_k, \psi_k)$ is valid when
-               $e_k = \challengeni{sch}(\Encode[refresh\_ack](\sid, k, \rid, A_k, \vec X^*))$
-               and $\verify{sch}(X^*_k, A_k, e_k, \psi_k)$
-        \State Wait until a valid ACK is held for every index $k \in [n]$
-        \State Send the bundle of these $n$ ACKs to all parties
+        \State Compute $(A^*_i; \tau^*_i) \gets \commit{sch}()$
+        \State Set $e^*_i \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, i, \rid, A^*_i, \vec X^*)\bigr)$
+        \State Set $\psi^*_i = \prove{sch}(e^*_i; \tau^*_i, x^*_i)$
+        \State The local $(A^*_i, \psi^*_i)$ fills slot $i$
+        \State Send $(A^*_i, \psi^*_i)$ to all parties
+               \Comment{no relayed index}
+        \While{some slot in $[n]$ is empty} \Comment{an invalid or duplicate message does not abort}
+            \State Receive a message from $P_j$
+            \State A message $(A^*, \psi^*)$ with no relayed index is a candidate only for slot $j$
+            \State A message $(k, A^*, \psi^*)$ is a candidate only for slot $k$
+            \If{the candidate slot is outside $[n]$, or that slot is already filled}
+                \State Ignore the message
+            \Else
+                \State Let $k$ be the candidate slot
+                \State Set $e^*_k \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, k, \rid, A^*, \vec X^*)\bigr)$
+                \If{$\verify{sch}(X^*_k, A^*, e^*_k, \psi^*)$}
+                    \State Store $(A^*_k, \psi^*_k) = (A^*, \psi^*)$ in slot $k$
+                    \State Send $(k, A^*_k, \psi^*_k)$ to all parties
+                \Else
+                    \State Ignore the message
+                \EndIf
+            \EndIf
+        \EndWhile
         \State \Return $(\rid, x^*_i, \vec X^*)$
     \end{algorithmic}
 
