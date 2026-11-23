@@ -1,8 +1,8 @@
 //! Final acknowledgement of the refreshed shares.
 //!
 //! Each party proves knowledge of its new share and echoes every proof it accepts.
-//! The round finishes only once a valid proof is held for every index. See `ack-buffer.md`
-//! for why the queue is capped per sender.
+//! The round finishes only once a valid proof is held for every index. Early messages
+//! sit in [`PerSenderBuf`], which is capped per sender so one party cannot close the round.
 
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
@@ -56,8 +56,48 @@ pub struct MsgAck<E: Curve> {
 
 /// Queues at most `n` not-yet-read messages from each sender.
 ///
-/// A message past that cap is dropped. [`RoundBuf::add_message`] does not fail, so a full
-/// sender cannot close the round. See `ack-buffer.md`.
+/// The ACK round reads messages one by one (`add_buffered_round`, `next_msg_in`).
+/// This buffer is ours. `RoundBufBounded` is the wrong buffer for this round.
+///
+/// `RoundBufBounded` stores every not-yet-read message of the round in one queue.
+/// [`RoundBuf::add_message`] returns an error once that queue is full. The router
+/// then wants no more messages and drops later ones for the round. After the
+/// messages already queued have been read, `next_msg_in` returns that error and
+/// closes the round.
+///
+/// Each round has its own queue. That does not keep the ACK queue empty while this
+/// party is still finishing an earlier round. `complete` reads the single incoming
+/// stream and files each message by round number. ACK messages that arrive during
+/// rounds 1–3 are appended before this party has called `next_msg_in`.
+///
+/// A party can use that window. It sends more ACK messages than the cap to one
+/// victim, then lets the last round-3 message through. The victim's ACK round
+/// returns an error. The other honest parties never saw the flood, finish, and
+/// adopt the new share. The victim does not.
+///
+/// The standalone consensus example does not hit this. It calls `next_msg_in`
+/// immediately, so its queue stays about one message deep. The overflow needs an
+/// earlier round still sitting in `complete`.
+///
+/// This buffer keeps a separate count per authenticated sender. The cap is `n`
+/// queued messages from that sender. A further message from the same sender is
+/// discarded, and [`RoundBuf::add_message`] still returns `Ok`. The round stays
+/// open. Discarding the new message, rather than the oldest, matters: junk that
+/// arrives while the queue is full does not push out a message already queued.
+///
+/// `n` is the most an honest party sends: its own proof, plus one forward of each
+/// of the other `n - 1` proofs. A flood fills only that sender's slots. A forward
+/// from an honest party uses the honest sender's slots. The sender index is the
+/// one on the incoming message. `relayed_from` is not used for the cap, so a party
+/// cannot spend another party's slots by claiming to relay them.
+///
+/// The cap counts messages still queued, and it assumes the transport delivers
+/// each message at most once. An at-least-once transport can replay an honest
+/// sender until a later forward is dropped. A relay from another party uses that
+/// party's own slots, so the dropped copy is not the only way the proof arrives.
+///
+/// This bound is not part of the protocol. It is there so one party cannot close
+/// another party's ACK round.
 pub(crate) struct PerSenderBuf<M> {
     cap: usize,
     queued: Vec<usize>,

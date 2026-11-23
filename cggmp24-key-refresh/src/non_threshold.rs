@@ -194,6 +194,19 @@ pub struct MsgRound3Unicast<E: Curve> {
 /// Fails if `share` is a threshold key share. The new share is returned only after every
 /// party has acknowledged its refreshed share.
 ///
+/// A party that never sends an acknowledgement, whether it is offline or malicious,
+/// makes this call wait forever. While it waits, this party does not replace its old
+/// share. Neither does any other party that is still waiting.
+///
+/// Do not impose an application timeout and treat it as a joint abort. A party that
+/// already holds every acknowledgement returns the new share. A party that hits the
+/// deadline returns an error and stays on the old share. Relaying cannot repair that
+/// once a caller has stopped. An error from this function, including end of stream
+/// after this party has sent its own acknowledgement, also does not mean the others
+/// are still on the old share: they may already have adopted. Agreeing that every
+/// honest party timed out, and that none of them should adopt, needs a separate
+/// timeout protocol. This crate does not provide one.
+///
 /// Indexes of all participants of the protocol should match exactly their indexes from
 /// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
 /// it must have the same index `j` in key refresh execution. In particular, the local
