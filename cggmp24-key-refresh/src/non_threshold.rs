@@ -9,14 +9,14 @@ use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::schnorr_pok;
 use rand_core::{CryptoRng, RngCore};
 use round_based::{
-    rounds_router::{simple_store::RoundInput, RoundsRouter},
+    rounds_router::{round_buf::RoundBufBounded, simple_store::RoundInput, RoundsRouter},
     Delivery, Mpc, MpcParty, Outgoing, ProtocolMessage,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
+use crate::ack;
 pub use crate::ack::MsgAck;
-use crate::ack::{self, PerSenderBuf};
 use crate::errors::IoError;
 use crate::progress::Tracer;
 use crate::security_level::SecurityLevel;
@@ -87,9 +87,6 @@ mod unambiguous {
         pub X: &'a Point<E>,
         pub sch_commit: &'a schnorr_pok::Commit<E>,
     }
-
-    use crate::ack::define_refresh_ack;
-    define_refresh_ack!(prefixed!("refresh_ack"));
 }
 
 /// Message of key refresh protocol
@@ -192,20 +189,8 @@ pub struct MsgRound3Unicast<E: Curve> {
 ///
 /// Refreshes additive secret shares without changing the joint public key.
 /// Fails if `share` is a threshold key share. The new share is returned only after every
-/// party has acknowledged its refreshed share.
-///
-/// A party that never sends an acknowledgement, whether it is offline or malicious,
-/// makes this call wait forever. While it waits, this party does not replace its old
-/// share. Neither does any other party that is still waiting.
-///
-/// Do not impose an application timeout and treat it as a joint abort. A party that
-/// already holds every acknowledgement returns the new share. A party that hits the
-/// deadline returns an error and stays on the old share. Relaying cannot repair that
-/// once a caller has stopped. An error from this function, including end of stream
-/// after this party has sent its own acknowledgement, also does not mean the others
-/// are still on the old share: they may already have adopted. Agreeing that every
-/// honest party timed out, and that none of them should adopt, needs a separate
-/// timeout protocol. This crate does not provide one.
+/// party has acknowledged its refreshed share. A missing acknowledgement makes this call
+/// wait forever, and a timeout is not a joint abort: see [Liveness](crate#liveness).
 ///
 /// Indexes of all participants of the protocol should match exactly their indexes from
 /// the key generation protocol execution. E.g. if party occupied index `j` in keygen,
@@ -245,8 +230,11 @@ where
     let round3_bc = rounds.add_round(RoundInput::<MsgRound3Broadcast<E>>::broadcast(i, n));
     let round3_p2p = rounds.add_round(RoundInput::<MsgRound3Unicast<E>>::p2p(i, n));
     let round3_sync = rounds.add_round(RoundInput::<MsgRound3ReliabilityCheck<D>>::broadcast(i, n));
-    // ACK messages that arrive during the earlier rounds stay queued until `x*` is known.
-    let mut ack_round = rounds.add_buffered_round(PerSenderBuf::<MsgAck<E>>::new(n));
+    // Messages for this round that arrive during rounds 1–3 stay queued until `x*` is known.
+    // Each party may send at most `n` for the whole round: its own proof, and one forward of
+    // each other proof. Further messages from that sender are dropped, and the round stays open.
+    let mut ack_round =
+        rounds.add_buffered_round(RoundBufBounded::<MsgAck<E>>::new(n, usize::from(n)));
     let mut rounds = rounds.listen(incomings);
 
     // Round 1
@@ -597,7 +585,7 @@ where
 
     let x_star = &share_out.x;
     let public_shares = &share_out.public_shares;
-    ack::collect_acks(
+    ack::consensus_on_termination(
         rng,
         &mut outgoings,
         &mut rounds,
@@ -608,13 +596,15 @@ where
         public_shares,
         &mut tracer,
         |prover, sch_commit| {
-            Scalar::from_hash::<D>(&unambiguous::RefreshAck {
+            let ack = ack::RefreshAck {
                 sid,
                 prover,
                 rid: rid.as_ref(),
                 sch_commit,
                 public_shares,
-            })
+            }
+            .digest_with_tag(prefixed!("refresh_ack"));
+            Scalar::from_hash::<D>(&ack)
         },
         Msg::Ack,
     )

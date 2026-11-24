@@ -56,11 +56,15 @@ impl IoError {
         }
     }
 
-    pub fn receive_buffered<E: StdError + Send + Sync + 'static>(
-        err: ReceiveMsgError<Infallible, E>,
-    ) -> Self {
+    pub fn receive_buffered<BufErr, E>(err: ReceiveMsgError<BufErr, E>) -> Self
+    where
+        BufErr: StdError + Send + Sync + 'static,
+        E: StdError + Send + Sync + 'static,
+    {
         match err {
-            ReceiveMsgError::Buffer(err) => match err {},
+            // `RoundBufBounded` returns this when `sender >= n`. A party index in `0..n`
+            // cannot hit it. Earlier rounds already reject that sender through `RoundInput`.
+            ReceiveMsgError::Buffer(err) => Self::ReceiveMessage(Box::new(err)),
             ReceiveMsgError::Io(router_error::IoError::Io(err)) => {
                 Self::ReceiveMessage(Box::new(err))
             }

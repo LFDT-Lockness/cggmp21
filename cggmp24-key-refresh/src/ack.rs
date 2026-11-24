@@ -2,44 +2,46 @@
 //!
 //! Each party proves knowledge of its new share and echoes every proof it accepts.
 //! The round finishes only once a valid proof is held for every index. Early messages
-//! sit in [`PerSenderBuf`], which is capped per sender so one party cannot close the round.
-
-use alloc::collections::VecDeque;
-use alloc::vec::Vec;
-use core::convert::Infallible;
+//! sit in a [`round_based::rounds_router::round_buf::RoundBufBounded`] capped at `n`
+//! messages from each party for the whole round.
 
 use futures_util::SinkExt;
 use generic_ec::{Curve, NonZero, Point, Scalar, SecretScalar};
 use generic_ec_zkp::schnorr_pok;
 use rand_core::{CryptoRng, RngCore};
-use round_based::rounds_router::round_buf::RoundBuf;
-use round_based::rounds_router::{BufferedRound, RoundsRouter};
-use round_based::{Incoming, Outgoing, ProtocolMessage, RoundMessage};
+use round_based::rounds_router::round_buf::RoundBufBounded;
+use round_based::rounds_router::simple_store::RoundInput;
+use round_based::rounds_router::{BufferedRound, MessagesStore, RoundsRouter};
+use round_based::{Incoming, MessageType, Outgoing, ProtocolMessage, RoundMessage};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{IoError, StdError};
 use crate::progress::Tracer;
 
-macro_rules! define_refresh_ack {
-    ($tag:expr) => {
-        /// Challenge input for the ACK proof of a new share.
-        ///
-        /// The fields are the session id, the prover index, `rid`, the ACK commitment,
-        /// and every new public share, in party order.
-        #[derive(udigest::Digestable)]
-        #[udigest(tag = $tag)]
-        #[udigest(bound = "")]
-        pub struct RefreshAck<'a, E: generic_ec::Curve> {
-            pub sid: $crate::ExecutionId<'a>,
-            pub prover: u16,
-            #[udigest(as_bytes)]
-            pub rid: &'a [u8],
-            pub sch_commit: &'a generic_ec_zkp::schnorr_pok::Commit<E>,
-            pub public_shares: &'a [generic_ec::NonZero<generic_ec::Point<E>>],
-        }
-    };
+/// Challenge input for the ACK proof of a new share.
+///
+/// The fields are the session id, the prover index, `rid`, the ACK commitment, and every new
+/// public share, in party order.
+pub(crate) struct RefreshAck<'a, E: Curve> {
+    pub sid: crate::ExecutionId<'a>,
+    pub prover: u16,
+    pub rid: &'a [u8],
+    pub sch_commit: &'a schnorr_pok::Commit<E>,
+    pub public_shares: &'a [NonZero<Point<E>>],
 }
-pub(crate) use define_refresh_ack;
+
+impl<'a, E: Curve> RefreshAck<'a, E> {
+    /// The non-threshold and threshold protocols use different tags.
+    pub fn digest_with_tag(self, tag: &'a str) -> impl udigest::Digestable + 'a {
+        udigest::inline_struct!(tag {
+            sid: self.sid,
+            prover: self.prover,
+            rid: udigest::Bytes(self.rid),
+            sch_commit: self.sch_commit,
+            public_shares: self.public_shares,
+        })
+    }
+}
 
 /// Acknowledgement of one party's refreshed share
 #[derive(Clone, Serialize, Deserialize)]
@@ -54,174 +56,21 @@ pub struct MsgAck<E: Curve> {
     pub sch_proof: schnorr_pok::Proof<E>,
 }
 
-/// Queues at most `n` not-yet-read messages from each sender.
-///
-/// The ACK round reads messages one by one (`add_buffered_round`, `next_msg_in`).
-/// This buffer is ours. `RoundBufBounded` is the wrong buffer for this round.
-///
-/// `RoundBufBounded` stores every not-yet-read message of the round in one queue.
-/// [`RoundBuf::add_message`] returns an error once that queue is full. The router
-/// then wants no more messages and drops later ones for the round. After the
-/// messages already queued have been read, `next_msg_in` returns that error and
-/// closes the round.
-///
-/// Each round has its own queue. That does not keep the ACK queue empty while this
-/// party is still finishing an earlier round. `complete` reads the single incoming
-/// stream and files each message by round number. ACK messages that arrive during
-/// rounds 1–3 are appended before this party has called `next_msg_in`.
-///
-/// A party can use that window. It sends more ACK messages than the cap to one
-/// victim, then lets the last round-3 message through. The victim's ACK round
-/// returns an error. The other honest parties never saw the flood, finish, and
-/// adopt the new share. The victim does not.
-///
-/// The standalone consensus example does not hit this. It calls `next_msg_in`
-/// immediately, so its queue stays about one message deep. The overflow needs an
-/// earlier round still sitting in `complete`.
-///
-/// This buffer keeps a separate count per authenticated sender. The cap is `n`
-/// queued messages from that sender. A further message from the same sender is
-/// discarded, and [`RoundBuf::add_message`] still returns `Ok`. The round stays
-/// open. Discarding the new message, rather than the oldest, matters: junk that
-/// arrives while the queue is full does not push out a message already queued.
-///
-/// `n` is the most an honest party sends: its own proof, plus one forward of each
-/// of the other `n - 1` proofs. A flood fills only that sender's slots. A forward
-/// from an honest party uses the honest sender's slots. The sender index is the
-/// one on the incoming message. `relayed_from` is not used for the cap, so a party
-/// cannot spend another party's slots by claiming to relay them.
-///
-/// The cap counts messages still queued, and it assumes the transport delivers
-/// each message at most once. An at-least-once transport can replay an honest
-/// sender until a later forward is dropped. A relay from another party uses that
-/// party's own slots, so the dropped copy is not the only way the proof arrives.
-///
-/// This bound is not part of the protocol. It is there so one party cannot close
-/// another party's ACK round.
-pub(crate) struct PerSenderBuf<M> {
-    cap: usize,
-    queued: Vec<usize>,
-    messages: VecDeque<Incoming<M>>,
-}
-
-impl<M> PerSenderBuf<M> {
-    /// `n` is the number of parties and the per-sender cap.
-    pub(crate) fn new(n: u16) -> Self {
-        let n = usize::from(n);
-        Self {
-            cap: n,
-            queued: alloc::vec![0; n],
-            messages: VecDeque::new(),
-        }
-    }
-
-    fn slot(&self, sender: u16) -> Option<usize> {
-        let sender = usize::from(sender);
-        (sender < self.queued.len()).then_some(sender)
-    }
-}
-
-impl<M: 'static> RoundBuf for PerSenderBuf<M> {
-    type Msg = M;
-    type Error = Infallible;
-
-    fn add_message(&mut self, msg: Incoming<Self::Msg>) -> Result<(), Self::Error> {
-        if let Some(slot) = self.slot(msg.sender) {
-            if self.queued[slot] < self.cap {
-                self.queued[slot] += 1;
-                self.messages.push_back(msg);
-            }
-        }
-        Ok(())
-    }
-
-    fn next_message(&mut self) -> Option<Incoming<Self::Msg>> {
-        let msg = self.messages.pop_front()?;
-        if let Some(slot) = self.slot(msg.sender) {
-            self.queued[slot] -= 1;
-        }
-        Some(msg)
-    }
-}
-
-/// Which ACK slots are already filled.
-pub(crate) struct AckSlots {
-    filled: Vec<bool>,
-}
-
-impl AckSlots {
-    pub(crate) fn new(n: u16) -> Self {
-        Self {
-            filled: alloc::vec![false; usize::from(n)],
-        }
-    }
-
-    /// The local proof occupies this party's slot before any message is received.
-    pub(crate) fn accept_local(&mut self, i: u16) {
-        self.filled[usize::from(i)] = true;
-    }
-
-    #[cfg(test)]
-    pub(crate) fn is_filled(&self, index: u16) -> bool {
-        self.filled
-            .get(usize::from(index))
-            .copied()
-            .unwrap_or(false)
-    }
-
-    pub(crate) fn is_complete(&self) -> bool {
-        self.filled.iter().all(|filled| *filled)
-    }
-
-    /// A direct message is a candidate only for the sender. A forward is a candidate only
-    /// for `relayed_from`. An index that is already filled, or out of range, is not a candidate.
-    fn open_slot(&self, sender: u16, relayed_from: Option<u16>) -> Option<u16> {
-        let index = relayed_from.unwrap_or(sender);
-        let slot = usize::from(index);
-        if slot >= self.filled.len() || self.filled[slot] {
-            None
-        } else {
-            Some(index)
-        }
-    }
-}
-
-/// Keeps the first message that `verify` accepts for an open slot.
-///
-/// Returns the filled index. Invalid and duplicate messages return `None` and leave the slots
-/// unchanged.
-pub(crate) fn consider<E, F>(
-    slots: &mut AckSlots,
-    sender: u16,
-    msg: &MsgAck<E>,
-    mut verify: F,
-) -> Option<u16>
-where
-    E: Curve,
-    F: FnMut(u16, &MsgAck<E>) -> bool,
-{
-    let index = slots.open_slot(sender, msg.relayed_from)?;
-    if verify(index, msg) {
-        slots.filled[usize::from(index)] = true;
-        Some(index)
-    } else {
-        None
-    }
-}
-
-/// Proves `x*_i`, broadcasts it, and echoes each newly accepted proof.
+/// Runs the termination consensus: prove `x*_i`, then echo each newly accepted proof.
 ///
 /// `challenge(prover, commitment)` is the ACK challenge for that prover's commitment and the
 /// full vector of new public shares. `into_msg` wraps [`MsgAck`] in the protocol message.
 ///
-/// The local proof fills slot `i` and is sent with `relayed_from: None`. A direct message fills
-/// only the sender's slot. A forward fills only `relayed_from`. The first valid proof for a slot
-/// is kept. This returns once every slot is filled.
-pub(crate) async fn collect_acks<E, M, S, RecvErr, Out, SendErr, R, F, G>(
+/// The local proof is broadcast with `relayed_from: None`. This party does not wait to receive
+/// its own proof back. A direct message is a proof of the sender's share. A message with
+/// `relayed_from: Some(k)` is a proof of party `k`'s share. The first valid proof for a party
+/// is kept and echoed. An invalid proof, a duplicate, and an index outside the party set are
+/// ignored. This returns once every other party's proof is held.
+pub(crate) async fn consensus_on_termination<E, M, S, RecvErr, Out, SendErr, R, F, G>(
     rng: &mut R,
     outgoings: &mut Out,
     rounds: &mut RoundsRouter<M, S>,
-    ack_round: &mut BufferedRound<PerSenderBuf<MsgAck<E>>>,
+    ack_round: &mut BufferedRound<RoundBufBounded<MsgAck<E>>>,
     i: u16,
     n: u16,
     x_star: &NonZero<SecretScalar<E>>,
@@ -244,7 +93,7 @@ where
     debug_assert_eq!(public_shares.len(), usize::from(n));
     debug_assert!(usize::from(i) < usize::from(n));
 
-    let mut slots = AckSlots::new(n);
+    let mut slots = RoundInput::<()>::p2p(i, n);
     let (tau_star, commit_star) = schnorr_pok::prover_commits_ephemeral_secret::<E, _>(rng);
     let challenge_star = challenge(i, &commit_star);
     let proof_star = schnorr_pok::prove(
@@ -254,8 +103,6 @@ where
         },
         x_star,
     );
-    slots.accept_local(i);
-
     tracer.round_begins();
     tracer.send_msg();
     outgoings
@@ -268,10 +115,7 @@ where
         .map_err(IoError::send_message)?;
     tracer.msg_sent();
 
-    loop {
-        if slots.is_complete() {
-            break;
-        }
+    while slots.wants_more() {
         tracer.receive_msgs();
         let incoming = rounds
             .next_msg_in(ack_round)
@@ -279,18 +123,34 @@ where
             .map_err(IoError::receive_buffered)?;
         tracer.msgs_received();
 
-        let Some(index) = consider(&mut slots, incoming.sender, &incoming.msg, |index, msg| {
-            let nonce = challenge(index, &msg.sch_commit);
-            msg.sch_proof
-                .verify(
-                    &msg.sch_commit,
-                    &schnorr_pok::Challenge { nonce },
-                    public_shares[usize::from(index)].as_ref(),
-                )
-                .is_ok()
-        }) else {
+        // A direct message proves the sender's share. A forward proves `relayed_from`.
+        let index = incoming.msg.relayed_from.unwrap_or(incoming.sender);
+        // This party, a filled slot, and an index past the party set are not open.
+        if !slots.needs_msg_from(index) {
             continue;
-        };
+        }
+        let nonce = challenge(index, &incoming.msg.sch_commit);
+        if incoming
+            .msg
+            .sch_proof
+            .verify(
+                &incoming.msg.sch_commit,
+                &schnorr_pok::Challenge { nonce },
+                public_shares[usize::from(index)].as_ref(),
+            )
+            .is_err()
+        {
+            continue;
+        }
+        // Record as p2p so a broadcast delivery and a p2p delivery both fit the store.
+        slots
+            .add_message(Incoming {
+                id: incoming.id,
+                sender: index,
+                msg_type: MessageType::P2P,
+                msg: (),
+            })
+            .map_err(|err| IoError::ReceiveMessage(alloc::boxed::Box::new(err)))?;
 
         tracer.send_msg();
         outgoings
@@ -310,15 +170,22 @@ where
 mod tests {
     use alloc::vec::Vec;
 
+    use core::future::Future;
+    use core::pin::Pin;
+    use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
     use generic_ec::curves::Secp256k1;
     use generic_ec::{NonZero, Point, Scalar, SecretScalar};
     use generic_ec_zkp::schnorr_pok;
     use rand_core::{CryptoRng, RngCore};
-    use round_based::rounds_router::round_buf::RoundBuf;
-    use round_based::{Incoming, MessageType, RoundMessage};
+
+    use futures_util::sink::Sink;
+    use futures_util::stream;
+    use round_based::rounds_router::round_buf::RoundBufBounded;
+    use round_based::{Incoming, MessageType, Outgoing, ProtocolMessage, RoundMessage};
+    use serde::{Deserialize, Serialize};
     use sha2::Sha256;
 
-    use super::{consider, AckSlots, MsgAck, PerSenderBuf};
+    use super::{MsgAck, RefreshAck};
     use crate::security_level::SecurityLevel128;
     use crate::ExecutionId;
 
@@ -326,49 +193,22 @@ mod tests {
     type SecretShare = NonZero<SecretScalar<E>>;
     type PublicShare = NonZero<Point<E>>;
 
-    #[derive(udigest::Digestable)]
-    #[udigest(tag = "dfns.cggmp24.key_refresh.test.refresh_ack")]
-    #[udigest(bound = "")]
-    struct TestAck<'a> {
-        sid: ExecutionId<'a>,
+    fn challenge(
+        sid: ExecutionId<'_>,
+        rid: &[u8],
         prover: u16,
-        #[udigest(as_bytes)]
-        rid: &'a [u8],
-        sch_commit: &'a schnorr_pok::Commit<E>,
-        public_shares: &'a [NonZero<Point<E>>],
-    }
-
-    fn challenge<'a>(
-        sid: ExecutionId<'a>,
-        rid: &'a [u8],
-        prover: u16,
-        sch_commit: &'a schnorr_pok::Commit<E>,
-        public_shares: &'a [NonZero<Point<E>>],
+        sch_commit: &schnorr_pok::Commit<E>,
+        public_shares: &[NonZero<Point<E>>],
     ) -> Scalar<E> {
-        Scalar::from_hash::<Sha256>(&TestAck {
+        let ack = RefreshAck {
             sid,
             prover,
             rid,
             sch_commit,
             public_shares,
-        })
-    }
-
-    fn verify(
-        sid: ExecutionId<'_>,
-        rid: &[u8],
-        public_shares: &[NonZero<Point<E>>],
-        index: u16,
-        msg: &MsgAck<E>,
-    ) -> bool {
-        let nonce = challenge(sid, rid, index, &msg.sch_commit, public_shares);
-        msg.sch_proof
-            .verify(
-                &msg.sch_commit,
-                &schnorr_pok::Challenge { nonce },
-                public_shares[usize::from(index)].as_ref(),
-            )
-            .is_ok()
+        }
+        .digest_with_tag("dfns.cggmp24.key_refresh.test.refresh_ack");
+        Scalar::from_hash::<Sha256>(&ack)
     }
 
     fn sample_shares<R: RngCore + CryptoRng>(
@@ -409,15 +249,6 @@ mod tests {
         }
     }
 
-    fn incoming(sender: u16, msg: u32) -> Incoming<u32> {
-        Incoming {
-            id: u64::from(msg),
-            sender,
-            msg_type: MessageType::Broadcast,
-            msg,
-        }
-    }
-
     #[test]
     fn ack_round_number_is_appended() {
         assert_eq!(
@@ -430,6 +261,130 @@ mod tests {
         );
     }
 
+    #[derive(Clone, ProtocolMessage, Serialize, Deserialize)]
+    #[serde(bound = "")]
+    enum TestMsg {
+        Ack(MsgAck<E>),
+    }
+
+    fn ack(msg: &TestMsg) -> &MsgAck<E> {
+        match msg {
+            TestMsg::Ack(ack) => ack,
+        }
+    }
+
+    struct Outbox(Vec<TestMsg>);
+
+    impl Sink<Outgoing<TestMsg>> for Outbox {
+        type Error = core::convert::Infallible;
+
+        fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn start_send(self: Pin<&mut Self>, item: Outgoing<TestMsg>) -> Result<(), Self::Error> {
+            self.get_mut().0.push(item.msg);
+            Ok(())
+        }
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    fn block_on<F: Future>(future: F) -> F::Output {
+        fn clone(_: *const ()) -> RawWaker {
+            RawWaker::new(core::ptr::null(), &VTABLE)
+        }
+        fn no_op(_: *const ()) {}
+        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, no_op, no_op, no_op);
+
+        let waker = unsafe { Waker::from_raw(RawWaker::new(core::ptr::null(), &VTABLE)) };
+        let mut context = Context::from_waker(&waker);
+        let mut future = core::pin::pin!(future);
+        match future.as_mut().poll(&mut context) {
+            Poll::Ready(output) => output,
+            Poll::Pending => panic!("termination consensus is still waiting"),
+        }
+    }
+
+    /// Party 0 runs the termination round on a fixed list of incoming messages.
+    fn run_party0(
+        rng: &mut (impl RngCore + CryptoRng),
+        secret: &SecretShare,
+        public_shares: &[PublicShare],
+        sid: ExecutionId<'_>,
+        rid: &[u8],
+        incoming: Vec<(u16, MsgAck<E>)>,
+    ) -> (Vec<MsgAck<E>>, Result<(), crate::errors::IoError>) {
+        let incoming = incoming
+            .into_iter()
+            .enumerate()
+            .map(|(id, (sender, msg))| {
+                Ok::<_, core::convert::Infallible>(Incoming {
+                    id: u64::try_from(id).expect("message id fits in u64"),
+                    sender,
+                    msg_type: MessageType::Broadcast,
+                    msg: TestMsg::Ack(msg),
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut rounds = round_based::rounds_router::RoundsRouter::<TestMsg>::builder();
+        let mut ack_round = rounds.add_buffered_round(RoundBufBounded::new(3, 3));
+        let mut rounds = rounds.listen(stream::iter(incoming));
+        let mut outbox = Outbox(Vec::new());
+        let mut tracer = None;
+        let result = block_on(super::consensus_on_termination(
+            rng,
+            &mut outbox,
+            &mut rounds,
+            &mut ack_round,
+            0,
+            3,
+            secret,
+            public_shares,
+            &mut tracer,
+            |prover, sch_commit| challenge(sid, rid, prover, sch_commit, public_shares),
+            TestMsg::Ack,
+        ));
+        let sent = outbox.0.into_iter().map(|msg| ack(&msg).clone()).collect();
+        (sent, result)
+    }
+
+    fn echoes(sent: &[MsgAck<E>]) -> &[MsgAck<E>] {
+        &sent[1..]
+    }
+
+    #[test]
+    fn index_past_the_end_is_ignored() {
+        let mut rng = rand_dev::DevRng::new();
+        let (secrets, public_shares) = sample_shares(&mut rng, 3);
+        let sid_bytes = [7u8; 32];
+        let rid = [9u8; 32];
+        let sid = ExecutionId::new(&sid_bytes);
+        let mut out_of_range = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
+        out_of_range.relayed_from = Some(3);
+        let ack1 = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
+        let ack2 = prove(&mut rng, sid, &rid, 2, &secrets[2], &public_shares);
+
+        let (sent, result) = run_party0(
+            &mut rng,
+            &secrets[0],
+            &public_shares,
+            sid,
+            &rid,
+            alloc::vec![(1, out_of_range), (1, ack1.clone()), (2, ack2.clone()),],
+        );
+        result.unwrap_or_else(|err| panic!("termination consensus failed: {err}"));
+        let echoed = echoes(&sent);
+        assert_eq!(echoed.len(), 2);
+        assert_eq!(echoed[0].relayed_from, Some(1));
+        assert_eq!(echoed[0].sch_commit.0, ack1.sch_commit.0);
+        assert_eq!(echoed[1].relayed_from, Some(2));
+        assert_eq!(echoed[1].sch_commit.0, ack2.sch_commit.0);
+    }
+
     #[test]
     fn direct_acks_complete_and_a_duplicate_is_ignored() {
         let mut rng = rand_dev::DevRng::new();
@@ -437,31 +392,24 @@ mod tests {
         let sid_bytes = [7u8; 32];
         let rid = [9u8; 32];
         let sid = ExecutionId::new(&sid_bytes);
-        let mut slots = AckSlots::new(3);
-        slots.accept_local(0);
-
         let ack1 = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
-        assert_eq!(
-            consider(&mut slots, 1, &ack1, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            Some(1)
-        );
-        assert_eq!(
-            consider(&mut slots, 1, &ack1, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            None
-        );
-
         let ack2 = prove(&mut rng, sid, &rid, 2, &secrets[2], &public_shares);
-        assert_eq!(
-            consider(&mut slots, 2, &ack2, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            Some(2)
+
+        let (sent, result) = run_party0(
+            &mut rng,
+            &secrets[0],
+            &public_shares,
+            sid,
+            &rid,
+            alloc::vec![(1, ack1.clone()), (1, ack1.clone()), (2, ack2.clone())],
         );
-        assert!(slots.is_complete());
+        result.unwrap_or_else(|err| panic!("termination consensus failed: {err}"));
+        let echoed = echoes(&sent);
+        assert_eq!(echoed.len(), 2);
+        assert_eq!(echoed[0].relayed_from, Some(1));
+        assert_eq!(echoed[0].sch_commit.0, ack1.sch_commit.0);
+        assert_eq!(echoed[1].relayed_from, Some(2));
+        assert_eq!(echoed[1].sch_commit.0, ack2.sch_commit.0);
     }
 
     #[test]
@@ -471,29 +419,25 @@ mod tests {
         let sid_bytes = [7u8; 32];
         let rid = [9u8; 32];
         let sid = ExecutionId::new(&sid_bytes);
-        let mut slots = AckSlots::new(3);
-        slots.accept_local(0);
-
         let mut forwarded = prove(&mut rng, sid, &rid, 2, &secrets[2], &public_shares);
         forwarded.relayed_from = Some(2);
-        assert_eq!(
-            consider(&mut slots, 1, &forwarded, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            Some(2)
-        );
-        assert!(!slots.is_filled(1));
-        assert!(slots.is_filled(2));
-        assert!(!slots.is_complete());
-
         let ack1 = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
-        assert_eq!(
-            consider(&mut slots, 1, &ack1, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            Some(1)
+
+        let (sent, result) = run_party0(
+            &mut rng,
+            &secrets[0],
+            &public_shares,
+            sid,
+            &rid,
+            alloc::vec![(1, forwarded.clone()), (1, ack1.clone())],
         );
-        assert!(slots.is_complete());
+        result.unwrap_or_else(|err| panic!("termination consensus failed: {err}"));
+        let echoed = echoes(&sent);
+        assert_eq!(echoed.len(), 2);
+        assert_eq!(echoed[0].relayed_from, Some(2));
+        assert_eq!(echoed[0].sch_commit.0, forwarded.sch_commit.0);
+        assert_eq!(echoed[1].relayed_from, Some(1));
+        assert_eq!(echoed[1].sch_commit.0, ack1.sch_commit.0);
     }
 
     #[test]
@@ -503,41 +447,55 @@ mod tests {
         let sid_bytes = [7u8; 32];
         let rid = [9u8; 32];
         let sid = ExecutionId::new(&sid_bytes);
-        let mut slots = AckSlots::new(3);
         let ack0 = prove(&mut rng, sid, &rid, 0, &secrets[0], &public_shares);
-        assert_eq!(
-            consider(&mut slots, 1, &ack0, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            None
+        let ack1 = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
+        let ack2 = prove(&mut rng, sid, &rid, 2, &secrets[2], &public_shares);
+
+        let (sent, result) = run_party0(
+            &mut rng,
+            &secrets[0],
+            &public_shares,
+            sid,
+            &rid,
+            alloc::vec![(1, ack0), (1, ack1.clone()), (2, ack2.clone())],
         );
-        assert!(!slots.is_filled(0));
-        assert!(!slots.is_filled(1));
-        assert!(!slots.is_complete());
+        result.unwrap_or_else(|err| panic!("termination consensus failed: {err}"));
+        let echoed = echoes(&sent);
+        assert_eq!(echoed.len(), 2);
+        assert_eq!(echoed[0].relayed_from, Some(1));
+        assert_eq!(echoed[0].sch_commit.0, ack1.sch_commit.0);
+        assert_eq!(echoed[1].relayed_from, Some(2));
+        assert_eq!(echoed[1].sch_commit.0, ack2.sch_commit.0);
     }
 
     #[test]
     fn junk_ack_is_ignored() {
         let mut rng = rand_dev::DevRng::new();
-        let (_secrets, public_shares) = sample_shares(&mut rng, 3);
+        let (secrets, public_shares) = sample_shares(&mut rng, 3);
         let sid_bytes = [7u8; 32];
         let rid = [9u8; 32];
         let sid = ExecutionId::new(&sid_bytes);
-        let mut slots = AckSlots::new(3);
-        slots.accept_local(0);
         let junk = MsgAck {
             relayed_from: None,
             sch_commit: schnorr_pok::Commit(Point::generator() * Scalar::<E>::random(&mut rng)),
             sch_proof: schnorr_pok::Proof(Scalar::random(&mut rng)),
         };
-        assert_eq!(
-            consider(&mut slots, 1, &junk, |index, msg| {
-                verify(sid, &rid, &public_shares, index, msg)
-            }),
-            None
+        let ack1 = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
+        let ack2 = prove(&mut rng, sid, &rid, 2, &secrets[2], &public_shares);
+
+        let (sent, result) = run_party0(
+            &mut rng,
+            &secrets[0],
+            &public_shares,
+            sid,
+            &rid,
+            alloc::vec![(1, junk), (1, ack1.clone()), (2, ack2.clone())],
         );
-        assert!(!slots.is_filled(1));
-        assert!(!slots.is_complete());
+        result.unwrap_or_else(|err| panic!("termination consensus failed: {err}"));
+        let echoed = echoes(&sent);
+        assert_eq!(echoed.len(), 2);
+        assert_eq!(echoed[0].sch_commit.0, ack1.sch_commit.0);
+        assert_eq!(echoed[1].sch_commit.0, ack2.sch_commit.0);
     }
 
     #[test]
@@ -547,61 +505,28 @@ mod tests {
         let sid_bytes = [7u8; 32];
         let rid = [9u8; 32];
         let sid = ExecutionId::new(&sid_bytes);
-        let mut slots = AckSlots::new(3);
-        slots.accept_local(0);
         let ack1 = prove(&mut rng, sid, &rid, 1, &secrets[1], &public_shares);
-        consider(&mut slots, 1, &ack1, |index, msg| {
-            verify(sid, &rid, &public_shares, index, msg)
-        });
-        assert!(slots.is_filled(1));
-        assert!(!slots.is_filled(2));
-        assert!(!slots.is_complete());
-    }
 
-    #[test]
-    fn one_sender_cannot_crowd_out_another() {
-        let n = 3u16;
-        let mut buf = PerSenderBuf::new(n);
-        for id in 0..n {
-            buf.add_message(incoming(0, u32::from(id))).unwrap();
-        }
-        buf.add_message(incoming(0, 999)).unwrap();
-        buf.add_message(incoming(1, 7)).unwrap();
-
-        let queued = core::iter::from_fn(|| buf.next_message())
-            .map(|msg| (msg.sender, msg.msg))
-            .collect::<Vec<_>>();
-        assert_eq!(queued, alloc::vec![(0, 0), (0, 1), (0, 2), (1, 7)]);
-
-        buf.add_message(incoming(0, 5)).unwrap();
-        let next = buf.next_message().unwrap();
-        assert_eq!((next.sender, next.msg), (0, 5));
+        let (sent, result) = run_party0(
+            &mut rng,
+            &secrets[0],
+            &public_shares,
+            sid,
+            &rid,
+            alloc::vec![(1, ack1.clone())],
+        );
+        assert!(result.is_err());
+        let echoed = echoes(&sent);
+        assert_eq!(echoed.len(), 1);
+        assert_eq!(echoed[0].relayed_from, Some(1));
+        assert_eq!(echoed[0].sch_commit.0, ack1.sch_commit.0);
     }
 
     #[cfg(feature = "state-machine")]
     #[test]
     fn withheld_direct_ack_is_replaced_by_forward() {
         use round_based::state_machine::{wrap_protocol, ProceedResult, StateMachine};
-        use round_based::{Delivery, Mpc, MpcParty, ProtocolMessage};
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Clone, ProtocolMessage, Serialize, Deserialize)]
-        #[serde(bound = "")]
-        enum TestMsg {
-            Ack(MsgAck<E>),
-        }
-
-        #[derive(udigest::Digestable)]
-        #[udigest(tag = "dfns.cggmp24.key_refresh.test.refresh_ack")]
-        #[udigest(bound = "")]
-        struct Challenge<'a> {
-            sid: ExecutionId<'a>,
-            prover: u16,
-            #[udigest(as_bytes)]
-            rid: &'a [u8],
-            sch_commit: &'a schnorr_pok::Commit<E>,
-            public_shares: &'a [NonZero<Point<E>>],
-        }
+        use round_based::{Delivery, Mpc, MpcParty};
 
         async fn run<R, Party>(
             mut rng: R,
@@ -619,10 +544,10 @@ mod tests {
             let MpcParty { delivery, .. } = party.into_party();
             let (incomings, mut outgoings) = delivery.split();
             let mut rounds = round_based::rounds_router::RoundsRouter::<TestMsg>::builder();
-            let mut ack_round = rounds.add_buffered_round(PerSenderBuf::new(3));
+            let mut ack_round = rounds.add_buffered_round(RoundBufBounded::new(3, 3));
             let mut rounds = rounds.listen(incomings);
             let mut tracer = None;
-            super::collect_acks(
+            super::consensus_on_termination(
                 &mut rng,
                 &mut outgoings,
                 &mut rounds,
@@ -632,15 +557,7 @@ mod tests {
                 &secret,
                 &public_shares,
                 &mut tracer,
-                |prover, sch_commit| {
-                    Scalar::from_hash::<Sha256>(&Challenge {
-                        sid,
-                        prover,
-                        rid: &rid,
-                        sch_commit,
-                        public_shares: &public_shares,
-                    })
-                },
+                |prover, sch_commit| challenge(sid, &rid, prover, sch_commit, &public_shares),
                 TestMsg::Ack,
             )
             .await
@@ -667,12 +584,6 @@ mod tests {
                 sender,
                 msg_type: MessageType::P2P,
                 msg: msg.clone(),
-            }
-        }
-
-        fn ack(msg: &TestMsg) -> &MsgAck<E> {
-            match msg {
-                TestMsg::Ack(ack) => ack,
             }
         }
 
