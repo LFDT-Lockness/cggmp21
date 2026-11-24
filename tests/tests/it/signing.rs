@@ -5,7 +5,6 @@ use generic_ec::{coords::HasAffineX, Curve, Point};
 use rand::seq::SliceRandom;
 use rand::{Rng, RngCore};
 use rand_dev::DevRng;
-use sha2::Sha256;
 
 use cggmp24::key_share::AnyKeyShare;
 use cggmp24::signing::DataToSign;
@@ -40,7 +39,7 @@ where
 
     let mut original_message_to_sign = [0u8; 100];
     rng.fill_bytes(&mut original_message_to_sign);
-    let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
+    let message_to_sign = DataToSign::digest::<E::Digest>(&original_message_to_sign);
 
     let optional_hd = Hd::generate_derivation_path(&mut rng);
 
@@ -129,7 +128,7 @@ where
     // and the derivation path (if hd is enabled)
     let mut original_message_to_sign = [0u8; 100];
     rng.fill_bytes(&mut original_message_to_sign);
-    let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
+    let message_to_sign = DataToSign::digest::<E::Digest>(&original_message_to_sign);
 
     // all presig commitments must be same
     for (i, (_, commitment)) in presigs.iter().enumerate() {
@@ -181,7 +180,7 @@ where
 
     let mut original_message_to_sign = [0u8; 100];
     rng.fill_bytes(&mut original_message_to_sign);
-    let message_to_sign = DataToSign::digest::<Sha256>(&original_message_to_sign);
+    let message_to_sign = DataToSign::digest::<E::Digest>(&original_message_to_sign);
 
     let optional_hd = Hd::generate_derivation_path(&mut rng);
 
