@@ -117,8 +117,7 @@ impl ExternalVerifier<cggmp24::supported_curves::Secp384r1> for P384 {
         message: &[u8],
     ) -> anyhow::Result<()> {
         use anyhow::Context;
-        use p384::ecdsa::{signature::hazmat::PrehashVerifier, Signature as EcdsaSig, VerifyingKey};
-        use sha2::Digest;
+        use p384::ecdsa::{signature::Verifier, Signature as EcdsaSig, VerifyingKey};
 
         let verifying_key = VerifyingKey::from_sec1_bytes(&public_key.to_bytes(true))
             .map_err(|e| anyhow::anyhow!("public key is not valid: {e}"))?;
@@ -126,10 +125,8 @@ impl ExternalVerifier<cggmp24::supported_curves::Secp384r1> for P384 {
         signature.write_to_slice(&mut signature_bytes);
         let signature = EcdsaSig::from_slice(&signature_bytes).context("malformed signature")?;
 
-        // Signing tests hash the message with SHA-256 (`DataToSign::digest::<Sha256>`)
-        let digest = sha2::Sha256::digest(message);
         verifying_key
-            .verify_prehash(&digest, &signature)
+            .verify(message, &signature)
             .map_err(|e| anyhow::anyhow!("invalid signature: {e}"))
     }
 }
@@ -140,23 +137,56 @@ mod tests {
     use generic_ec::{NonZero, Scalar};
 
     #[test]
-    fn p256_and_p384_reject_invalid_signatures() {
-        let mut rng = rand_dev::DevRng::new();
+    fn p256_verifier_roundtrip_and_rejections() {
+        use p256::ecdsa::{signature::Signer, Signature as EcdsaSig, SigningKey};
 
-        let sk256 = Scalar::<cggmp24::supported_curves::Secp256r1>::random(&mut rng);
-        let pk256 = Point::generator() * sk256;
-        let bad_sig256 = Signature {
+        let sk = SigningKey::from_bytes(&[1u8; 32].into()).unwrap();
+        let other_sk = SigningKey::from_bytes(&[2u8; 32].into()).unwrap();
+        let pk_bytes = sk.verifying_key().to_encoded_point(true);
+        let other_pk_bytes = other_sk.verifying_key().to_encoded_point(true);
+
+        let pk = Point::from_bytes(pk_bytes.as_bytes()).unwrap();
+        let other_pk = Point::from_bytes(other_pk_bytes.as_bytes()).unwrap();
+
+        let msg = b"test message";
+        let raw_sig: EcdsaSig = sk.sign(msg);
+        let sig = Signature::read_from_slice(&raw_sig.to_bytes()).unwrap();
+
+        assert!(P256::verify(&pk, &sig, msg).is_ok());
+        assert!(P256::verify(&pk, &sig, b"tampered message").is_err());
+        assert!(P256::verify(&other_pk, &sig, msg).is_err());
+
+        let bad_sig = Signature {
             r: NonZero::from_scalar(Scalar::one()).unwrap(),
             s: NonZero::from_scalar(Scalar::one()).unwrap(),
         };
-        assert!(P256::verify(&pk256, &bad_sig256, b"test message").is_err());
+        assert!(P256::verify(&pk, &bad_sig, msg).is_err());
+    }
 
-        let sk384 = Scalar::<cggmp24::supported_curves::Secp384r1>::random(&mut rng);
-        let pk384 = Point::generator() * sk384;
-        let bad_sig384 = Signature {
+    #[test]
+    fn p384_verifier_roundtrip_and_rejections() {
+        use p384::ecdsa::{signature::Signer, Signature as EcdsaSig, SigningKey};
+
+        let sk = SigningKey::from_bytes(&[1u8; 48].into()).unwrap();
+        let other_sk = SigningKey::from_bytes(&[2u8; 48].into()).unwrap();
+        let pk_bytes = sk.verifying_key().to_encoded_point(true);
+        let other_pk_bytes = other_sk.verifying_key().to_encoded_point(true);
+
+        let pk = Point::from_bytes(pk_bytes.as_bytes()).unwrap();
+        let other_pk = Point::from_bytes(other_pk_bytes.as_bytes()).unwrap();
+
+        let msg = b"test message";
+        let raw_sig: EcdsaSig = sk.sign(msg);
+        let sig = Signature::read_from_slice(&raw_sig.to_bytes()).unwrap();
+
+        assert!(P384::verify(&pk, &sig, msg).is_ok());
+        assert!(P384::verify(&pk, &sig, b"tampered message").is_err());
+        assert!(P384::verify(&other_pk, &sig, msg).is_err());
+
+        let bad_sig = Signature {
             r: NonZero::from_scalar(Scalar::one()).unwrap(),
             s: NonZero::from_scalar(Scalar::one()).unwrap(),
         };
-        assert!(P384::verify(&pk384, &bad_sig384, b"test message").is_err());
+        assert!(P384::verify(&pk, &bad_sig, msg).is_err());
     }
 }
