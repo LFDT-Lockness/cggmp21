@@ -73,3 +73,56 @@ fn trusted_dealer_generates_correct_shares<E: Curve>() {
         }
     }
 }
+
+#[test]
+fn rejects_duplicate_vss_preimages() {
+    use cggmp24::key_share::{DirtyKeyInfo, Validate, VssSetup};
+    use generic_ec::curves::Secp256k1 as E;
+
+    let mut rng = DevRng::new();
+    let idx = |v: u16| NonZero::from_scalar(Scalar::<E>::from(v)).unwrap();
+
+    // Linear polynomial f(x) = a0 + a1 * x for t = 2
+    let a0 = Scalar::<E>::random(&mut rng);
+    let a1 = Scalar::<E>::random(&mut rng);
+    let shared_public_key = NonZero::from_point(Point::generator() * a0).unwrap();
+
+    let make_key_info = |preimages: Vec<NonZero<Scalar<E>>>| {
+        let public_shares = preimages
+            .iter()
+            .map(|&x| NonZero::from_point(Point::generator() * (a0 + a1 * x)).unwrap())
+            .collect();
+        DirtyKeyInfo {
+            curve: Default::default(),
+            shared_public_key,
+            public_shares,
+            vss_setup: Some(VssSetup {
+                min_signers: 2,
+                I: preimages,
+            }),
+        }
+    };
+
+    // Valid distinct preimages
+    assert!(make_key_info(vec![idx(1), idx(2), idx(3), idx(4)])
+        .validate()
+        .is_ok());
+
+    // Duplicate within the first `t` entries
+    let err = make_key_info(vec![idx(1), idx(1), idx(3), idx(4)])
+        .validate()
+        .unwrap_err();
+    assert!(format!("{err:?}").contains("INotPairwiseDistinct"));
+
+    // Duplicate spanning the first `t` and remaining `n - t` entries
+    let err = make_key_info(vec![idx(1), idx(2), idx(1), idx(4)])
+        .validate()
+        .unwrap_err();
+    assert!(format!("{err:?}").contains("INotPairwiseDistinct"));
+
+    // Duplicate strictly outside the first `t` entries (issue #243)
+    let err = make_key_info(vec![idx(1), idx(2), idx(3), idx(3)])
+        .validate()
+        .unwrap_err();
+    assert!(format!("{err:?}").contains("INotPairwiseDistinct"));
+}

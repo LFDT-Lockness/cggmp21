@@ -332,6 +332,11 @@ fn validate_vss_key_info<E: Curve>(
     if vss_setup.I.len() != usize::from(n) {
         return Err(InvalidShareReason::ILen.into());
     }
+    for (idx, i) in vss_setup.I.iter().enumerate() {
+        if vss_setup.I[idx + 1..].contains(i) {
+            return Err(InvalidShareReason::INotPairwiseDistinct.into());
+        }
+    }
 
     // Now we need to check that public key shares indeed form a public key.
     // We do that in two steps:
