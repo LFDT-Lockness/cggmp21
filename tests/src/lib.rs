@@ -504,7 +504,7 @@ impl CurveParams for cggmp24::supported_curves::Secp256k1 {
 }
 
 impl CurveParams for cggmp24::supported_curves::Secp256r1 {
-    type ExVerifier = external_verifier::Noop;
+    type ExVerifier = external_verifier::P256;
     type SecurityLevel = cggmp24::security_level::SecurityLevel128;
     type Digest = sha2::Sha256;
     type DigestOutSize = <Self::Digest as digest::OutputSizeUser>::OutputSize;
@@ -513,7 +513,7 @@ impl CurveParams for cggmp24::supported_curves::Secp256r1 {
 }
 
 impl CurveParams for cggmp24::supported_curves::Secp384r1 {
-    type ExVerifier = external_verifier::Noop;
+    type ExVerifier = external_verifier::P384;
     type SecurityLevel = cggmp24::security_level::SecurityLevel192;
     type Digest = sha2::Sha384;
     type DigestOutSize = <Self::Digest as digest::OutputSizeUser>::OutputSize;
