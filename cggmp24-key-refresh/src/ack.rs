@@ -22,7 +22,7 @@ use crate::progress::Tracer;
 ///
 /// The fields are the session id, the prover index, `rid`, the ACK commitment, and every new
 /// public share, in party order.
-pub(crate) struct RefreshAck<'a, E: Curve> {
+pub struct RefreshAck<'a, E: Curve> {
     pub sid: crate::ExecutionId<'a>,
     pub prover: u16,
     pub rid: &'a [u8],

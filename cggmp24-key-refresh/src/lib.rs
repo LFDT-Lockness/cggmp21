@@ -4,6 +4,21 @@
 //! regeneration. Both non-threshold (`n`-out-of-`n`) and threshold (`t`-out-of-`n`) refresh
 //! are supported
 //!
+//! # Liveness
+//!
+//! The new share is returned only after every party has acknowledged it. A missing
+//! acknowledgement makes the call wait forever, including when a party crashes after round 3.
+//! While the call waits, this party keeps its old share, and so does every other party that
+//! is still waiting.
+//!
+//! A timeout is not a joint abort. A party that already has every acknowledgement returns the
+//! new share. A party that stops at the deadline returns an error and keeps the old share.
+//! Once it has stopped, the others can no longer finish its round, so the split stays.
+//!
+//! An error after this party has sent its own acknowledgement, including end of stream, does
+//! not mean the others kept the old share. Agreeing that every honest party stopped needs
+//! another protocol. This crate does not provide one.
+//!
 //! [CGGMP24]: https://ia.cr/2021/060
 
 #![allow(non_snake_case, clippy::too_many_arguments)]
