@@ -4,6 +4,21 @@
 //! regeneration. Both non-threshold (`n`-out-of-`n`) and threshold (`t`-out-of-`n`) refresh
 //! are supported
 //!
+//! # Liveness
+//!
+//! The new share is returned only after every party has acknowledged it. A missing
+//! acknowledgement makes the call wait forever, including when a party crashes after round 3.
+//! While the call waits, this party keeps its old share, and so does every other party that
+//! is still waiting.
+//!
+//! A timeout is not a joint abort. A party that already has every acknowledgement returns the
+//! new share. A party that stops at the deadline returns an error and keeps the old share.
+//! Once it has stopped, the others can no longer finish its round, so the split stays.
+//!
+//! An error after this party has sent its own acknowledgement, including end of stream, does
+//! not mean the others kept the old share. Agreeing that every honest party stopped needs
+//! another protocol. This crate does not provide one.
+//!
 //! [CGGMP24]: https://ia.cr/2021/060
 
 #![allow(non_snake_case, clippy::too_many_arguments)]
@@ -14,6 +29,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod ack;
 mod errors;
 /// Non-threshold (`n`-out-of-`n`) key share refresh
 pub mod non_threshold;
@@ -59,14 +75,16 @@ pub mod msg {
     /// Messages for non-threshold (`n`-out-of-`n`) key refresh
     pub mod non_threshold {
         pub use crate::non_threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast, MsgRound3Unicast,
+            Msg, MsgAck, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
+            MsgRound3ReliabilityCheck, MsgRound3Unicast,
         };
     }
 
     /// Messages for threshold (`t`-out-of-`n`) key refresh
     pub mod threshold {
         pub use crate::threshold::{
-            Msg, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast, MsgRound3Unicast,
+            Msg, MsgAck, MsgReliabilityCheck, MsgRound1, MsgRound2, MsgRound3Broadcast,
+            MsgRound3ReliabilityCheck, MsgRound3Unicast,
         };
     }
 }
@@ -143,6 +161,8 @@ enum ProtocolAborted {
     InvalidSchnorrProof(Vec<utils::AbortBlame>),
     #[displaydoc("round1 wasn't reliable")]
     Round1NotReliable(Vec<utils::AbortBlame>),
+    #[displaydoc("round3 wasn't reliable")]
+    Round3NotReliable(Vec<utils::AbortBlame>),
 }
 
 #[derive(Debug, displaydoc::Display)]
@@ -171,4 +191,5 @@ impl ProtocolAborted {
     make_factory!(invalid_masked_share, InvalidMaskedShare);
     make_factory!(invalid_schnorr_proof, InvalidSchnorrProof);
     make_factory!(round1_not_reliable, Round1NotReliable);
+    make_factory!(round3_not_reliable, Round3NotReliable);
 }

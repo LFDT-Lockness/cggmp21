@@ -38,3 +38,7 @@ default = ["std"]
 std = ["thiserror", "key-share/std", "udigest/std", "cggmp24-keygen/std"]
 hd-wallet = ["dep:hd-wallet", "key-share/hd-wallet", "cggmp24-keygen/hd-wallet"]
 state-machine = ["round-based/state-machine"]
+
+[dev-dependencies]
+generic-ec = { workspace = true, features = ["curve-secp256k1"] }
+rand_dev = { workspace = true }

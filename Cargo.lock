@@ -336,6 +336,7 @@ dependencies = [
  "hex",
  "key-share",
  "rand_core",
+ "rand_dev",
  "round-based",
  "serde",
  "serde_with",
@@ -2140,9 +2141,8 @@ dependencies = [
 
 [[package]]
 name = "round-based"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da76edf50de0a9d6911fc79261bb04cc9f3f3a375e0201799f5edf58499af341"
+version = "0.4.3"
+source = "git+https://github.com/LFDT-Lockness/round-based?rev=dd5657ed8a3adde352437ecf461340c178ae6b10#dd5657ed8a3adde352437ecf461340c178ae6b10"
 dependencies = [
  "futures-util",
  "phantom-type 0.3.1",
@@ -2154,8 +2154,7 @@ dependencies = [
 [[package]]
 name = "round-based-derive"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4afa4d5b318bcafae8a7ebc57c1cb7d4b2db7358293e34d71bfd605fd327cc13"
+source = "git+https://github.com/LFDT-Lockness/round-based?rev=dd5657ed8a3adde352437ecf461340c178ae6b10#dd5657ed8a3adde352437ecf461340c178ae6b10"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2812,7 +2811,19 @@ checksum = "2fce9567bd60a67d08a16488756721ba392f24f29006402881e43b19aac64307"
 dependencies = [
  "cfg-if",
  "pin-project-lite",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7490cfa5ec963746568740651ac6781f701c9c5ea257c58e057f3ba8cf69e8da"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
 ]
 
 [[package]]

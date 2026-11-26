@@ -2340,8 +2340,14 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
     \item[\textbf{Output.}] \
     \begin{algorithmic}[1]
-        \State Receive $(\hat\psi_{j,k})_{k \in [n]} \in \Z_q^n$ from all parties,
-               and $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \State Receive $(\hat\psi_{j,k})_{k \in [n]} \in \Z_q^n$ from all parties
+        \State Let $\hat\psi_j = (\hat\psi_{j,k})_{k \in [n]}$ for every $j \in [n]$, including $j = i$
+        \If{$\var{echo\_enabled}$} \Comment{Reliability check}
+            \State Compute $h_i = H\bigl((\Encode[echo\_round3](\sid, \hat\psi_j))_{j \in [n]}\bigr)$ and send $h_i$ to all parties
+                   \Comment{\parbox[t]{.34\linewidth}{party order, including $j = i$. Each proof message is bound to $\sid$. The private $c_{i,j}$ are not included}}
+            \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
+        \EndIf
+        \State Receive $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
                    \Statex \Comment{\parbox[t]{.3\linewidth}{$j$ is sender, $i$ is recipient}}
@@ -2360,8 +2366,38 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
                \Comment{\parbox[t]{.35\linewidth}{the $j = i$ term $x'_{i,i}$ is known locally}}
         \State Set $X^*_k = X_k + \sum_{j \in [n]} X'_{j,k}$ for every $k \in [n]$;
                let $\vec X^* = (X^*_k)_{k \in [n]}$
+    \end{algorithmic}
+
+    \item[\textbf{ACK.}] \
+    \begin{algorithmic}[1]
+        \State Compute $(A^*_i; \tau^*_i) \gets \commit{sch}()$
+        \State Set $e^*_i \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, i, \rid, A^*_i, \vec X^*)\bigr)$
+        \State Set $\psi^*_i = \prove{sch}(e^*_i; \tau^*_i, x^*_i)$
+        \State The local $(A^*_i, \psi^*_i)$ fills slot $i$
+        \State Send $(A^*_i, \psi^*_i)$ to all parties
+               \Comment{no relayed index}
+        \While{some slot in $[n]$ is empty} \Comment{an invalid or duplicate message does not abort}
+            \State Receive a message from $P_j$
+            \State A message $(A^*, \psi^*)$ with no relayed index is a candidate only for slot $j$
+            \State A message $(k, A^*, \psi^*)$ is a candidate only for slot $k$
+            \If{the candidate slot is outside $[n]$, or that slot is already filled}
+                \State Ignore the message
+            \Else
+                \State Let $k$ be the candidate slot
+                \State Set $e^*_k \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, k, \rid, A^*, \vec X^*)\bigr)$
+                \If{$\verify{sch}(X^*_k, A^*, e^*_k, \psi^*)$}
+                    \State Store $(A^*_k, \psi^*_k) = (A^*, \psi^*)$ in slot $k$
+                    \State Send $(k, A^*_k, \psi^*_k)$ to all parties
+                \Else
+                    \State Ignore the message
+                \EndIf
+            \EndIf
+        \EndWhile
         \State \Return $(\rid, x^*_i, \vec X^*)$
     \end{algorithmic}
+
+    A malformed $c_{j,i}$ makes its recipient abort before sending an ACK, so that ACK never exists.
+    Every party waits for an ACK for every index, and no honest party replaces its key share.
 
 \end{description}
 
@@ -2456,8 +2492,14 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
 
     \item[\textbf{Output.}] \
     \begin{algorithmic}[1]
-        \State Receive $(\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ from all parties,
-               and $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
+        \State Receive $(\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ from all parties
+        \State Let $\hat\psi_j = (\hat\psi_{j,k})_{k \in \{1, \ldots, t-1\}}$ for every $j \in [n]$, including $j = i$
+        \If{$\var{echo\_enabled}$} \Comment{Reliability check}
+            \State Compute $h_i = H\bigl((\Encode[echo\_round3](\sid, \hat\psi_j))_{j \in [n]}\bigr)$ and send $h_i$ to all parties
+                   \Comment{\parbox[t]{.34\linewidth}{party order, including $j = i$. Each proof message is bound to $\sid$. The private $c_{i,j}$ are not included}}
+            \State Upon receiving $h_j \in \Bit^\kappa$ from all parties, abort if $h_i \neq h_j$ for some $j \in [n]$
+        \EndIf
+        \State Receive $c_{i,j} \in \Z_q$ from each $P_j$ with $j \neq i$
         \For{$j \in [n] \setminus \{i\}$}
             \State Compute $\rho_{j,i} \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_mask](\sid, \rid, j, i, y_{j,i} \cdot Y_{i,j})\bigr)$
             \State Compute $z_{j,i} = c_{i,j} - \rho_{j,i} \bmod q$
@@ -2478,8 +2520,38 @@ Share-refresh protocol from~\cite[Figure~7]{cggmp24}, without Paillier/Pedersen 
             \State Set $X^*_k = X_k + \Phi(I(k))$
         \EndFor
         \State Let $\vec X^* = (X^*_k)_{k \in [n]}$
+    \end{algorithmic}
+
+    \item[\textbf{ACK.}] \
+    \begin{algorithmic}[1]
+        \State Compute $(A^*_i; \tau^*_i) \gets \commit{sch}()$
+        \State Set $e^*_i \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, i, \rid, A^*_i, \vec X^*)\bigr)$
+        \State Set $\psi^*_i = \prove{sch}(e^*_i; \tau^*_i, x^*_i)$
+        \State The local $(A^*_i, \psi^*_i)$ fills slot $i$
+        \State Send $(A^*_i, \psi^*_i)$ to all parties
+               \Comment{no relayed index}
+        \While{some slot in $[n]$ is empty} \Comment{an invalid or duplicate message does not abort}
+            \State Receive a message from $P_j$
+            \State A message $(A^*, \psi^*)$ with no relayed index is a candidate only for slot $j$
+            \State A message $(k, A^*, \psi^*)$ is a candidate only for slot $k$
+            \If{the candidate slot is outside $[n]$, or that slot is already filled}
+                \State Ignore the message
+            \Else
+                \State Let $k$ be the candidate slot
+                \State Set $e^*_k \in \Z_q = \hashtoscalar\bigl(\Encode[refresh\_ack](\sid, k, \rid, A^*, \vec X^*)\bigr)$
+                \If{$\verify{sch}(X^*_k, A^*, e^*_k, \psi^*)$}
+                    \State Store $(A^*_k, \psi^*_k) = (A^*, \psi^*)$ in slot $k$
+                    \State Send $(k, A^*_k, \psi^*_k)$ to all parties
+                \Else
+                    \State Ignore the message
+                \EndIf
+            \EndIf
+        \EndWhile
         \State \Return $(\rid, x^*_i, \vec X^*)$
     \end{algorithmic}
+
+    A malformed $c_{j,i}$ makes its recipient abort before sending an ACK, so that ACK never exists.
+    Every party waits for an ACK for every index, and no honest party replaces its key share.
 
 \end{description}
 
